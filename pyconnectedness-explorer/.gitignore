@@ -1,0 +1,7 @@
+pipeline/.venv/
+pipeline/__pycache__/
+pipeline/out/Demo.executed.ipynb
+app/node_modules/
+app/dist/
+app/tsconfig.tsbuildinfo
+.DS_Store

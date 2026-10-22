@@ -1,0 +1,3 @@
+[submodule "pyconnectedness-explorer/vendor/PyConnectedness"]
+	path = pyconnectedness-explorer/vendor/PyConnectedness
+	url = https://github.com/zstoi/PyConnectedness.git
