@@ -204,16 +204,17 @@ export class TimelineChart {
 
     this.title
       .attr("x", m.left)
-      .attr("y", 24)
+      .attr("y", 26)
       .attr("text-anchor", "start")
       .attr("font-family", FONTS.display)
       .attr("font-size", REDESIGN.titlePx)
-      .attr("font-weight", "600")
+      .attr("font-weight", "800")
+      .attr("letter-spacing", "-0.01em")
       .attr("fill", t.primary)
       .text(d.title);
     this.subtitle
       .attr("x", m.left)
-      .attr("y", 42)
+      .attr("y", 44)
       .attr("text-anchor", "start")
       .attr("font-family", FONTS.body)
       .attr("font-size", REDESIGN.subtitlePx)
@@ -252,6 +253,11 @@ export class TimelineChart {
 
     // gradient area fill under the line -- per the reference charts (Brink's "Monthly Trend",
     // Pillow's duration curves): a soft wash fading to nothing at the baseline, not a flat tint.
+    // tie the wash to the same trend colour as the hero number (above/below full-sample mean)
+    // instead of flat ink -- a near-black fill over a near-white card reads as a dirty smear,
+    // not a wash
+    const heroValForFill = d.total[Math.min(d.selectedIndex, d.total.length - 1)];
+    const areaColor = heroValForFill >= d.fullSampleTotal ? t.send : t.recv;
     let defs = this.svg.select<SVGDefsElement>("defs");
     if (defs.empty()) defs = this.svg.append("defs");
     const gradId = "tl-area-grad";
@@ -261,8 +267,8 @@ export class TimelineChart {
     grad
       .selectAll("stop")
       .data([
-        { o: 0, c: t.primary, a: 0.22 },
-        { o: 1, c: t.primary, a: 0 },
+        { o: 0, c: areaColor, a: 0.14 },
+        { o: 1, c: areaColor, a: 0 },
       ])
       .join("stop")
       .attr("offset", (s) => `${s.o * 100}%`)
@@ -281,43 +287,73 @@ export class TimelineChart {
 
     // notable weeks: named episodes + the two largest week-over-week jumps + the series
     // extremes. A soft full-height band (the style guide's own crisis recipe: "a soft band,
-    // not a hard line") plus a small rounded badge chip for the label, matching the badge
-    // language used elsewhere in this pass, rather than the old triple-layered pulse stems.
+    // not a hard line") plus a small rounded badge chip for the label.
+    //
+    // Badges used to float at each point's own y, which let close-together events (e.g. "peak"
+    // landing right next to "euro-area crisis") draw on top of each other and eat the label
+    // underneath. Badges now live in stacked lanes along a fixed baseline near the top of the
+    // chart, with a thin leader line down to the actual point -- greedy interval placement
+    // (sorted left to right, first lane with room wins) guarantees no two ever overlap.
     this.gPulses.selectAll("*").remove();
     const notable = notableIndices(d);
-    for (const n of notable) {
-      const px = this.x(dates[n.index]);
-      const py = this.y(d.total[n.index]);
-      const color = n.kind === "low" ? t.recv : t.send;
+    const points = notable.map((n) => ({
+      n,
+      px: this.x(dates[n.index]),
+      py: this.y(d.total[n.index]),
+      color: n.kind === "low" ? t.recv : t.send,
+    }));
 
+    for (const p of points) {
       this.gPulses
         .append("rect")
-        .attr("x", px - 5).attr("width", 10).attr("y", 0).attr("height", ph)
-        .attr("rx", 5).attr("fill", color).attr("opacity", 0.1);
+        .attr("x", p.px - 5).attr("width", 10).attr("y", 0).attr("height", ph)
+        .attr("rx", 5).attr("fill", p.color).attr("opacity", 0.1);
       this.gPulses
         .append("circle")
-        .attr("cx", px).attr("cy", py).attr("r", 4)
-        .attr("fill", t.surface).attr("stroke", color).attr("stroke-width", 2);
+        .attr("cx", p.px).attr("cy", p.py).attr("r", 4)
+        .attr("fill", t.surface).attr("stroke", p.color).attr("stroke-width", 2);
+    }
 
-      if (n.label) {
-        const badge = this.gPulses.append("g").attr("transform", `translate(${px},${py - 26})`);
+    const BASE_Y = 16;
+    const ROW_H = 22;
+    const GAP = 8;
+    const labeled = points
+      .filter((p) => p.n.label)
+      .map((p) => {
         const padX = 7;
-        const textW = n.label.length * 5.6 + padX * 2;
-        badge
-          .append("rect")
-          .attr("x", -textW / 2).attr("y", -11).attr("width", textW).attr("height", 18)
-          .attr("rx", 9).attr("fill", t.surfaceRaised).attr("stroke", t.border).attr("stroke-width", 1);
-        badge
-          .append("text")
-          .attr("text-anchor", "middle")
-          .attr("y", 2)
-          .attr("font-family", FONTS.body)
-          .attr("font-size", 9.5)
-          .attr("font-weight", "600")
-          .attr("letter-spacing", "0.02em")
-          .attr("fill", t.secondary)
-          .text(n.label);
-      }
+        const halfW = (p.n.label!.length * 5.6 + padX * 2) / 2;
+        const cx = Math.min(pw - halfW - 2, Math.max(halfW + 2, p.px));
+        return { ...p, cx, halfW };
+      })
+      .sort((a, b) => a.cx - b.cx);
+
+    const laneRightEdge: number[] = [];
+    for (const b of labeled) {
+      let row = laneRightEdge.findIndex((edge) => edge < b.cx - b.halfW - GAP);
+      if (row === -1) { row = laneRightEdge.length; laneRightEdge.push(-Infinity); }
+      laneRightEdge[row] = b.cx + b.halfW;
+
+      const by = BASE_Y + row * ROW_H;
+      const leaderBottom = Math.max(by + 9, b.py - 7); // never draw past the dot
+      this.gPulses
+        .append("line")
+        .attr("x1", b.cx).attr("y1", by + 9).attr("x2", b.px).attr("y2", leaderBottom)
+        .attr("stroke", t.axis).attr("stroke-width", 1).attr("stroke-dasharray", "1.5,2");
+      const badge = this.gPulses.append("g").attr("transform", `translate(${b.cx},${by})`);
+      badge
+        .append("rect")
+        .attr("x", -b.halfW).attr("y", -9).attr("width", b.halfW * 2).attr("height", 18)
+        .attr("rx", 9).attr("fill", t.surfaceRaised).attr("stroke", t.border).attr("stroke-width", 1);
+      badge
+        .append("text")
+        .attr("text-anchor", "middle")
+        .attr("y", 4)
+        .attr("font-family", FONTS.body)
+        .attr("font-size", 9.5)
+        .attr("font-weight", "600")
+        .attr("letter-spacing", "0.02em")
+        .attr("fill", t.secondary)
+        .text(b.n.label!);
     }
 
     const cx = this.x(dates[Math.min(d.selectedIndex, dates.length - 1)] ?? dates[0]);
@@ -344,7 +380,7 @@ export class TimelineChart {
     this.hero.selectAll("*").remove();
     const heroVal = d.total[Math.min(d.selectedIndex, d.total.length - 1)];
     const heroG = this.hero.append("g").attr("transform", `translate(${W - m.right + 4},30)`);
-    heroG.append("text").attr("text-anchor", "end").attr("font-family", FONTS.data).attr("font-size", REDESIGN.heroPx).attr("font-weight", "600").attr("fill", heroVal >= d.fullSampleTotal ? t.send : t.recv).text(`${heroVal.toFixed(1)}%`);
+    heroG.append("text").attr("text-anchor", "end").attr("font-family", FONTS.body).attr("font-size", REDESIGN.heroPx).attr("font-weight", "800").attr("letter-spacing", "-0.02em").attr("fill", heroVal >= d.fullSampleTotal ? t.send : t.recv).text(`${heroVal.toFixed(1)}%`);
     heroG.append("text").attr("y", 16).attr("text-anchor", "end").attr("font-family", FONTS.body).attr("font-size", 10.5).attr("fill", t.muted).text(d.measureLabel ? `${d.measureLabel} spillover, this week` : "this week");
 
     this.overlay.attr("width", pw).attr("height", ph)

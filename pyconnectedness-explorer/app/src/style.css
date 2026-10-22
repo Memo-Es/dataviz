@@ -96,8 +96,9 @@ html, body {
 
 .topbar h1 {
   font-family: var(--f-display);
-  font-size: 22px;
-  font-weight: 600;
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: -0.015em;
   margin: 0;
 }
 
@@ -198,11 +199,11 @@ select, .theme-toggle {
 
 .panel h2 {
   font-family: var(--f-body);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
+  letter-spacing: 0.03em;
+  color: var(--secondary);
   margin: 0 0 12px;
 }
 

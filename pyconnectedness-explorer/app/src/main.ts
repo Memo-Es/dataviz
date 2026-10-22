@@ -247,8 +247,10 @@ async function main() {
       measureLabel: "volatility",
       onScrub: (idx) => store.set({ t: reindexFor("volatility", idx, measure) }),
     });
-    el.timelineReturnsHost.style.outline = measure === "returns" ? "2px solid var(--send)" : "none";
-    el.timelineVolHost.style.outline = measure === "volatility" ? "2px solid var(--send)" : "none";
+    // which measure is "driving" the rest of the view -- a thin accent rule under the card
+    // instead of a full-perimeter coloured box, which reads as an alert/error state at this size
+    el.timelineReturnsHost.style.boxShadow = measure === "returns" ? "inset 0 -3px 0 var(--send)" : "none";
+    el.timelineVolHost.style.boxShadow = measure === "volatility" ? "inset 0 -3px 0 var(--send)" : "none";
 
     network.render({
       names: data.meta.names,

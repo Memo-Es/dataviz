@@ -105,7 +105,7 @@ export class HeatmapChart {
     const cell = plotSize / k;
     this.gPlot.attr("transform", `translate(${m.left},${m.top})`);
 
-    this.title.attr("font-family", FONTS.display).attr("font-size", REDESIGN.titlePx).attr("font-weight", "600").attr("fill", t.primary).text(d.title);
+    this.title.attr("font-family", FONTS.display).attr("font-size", REDESIGN.titlePx).attr("font-weight", "800").attr("letter-spacing", "-0.01em").attr("fill", t.primary).text(d.title);
 
     let maxAbs = 0;
     for (const row of d.matrix) for (const v of row) maxAbs = Math.max(maxAbs, Math.abs(v));

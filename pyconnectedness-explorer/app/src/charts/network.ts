@@ -270,7 +270,8 @@ export class NetworkChart {
       .attr("y", 34)
       .attr("font-family", FONTS.display)
       .attr("font-size", REDESIGN.titlePx)
-      .attr("font-weight", "600")
+      .attr("font-weight", "800")
+      .attr("letter-spacing", "-0.01em")
       .attr("fill", t.primary)
       .text(d.title);
     this.subtitle

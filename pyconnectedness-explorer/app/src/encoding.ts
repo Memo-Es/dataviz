@@ -54,7 +54,10 @@ export const BASELINE = {
 } as const;
 
 export const FONTS = {
-  display: "'Source Serif 4', Georgia, serif", // titles only -- never numbers, per the skill
+  // Source Serif 4 read as an academic-paper byline next to the reference apps (Pillow, Fitbit,
+  // Brink, Commons) that set this pass's direction -- none of them touch a serif anywhere. Bold
+  // IBM Plex Sans carries the same "titles, never numbers" job without that editorial tell.
+  display: "'IBM Plex Sans', system-ui, sans-serif",
   body: "'IBM Plex Sans', system-ui, sans-serif",
   data: "'B612 Mono', 'SFMono-Regular', monospace", // numbers, ticks, tabular figures -- client's own pick
 } as const;
@@ -132,12 +135,12 @@ export const REDESIGN = {
   edgeAlpha: 0.55,
   edgeArrowSizePx: 9,
   edgeCurveRad: 0.1,
-  titlePx: 16,
+  titlePx: 19,
   subtitlePx: 12.5,
   labelPx: 12,
   tickLabelPx: 11,
   networkLabelPx: 11.5,
-  heroPx: 30,
+  heroPx: 34,
   /** Diverging scale from the validated pair, two hues + neutral midpoint (not d3's RdBu,
    * which uses different, unvalidated hex values than the rest of this system). */
   divergingScale(maxAbs: number, t: RedesignTokens) {
