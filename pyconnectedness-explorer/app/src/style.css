@@ -1,48 +1,58 @@
+/* Mirrors app/src/encoding.ts REDESIGN_LIGHT/REDESIGN_DARK -- keep both in sync by hand. */
 :root {
-  --bg: #f4f5f3;
-  --panel: #ffffff;
-  --fg: #1b2226;
-  --muted: #5f6b70;
-  --line: #d9dedd;
-  --grid: #e8ecea;
-  --send: #c2462e;
-  --recv: #25668f;
-  --mid: #eef0ee;
-  --band: #e3e7e4;
-  --edge: #3d474c;
+  --bg: #f9f9f7;
+  --panel: #fcfcfb;
+  --fg: #0b0b0b;
+  --secondary: #52514e;
+  --muted: #898781;
+  --line: rgba(11, 11, 11, 0.1);
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --send: #e34948;
+  --recv: #2a78d6;
+  --mid: #f0efec;
+  --crisis: #d03b3b;
+  --band: #eceae4;
+  --edge: #52514e;
   --f-display: "Source Serif 4", Georgia, serif;
   --f-body: "IBM Plex Sans", system-ui, sans-serif;
-  --f-data: "IBM Plex Mono", "SFMono-Regular", monospace;
+  --f-data: "B612 Mono", "SFMono-Regular", monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #111517;
-    --panel: #181d20;
-    --fg: #e6eae9;
-    --muted: #97a3a6;
-    --line: #2c3438;
-    --grid: #232a2d;
-    --send: #e26a4f;
-    --recv: #5aa2cf;
-    --mid: #262d30;
-    --band: #20272a;
-    --edge: #b9c3c6;
+    --bg: #0d0d0d;
+    --panel: #1a1a19;
+    --fg: #f0efec;
+    --secondary: #c3c2b7;
+    --muted: #898781;
+    --line: rgba(255, 255, 255, 0.1);
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --send: #e66767;
+    --recv: #3987e5;
+    --mid: #383835;
+    --crisis: #d03b3b;
+    --band: #201f1c;
+    --edge: #c3c2b7;
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #111517;
-  --panel: #181d20;
-  --fg: #e6eae9;
-  --muted: #97a3a6;
-  --line: #2c3438;
-  --grid: #232a2d;
-  --send: #e26a4f;
-  --recv: #5aa2cf;
-  --mid: #262d30;
-  --band: #20272a;
-  --edge: #b9c3c6;
+  --bg: #0d0d0d;
+  --panel: #1a1a19;
+  --fg: #f0efec;
+  --secondary: #c3c2b7;
+  --muted: #898781;
+  --line: rgba(255, 255, 255, 0.1);
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --send: #e66767;
+  --recv: #3987e5;
+  --mid: #383835;
+  --crisis: #d03b3b;
+  --band: #201f1c;
+  --edge: #c3c2b7;
 }
 
 * { box-sizing: border-box; }

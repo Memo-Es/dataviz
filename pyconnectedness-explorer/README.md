@@ -63,6 +63,14 @@ npm run build   # static build, deployed by .github/workflows/pages.yml
 
 `public/data/` is committed, so neither the app nor CI ever calls Yahoo.
 
+## Two looks, one toggle
+
+The app opens in the redesign; the top-right toggle switches to the faithful baseline (a pixel
+match of the library's own matplotlib defaults) and back. See `CONTEXT.md`'s decision log for
+why both exist. `styleguide/` has the matplotlib-portable version of the redesign's colour and
+type system -- `styleguide/STYLE_GUIDE.md` is the actual deliverable for the library itself, not
+just the web prototype.
+
 ## Layout
 
 See `SPEC.md` section 2. Short version: `pipeline/` is what turns the notebook's output into

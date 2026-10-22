@@ -11,7 +11,7 @@ import {
   type StaticWindow,
 } from "./data";
 import { Store, prefersDark, type ExplorerState } from "./state";
-import { REGION_OF, REGION_ORDER } from "./encoding";
+import { REGION_OF, REGION_ORDER, REDESIGN_LIGHT, REDESIGN_DARK, type RedesignTokens } from "./encoding";
 import { NetworkChart } from "./charts/network";
 import { TimelineChart } from "./charts/timeline";
 import { HeatmapChart } from "./charts/heatmap";
@@ -33,6 +33,10 @@ app.innerHTML = `
       <p class="subtitle">How shocks travel between 20 stock markets &mdash; from PyConnectedness's own Demo notebook output.</p>
     </div>
     <div class="controls">
+      <div class="pill-group" id="style-group">
+        <button data-style="redesign" aria-pressed="true">Redesign</button>
+        <button data-style="baseline" aria-pressed="false">Faithful baseline</button>
+      </div>
       <div class="pill-group" id="measure-group">
         <button data-measure="returns" aria-pressed="true">Returns</button>
         <button data-measure="volatility" aria-pressed="false">Volatility</button>
@@ -45,6 +49,7 @@ app.innerHTML = `
     <strong>Design prototype for the coaching</strong> &mdash; not the stage 2 browser interface. See CONTEXT.md.
   </div>
   <div class="banner" id="synthetic-banner" style="display:none"></div>
+  <p class="legend-note" id="style-note"></p>
 
   <div class="panel">
     <h2>Total connectedness over time</h2>
@@ -92,6 +97,8 @@ app.innerHTML = `
 `;
 
 const el = {
+  styleGroup: app.querySelector<HTMLDivElement>("#style-group")!,
+  styleNote: app.querySelector<HTMLParagraphElement>("#style-note")!,
   measureGroup: app.querySelector<HTMLDivElement>("#measure-group")!,
   themeToggle: app.querySelector<HTMLButtonElement>("#theme-toggle")!,
   syntheticBanner: app.querySelector<HTMLDivElement>("#synthetic-banner")!,
@@ -131,7 +138,12 @@ async function main() {
     selection: { market: null, pair: null },
     playing: false,
     theme: prefersDark() ? "dark" : "light",
+    chartStyle: "redesign",
   });
+
+  function tokens(): RedesignTokens {
+    return store.get().theme === "dark" ? REDESIGN_DARK : REDESIGN_LIGHT;
+  }
 
   applyTheme(store.get().theme);
 
@@ -177,10 +189,20 @@ async function main() {
     const { t, measure } = s;
     const dyn = data.meta.dynamic[measure];
     const date = dyn.dates[t];
+    const isRedesign = s.chartStyle === "redesign";
+    const tok = tokens();
 
     el.weekLabel.textContent = `Week of ${date} (${t + 1} / ${dyn.dates.length})`;
     el.play.textContent = s.playing ? "⏸" : "▶";
     el.play.title = s.playing ? "Pause" : "Play";
+
+    // style pills
+    el.styleGroup.querySelectorAll("button").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-style") === s.chartStyle));
+    });
+    el.styleNote.textContent = isRedesign
+      ? "Redesign: a validated colour system (CVD-checked), region-grouped network, crisis markers and hover detail -- see CONTEXT.md's decision log and the matplotlib style guide in pipeline/styleguide/."
+      : "Faithful baseline: a pixel match of the library's own matplotlib defaults, deliberately unstyled (see CONTEXT.md's style analysis).";
 
     // measure pills
     el.measureGroup.querySelectorAll("button").forEach((b) => {
@@ -198,12 +220,15 @@ async function main() {
       dates: dynReturns.dates,
       total: dynReturns.total,
       fullSampleTotal: data.meta.static.returns.full.total,
-      title: "Rolling return spillover index (200-week window, VAR(2), H=10)",
-      ylabel: "Total spillover, %",
+      title: isRedesign ? "When markets became fragile" : "Rolling return spillover index (200-week window, VAR(2), H=10)",
+      ylabel: isRedesign ? "Total return spillover, 200-week window, VAR(2), H=10" : "Total spillover, %",
       episodes: data.meta.episodes,
       periods,
       selectedIndex: measure === "returns" ? t : dateIndexFor("returns", date),
       showXAxis: false,
+      style: s.chartStyle,
+      tokens: tok,
+      measureLabel: "return",
       onScrub: (idx) => store.set({ t: reindexFor("returns", idx, measure) }),
     });
     const dynVol = data.meta.dynamic.volatility;
@@ -211,12 +236,15 @@ async function main() {
       dates: dynVol.dates,
       total: dynVol.total,
       fullSampleTotal: data.meta.static.volatility.full.total,
-      title: "Rolling volatility spillover index",
-      ylabel: "Total spillover, %",
+      title: isRedesign ? "Same story, volatility spillover" : "Rolling volatility spillover index",
+      ylabel: isRedesign ? "Total volatility spillover" : "Total spillover, %",
       episodes: data.meta.episodes,
       periods,
       selectedIndex: measure === "volatility" ? t : dateIndexFor("volatility", date),
       showXAxis: true,
+      style: s.chartStyle,
+      tokens: tok,
+      measureLabel: "volatility",
       onScrub: (idx) => store.set({ t: reindexFor("volatility", idx, measure) }),
     });
     el.timelineReturnsHost.style.outline = measure === "returns" ? "2px solid var(--send)" : "none";
@@ -229,17 +257,24 @@ async function main() {
       threshold: full.threshold_p90,
       globalMaxAbsNet: measure === "returns" ? globalMaxNetReturns : globalMaxNetVol,
       globalMaxAbsPairwise: measure === "returns" ? globalMaxPairReturns : globalMaxPairVol,
-      title: `Net pairwise ${measure} connectedness, strongest 10% of links`,
+      title: isRedesign ? "Who sends risk to whom" : `Net pairwise ${measure} connectedness, strongest 10% of links`,
+      weekLabel: isRedesign ? `Week of ${date} · strongest 10% of links` : undefined,
+      style: s.chartStyle,
+      tokens: tok,
       onSelectMarket: (name) => store.set({ selection: { market: name, pair: null } }),
       onSelectPair: (pair) => store.set({ selection: { market: null, pair } }),
       selectedMarket: s.selection.market,
       selectedPair: s.selection.pair,
     });
-    el.networkNote.textContent = `Threshold: ${full.threshold_p90.toFixed(2)}% (90th percentile of |net pairwise|, this week's static full-sample rule). Node colour follows net at the selected week; size and edge width use a fixed scale across every week so the animation is comparable frame to frame.`;
+    el.networkNote.textContent = isRedesign
+      ? "Grouped by region so position means something; size and colour use a fixed scale across every week, so the animation is comparable frame to frame."
+      : `Threshold: ${full.threshold_p90.toFixed(2)}% (90th percentile of |net pairwise|, this week's static full-sample rule). Node colour follows net at the selected week; size and edge width use a fixed scale across every week so the animation is comparable frame to frame.`;
 
     ranking.render({
       names: data.meta.names,
       net,
+      style: s.chartStyle,
+      tokens: tok,
       selectedMarket: s.selection.market,
       onSelect: (name) => store.set({ selection: { market: name, pair: null } }),
     });
@@ -262,11 +297,21 @@ async function main() {
       names: order,
       matrix: reordered,
       title: hmTitle,
+      style: s.chartStyle,
+      tokens: tok,
       selectedPair: s.selection.pair,
       onSelectCell: (row, col) => store.set({ selection: { market: null, pair: [row, col] } }),
     });
 
-    renderDetail(el.detailHost, { data, measure, t, market: s.selection.market, pair: s.selection.pair });
+    renderDetail(el.detailHost, {
+      data,
+      measure,
+      t,
+      market: s.selection.market,
+      pair: s.selection.pair,
+      style: s.chartStyle,
+      tokens: tok,
+    });
 
     el.footnote.innerHTML = footnoteHtml(data);
   }
@@ -287,6 +332,12 @@ async function main() {
   render();
 
   // --- interactions ---
+  el.styleGroup.addEventListener("click", (ev) => {
+    const btn = (ev.target as HTMLElement).closest("button");
+    if (!btn) return;
+    store.set({ chartStyle: btn.getAttribute("data-style") as ExplorerState["chartStyle"] });
+  });
+
   el.measureGroup.addEventListener("click", (ev) => {
     const btn = (ev.target as HTMLElement).closest("button");
     if (!btn) return;

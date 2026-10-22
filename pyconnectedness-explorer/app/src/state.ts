@@ -5,6 +5,8 @@ export interface Selection {
   pair: [string, string] | null; // [sender, receiver]
 }
 
+export type ChartStyle = "baseline" | "redesign";
+
 export interface ExplorerState {
   t: number; // index into dynamic.<measure>.dates
   measure: Measure;
@@ -14,6 +16,7 @@ export interface ExplorerState {
   selection: Selection;
   playing: boolean;
   theme: "light" | "dark";
+  chartStyle: ChartStyle; // faithful matplotlib baseline, or the redesign -- see CONTEXT.md
 }
 
 type Listener = (s: ExplorerState) => void;

@@ -163,6 +163,9 @@ the app shell around the charts — sidebar, panels, footnote, dark mode — non
 questionnaire describes and none of which touches "numbers must come from the library,
 unchanged." I annotated SPEC.md in place so it points here instead of just quietly diverging.
 
-Didn't build (c), a toggle between both styles. It was on the table but nobody asked for it.
-Worth noting though: `encoding.ts` keeps the baseline and §6 palettes as separate exports, so a
-toggle wouldn't need either one re-derived if the team wants it later.
+Later asked for (c) directly: a toggle between the faithful baseline and an actual redesign
+(not the untouched §6 tokens -- a new validated system, built with the `dataviz` skill's
+method). That's now in the app (top right) and in `styleguide/` as a matplotlib-portable
+version of the same colour/type system, documented in `styleguide/STYLE_GUIDE.md`. The web
+redesign's network layout and heatmap cell style go further than the matplotlib guide does, on
+purpose -- see that file's "What's not here" section for why.

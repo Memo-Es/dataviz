@@ -2,9 +2,10 @@
  * Detail panel (SPEC.md section 6, view 5). No Figma reference; app-shell styling.
  */
 import * as d3 from "d3";
-import { BASELINE, REGION_OF } from "../encoding";
+import { BASELINE, REGION_OF, type RedesignTokens } from "../encoding";
 import type { ExplorerData, Measure } from "../data";
 import { matrixAt } from "../data";
+import type { ChartStyle } from "../state";
 
 export interface DetailProps {
   data: ExplorerData;
@@ -12,9 +13,19 @@ export interface DetailProps {
   t: number;
   market: string | null;
   pair: [string, string] | null;
+  style: ChartStyle;
+  tokens: RedesignTokens;
 }
 
-function sparkline(host: HTMLElement, series: number[], tIndex: number, width = 260, height = 44) {
+function sparkline(
+  host: HTMLElement,
+  series: number[],
+  tIndex: number,
+  sendColor: string,
+  recvColor: string,
+  width = 260,
+  height = 44
+) {
   host.innerHTML = "";
   const svg = d3.select(host).append("svg").attr("viewBox", `0 0 ${width} ${height}`).attr("width", "100%");
   const x = d3.scaleLinear().domain([0, series.length - 1]).range([2, width - 2]);
@@ -31,7 +42,7 @@ function sparkline(host: HTMLElement, series: number[], tIndex: number, width = 
     .attr("cx", x(tIndex))
     .attr("cy", y(series[tIndex] ?? 0))
     .attr("r", 3)
-    .attr("fill", (series[tIndex] ?? 0) >= 0 ? BASELINE.sendColor : BASELINE.recvColor);
+    .attr("fill", (series[tIndex] ?? 0) >= 0 ? sendColor : recvColor);
 }
 
 function row(label: string, value: string): HTMLElement {
@@ -96,7 +107,9 @@ export function renderDetail(host: HTMLElement, p: DetailProps) {
     const spark = document.createElement("div");
     spark.style.margin = "8px 0";
     host.appendChild(spark);
-    sparkline(spark, net, t);
+    const sendColor = p.style === "redesign" ? p.tokens.send : BASELINE.sendColor;
+    const recvColor = p.style === "redesign" ? p.tokens.recv : BASELINE.recvColor;
+    sparkline(spark, net, t, sendColor, recvColor);
 
     const mat = matrixAt(data, measure, t);
     const outLinks = names
