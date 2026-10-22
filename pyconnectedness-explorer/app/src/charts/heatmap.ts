@@ -177,7 +177,7 @@ export class HeatmapChart {
       .attr("width", trackW)
       .attr("height", cell * 0.88)
       .attr("rx", trackW / 2)
-      .attr("fill", t.gridline);
+      .attr("fill", t.surfaceRaised);
 
     const capSel = this.gCells.selectAll<SVGRectElement, Cell>("rect.cap").data(cells, (c) => `c${c.i}-${c.j}`);
     capSel.exit().remove();

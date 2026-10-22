@@ -62,6 +62,7 @@ export const FONTS = {
 export interface RedesignTokens {
   page: string;
   surface: string;
+  surfaceRaised: string;
   primary: string;
   secondary: string;
   muted: string;
@@ -73,41 +74,54 @@ export interface RedesignTokens {
   mid: string;
   crisis: string;
   band: string;
+  cardShadow: string;
+  cardHighlight: string;
 }
 
 // Validated chart chrome + diverging pair. Light/dark are both "selected" steps, not an
 // automatic flip -- see the skill's palette.md.
+// send/recv/mid/crisis/primary/secondary/muted/gridline/axis/surface are the validated values
+// documented verbatim in styleguide/STYLE_GUIDE.md's palette table -- don't drift them here
+// without re-running the table + the matplotlib guide together. page/surfaceRaised/cardShadow/
+// cardHighlight are web-shell-only (the elevated-card chrome CONTEXT.md's decision log scopes
+// to "the app shell around the charts", same as border already was).
 export const REDESIGN_LIGHT: RedesignTokens = {
   page: "#f9f9f7",
   surface: "#fcfcfb",
+  surfaceRaised: "#ffffff", // nested rows (ranking, legend chips) read one step "closer"
   primary: "#0b0b0b",
   secondary: "#52514e",
   muted: "#898781",
   gridline: "#e1e0d9",
   axis: "#c3c2b7",
-  border: "rgba(11,11,11,0.10)",
+  border: "rgba(11,11,11,0.08)",
   send: "#e34948", // net transmitter -- diverging red
   recv: "#2a78d6", // net receiver -- diverging blue
   mid: "#f0efec", // diverging midpoint (near zero)
   crisis: "#d03b3b", // status "critical" -- distinct from `send`, reserved for crisis emphasis
   band: "#eceae4", // neutral period shading
+  cardShadow: "0 1px 2px rgba(11,11,11,0.04), 0 10px 28px rgba(11,11,11,0.07)",
+  cardHighlight: "rgba(255,255,255,0.6)",
 } as const;
 
 export const REDESIGN_DARK: RedesignTokens = {
   page: "#0d0d0d",
   surface: "#1a1a19",
+  surfaceRaised: "#242320", // Pillow-style elevated card: nested elements read lighter still
   primary: "#f0efec",
   secondary: "#c3c2b7",
   muted: "#898781",
   gridline: "#2c2c2a",
   axis: "#383835",
-  border: "rgba(255,255,255,0.10)",
+  border: "rgba(255,255,255,0.08)",
   send: "#e66767",
   recv: "#3987e5",
   mid: "#383835",
   crisis: "#d03b3b",
   band: "#201f1c",
-};
+  cardShadow: "0 1px 0 rgba(255,255,255,0.05) inset, 0 16px 40px rgba(0,0,0,0.55)",
+  cardHighlight: "rgba(255,255,255,0.07)",
+} as const;
 
 export const REDESIGN = {
   nodeAlpha: 0.9,

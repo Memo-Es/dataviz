@@ -104,6 +104,7 @@ export class NetworkChart {
   private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
   private gEdges: d3.Selection<SVGGElement, unknown, null, undefined>;
   private gRegionLabels: d3.Selection<SVGGElement, unknown, null, undefined>;
+  private gGlow: d3.Selection<SVGGElement, unknown, null, undefined>;
   private gNodes: d3.Selection<SVGGElement, unknown, null, undefined>;
   private gLabels: d3.Selection<SVGGElement, unknown, null, undefined>;
   private gLegend: d3.Selection<SVGGElement, unknown, null, undefined>;
@@ -131,11 +132,21 @@ export class NetworkChart {
       .append("path")
       .attr("d", "M 0 0 L 10 5 L 0 10 z");
 
+    // soft halo behind each node, per the dark-elevated references (Pillow's glowing rings,
+    // Brink/Commons' soft ring charts) -- a blurred, larger, low-opacity copy of the node itself
+    defs
+      .append("filter")
+      .attr("id", "node-glow")
+      .attr("x", "-150%").attr("y", "-150%").attr("width", "400%").attr("height", "400%")
+      .append("feGaussianBlur")
+      .attr("stdDeviation", 9);
+
     this.title = this.svg.append("text").attr("x", SIZE / 2).attr("text-anchor", "middle") as any;
     this.subtitle = this.svg.append("text").attr("x", SIZE / 2).attr("text-anchor", "middle") as any;
 
     this.gEdges = this.svg.append("g").attr("class", "edges") as any;
     this.gRegionLabels = this.svg.append("g").attr("class", "region-labels") as any;
+    this.gGlow = this.svg.append("g").attr("class", "glow").style("filter", "url(#node-glow)") as any;
     this.gNodes = this.svg.append("g").attr("class", "nodes") as any;
     this.gLabels = this.svg.append("g").attr("class", "labels") as any;
     this.gLegend = this.svg.append("g").attr("class", "legend") as any;
@@ -149,6 +160,7 @@ export class NetworkChart {
   private clearChrome() {
     this.gLegend.selectAll("*").remove();
     this.gRegionLabels.selectAll("*").remove();
+    this.gGlow.selectAll("*").remove();
   }
 
   // ---------------------------------------------------------------- baseline ----
@@ -274,19 +286,26 @@ export class NetworkChart {
     const ch = (gy1 - gy0) / GRID_ROWS;
     const pos = gridLayout(names, gx0, gy0, cw, ch);
 
-    // one label per zone, above its top-left corner
+    // one badge chip per zone, above its top-left corner -- per the reference apps' category
+    // badges (Fitbit's "FOOD & DRINK", Commons' category rows): a rounded pill, not bare text.
     for (const zone of ZONES) {
-      this.gRegionLabels
-        .append("text")
-        .attr("x", gx0 + zone.c0 * cw)
-        .attr("y", gy0 + zone.r0 * ch - 10)
-        .attr("text-anchor", "start")
+      const label = zone.region.toUpperCase();
+      const w = label.length * 6.1 + 20;
+      const g = this.gRegionLabels
+        .append("g")
+        .attr("transform", `translate(${gx0 + zone.c0 * cw},${gy0 + zone.r0 * ch - 28})`);
+      g.append("rect")
+        .attr("width", w).attr("height", 20).attr("rx", 10)
+        .attr("fill", t.surfaceRaised).attr("stroke", t.border).attr("stroke-width", 1);
+      g.append("text")
+        .attr("x", w / 2).attr("y", 13.5)
+        .attr("text-anchor", "middle")
         .attr("font-family", FONTS.body)
-        .attr("font-size", 11)
+        .attr("font-size", 10)
         .attr("font-weight", "600")
-        .attr("letter-spacing", "0.04em")
-        .attr("fill", t.muted)
-        .text(zone.region.toUpperCase());
+        .attr("letter-spacing", "0.05em")
+        .attr("fill", t.secondary)
+        .text(label);
     }
 
     const maxAbsNet = d.globalMaxAbsNet || 1e-9;
@@ -329,6 +348,18 @@ export class NetworkChart {
         ]);
       })
       .on("mouseleave", () => hideTooltip());
+
+    const glowSel = this.gGlow.selectAll<SVGCircleElement, number>("circle").data(d3.range(k));
+    glowSel.exit().remove();
+    glowSel
+      .enter()
+      .append("circle")
+      .merge(glowSel as any)
+      .attr("cx", (i) => pos[i].x)
+      .attr("cy", (i) => pos[i].y)
+      .attr("r", (i) => radii[i] * 1.6)
+      .attr("fill", (i) => (net[i] >= 0 ? t.send : t.recv))
+      .attr("opacity", (i) => (!d.selectedMarket || names[i] === d.selectedMarket ? 0.55 : 0.18));
 
     const nodeSel = this.gNodes.selectAll<SVGCircleElement, number>("circle").data(d3.range(k));
     nodeSel.exit().remove();

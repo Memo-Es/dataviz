@@ -43,6 +43,7 @@ export class TimelineChart {
   private gBands: d3.Selection<SVGGElement, unknown, null, undefined>;
   private gGridX: d3.Selection<SVGGElement, unknown, null, undefined>;
   private gGridY: d3.Selection<SVGGElement, unknown, null, undefined>;
+  private area: d3.Selection<SVGPathElement, unknown, null, undefined>;
   private path: d3.Selection<SVGPathElement, unknown, null, undefined>;
   private meanLine: d3.Selection<SVGLineElement, unknown, null, undefined>;
   private cursor: d3.Selection<SVGLineElement, unknown, null, undefined>;
@@ -81,6 +82,7 @@ export class TimelineChart {
     this.gPlot.append("rect").attr("class", "plotbg").lower();
 
     this.meanLine = this.gPlot.append("line").attr("stroke-dasharray", "6,4") as any;
+    this.area = this.gPlot.append("path").attr("stroke", "none") as any;
     this.path = this.gPlot.append("path").attr("fill", "none") as any;
     this.cursor = this.gPlot.append("line") as any;
 
@@ -102,6 +104,7 @@ export class TimelineChart {
   private renderBaseline(d: TimelineDatum) {
     this.svg.style("background", BASELINE.figureBg);
     this.hero.selectAll("*").remove();
+    this.area.attr("d", null);
     const m = MARGIN_BASELINE;
     const pw = W - m.left - m.right;
     const ph = H - m.top - m.bottom;
@@ -226,12 +229,14 @@ export class TimelineChart {
     this.gPlot.attr("transform", `translate(${m.left},${m.top})`);
     this.gPlot.select("rect.plotbg").attr("width", pw).attr("height", ph).attr("fill", "transparent");
 
+    // minimal grid: per the reference charts (Brink/Commons), just enough horizontal structure
+    // to read values by eye, not a full ruled sheet -- 3 ticks instead of 5, faint.
     this.gGridY
       .selectAll("line")
-      .data(this.y.ticks(5))
+      .data(this.y.ticks(3))
       .join("line")
       .attr("x1", 0).attr("x2", pw).attr("y1", (v) => this.y(v)).attr("y2", (v) => this.y(v))
-      .attr("stroke", t.gridline).attr("stroke-width", 1).attr("stroke-opacity", 1);
+      .attr("stroke", t.gridline).attr("stroke-width", 1).attr("stroke-opacity", 0.6).attr("stroke-dasharray", "2,4");
     this.gGridX.selectAll("*").remove();
 
     // period bands
@@ -245,7 +250,28 @@ export class TimelineChart {
       .attr("y", 0).attr("height", ph)
       .attr("fill", t.band);
 
+    // gradient area fill under the line -- per the reference charts (Brink's "Monthly Trend",
+    // Pillow's duration curves): a soft wash fading to nothing at the baseline, not a flat tint.
+    let defs = this.svg.select<SVGDefsElement>("defs");
+    if (defs.empty()) defs = this.svg.append("defs");
+    const gradId = "tl-area-grad";
+    let grad = defs.select<SVGLinearGradientElement>(`#${gradId}`);
+    if (grad.empty()) grad = defs.append("linearGradient").attr("id", gradId) as any;
+    grad.attr("x1", "0").attr("x2", "0").attr("y1", "0").attr("y2", "1");
+    grad
+      .selectAll("stop")
+      .data([
+        { o: 0, c: t.primary, a: 0.22 },
+        { o: 1, c: t.primary, a: 0 },
+      ])
+      .join("stop")
+      .attr("offset", (s) => `${s.o * 100}%`)
+      .attr("stop-color", (s) => s.c)
+      .attr("stop-opacity", (s) => s.a);
+
     const line = d3.line<number>().x((_v, i) => this.x(dates[i])).y((v) => this.y(v));
+    const area = d3.area<number>().x((_v, i) => this.x(dates[i])).y0(ph).y1((v) => this.y(v));
+    this.area.attr("d", area(d.total)).attr("fill", `url(#${gradId})`);
     this.path.attr("d", line(d.total)).attr("stroke", t.primary).attr("stroke-width", REDESIGN.lineWidthPx).attr("stroke-linejoin", "round").attr("stroke-linecap", "round");
 
     this.meanLine
@@ -254,35 +280,41 @@ export class TimelineChart {
       .attr("stroke", t.axis).attr("stroke-width", 1.2);
 
     // notable weeks: named episodes + the two largest week-over-week jumps + the series
-    // extremes -- banded "pulse" stems, inspired by the reference, built from the validated
-    // red/blue pair rather than an open hue set
+    // extremes. A soft full-height band (the style guide's own crisis recipe: "a soft band,
+    // not a hard line") plus a small rounded badge chip for the label, matching the badge
+    // language used elsewhere in this pass, rather than the old triple-layered pulse stems.
     this.gPulses.selectAll("*").remove();
     const notable = notableIndices(d);
     for (const n of notable) {
       const px = this.x(dates[n.index]);
       const py = this.y(d.total[n.index]);
-      const bands = [10, 6.5, 3.5];
       const color = n.kind === "low" ? t.recv : t.send;
-      bands.forEach((h, bi) => {
-        this.gPulses
-          .append("rect")
-          .attr("x", px - (3 - bi) * 1.6)
-          .attr("width", (3 - bi) * 3.2)
-          .attr("y", py - h)
-          .attr("height", h * 2)
-          .attr("rx", 1.5)
-          .attr("fill", color)
-          .attr("opacity", 0.16 + bi * 0.17);
-      });
+
+      this.gPulses
+        .append("rect")
+        .attr("x", px - 5).attr("width", 10).attr("y", 0).attr("height", ph)
+        .attr("rx", 5).attr("fill", color).attr("opacity", 0.1);
+      this.gPulses
+        .append("circle")
+        .attr("cx", px).attr("cy", py).attr("r", 4)
+        .attr("fill", t.surface).attr("stroke", color).attr("stroke-width", 2);
+
       if (n.label) {
-        this.gPulses
+        const badge = this.gPulses.append("g").attr("transform", `translate(${px},${py - 26})`);
+        const padX = 7;
+        const textW = n.label.length * 5.6 + padX * 2;
+        badge
+          .append("rect")
+          .attr("x", -textW / 2).attr("y", -11).attr("width", textW).attr("height", 18)
+          .attr("rx", 9).attr("fill", t.surfaceRaised).attr("stroke", t.border).attr("stroke-width", 1);
+        badge
           .append("text")
-          .attr("x", px)
-          .attr("y", py - 16)
           .attr("text-anchor", "middle")
+          .attr("y", 2)
           .attr("font-family", FONTS.body)
-          .attr("font-size", 10)
+          .attr("font-size", 9.5)
           .attr("font-weight", "600")
+          .attr("letter-spacing", "0.02em")
           .attr("fill", t.secondary)
           .text(n.label);
       }

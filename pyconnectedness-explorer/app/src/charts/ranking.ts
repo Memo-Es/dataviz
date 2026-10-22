@@ -37,6 +37,11 @@ export class RankingList {
       if (d.selectedMarket === o.name) row.style.fontWeight = "600";
       row.onclick = () => d.onSelect?.(o.name);
 
+      const dot = document.createElement("div");
+      dot.className = "ranking-dot";
+      dot.style.background = o.net >= 0 ? sendColor : recvColor;
+      dot.style.opacity = String(isRedesign ? 0.9 : BASELINE.nodeAlpha);
+
       const name = document.createElement("div");
       name.className = "ranking-name";
       name.textContent = o.name;
@@ -70,7 +75,7 @@ export class RankingList {
       value.style.fontFamily = valueFont;
       value.textContent = o.net.toFixed(1);
 
-      row.append(name, track, value);
+      row.append(dot, name, track, value);
       this.host.appendChild(row);
     }
   }
