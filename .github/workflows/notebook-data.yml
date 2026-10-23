@@ -1,0 +1,64 @@
+name: Rebuild explorer data from Demo.ipynb
+
+# Runs PyConnectedness's own examples/Demo.ipynb, unchanged, at the pinned submodule commit,
+# against live Yahoo Finance data, then commits what export_cell.py wrote. This is the only
+# way the explorer's numbers get made: no synthetic input, no reimplementation.
+
+on:
+  push:
+    branches: [claude/serene-shannon-v6pfgc]
+    paths:
+      - "pyconnectedness-explorer/pipeline/run_demo.py"
+      - "pyconnectedness-explorer/pipeline/export_cell.py"
+      - "pyconnectedness-explorer/pipeline/validate.py"
+      - "pyconnectedness-explorer/pipeline/requirements.txt"
+      - ".github/workflows/notebook-data.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: notebook-data-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run-notebook:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pyconnectedness-explorer/pipeline
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the library from the pinned submodule, plus the notebook's own imports
+        run: |
+          pip install -r requirements.txt
+          pip install --force-reinstall --no-deps ../vendor/PyConnectedness
+          python -c "import pyconnectedness, sys; print(pyconnectedness.__file__)"
+      - name: Execute Demo.ipynb unchanged (+ export cell)
+        run: python run_demo.py
+      - name: Upload output whatever validation says, for inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notebook-output
+          path: |
+            pyconnectedness-explorer/app/public/data/
+            pyconnectedness-explorer/pipeline/out/
+      - name: Validate against the numbers the notebook itself printed
+        run: python validate.py
+      - name: Commit the data
+        working-directory: .
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898+github-actions[bot]@users.noreply.github.com"
+          git add pyconnectedness-explorer/app/public/data pyconnectedness-explorer/pipeline/out/reference
+          git diff --cached --quiet && { echo "no change"; exit 0; }
+          git commit -m "Data: run Demo.ipynb (pinned 4cc953f) on live Yahoo Finance data"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

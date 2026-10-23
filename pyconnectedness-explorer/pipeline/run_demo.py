@@ -3,10 +3,13 @@ the export cell. See ../SPEC.md section 3 and ../CONTEXT.md for why this exists 
 must not touch the notebook's own cells.
 
 Requires network access to Yahoo Finance (yfinance) and the vendor/PyConnectedness submodule
-checked out at the pinned commit. Neither is available in the sandbox this build ran in, so
-this script has not been executed here — see README.md for how to run it once that access
-exists, and pipeline/generate_placeholder.py for the stand-in data this build shipped instead.
+checked out at the pinned commit. .github/workflows/notebook-data.yml runs it on a GitHub
+runner (which can reach Yahoo) and commits the result; it also runs fine locally.
+
+Also saves the notebook's own figures (its matplotlib outputs, untouched) to
+pipeline/out/reference/ so the app's charts can be checked against them by eye.
 """
+import base64
 import hashlib
 import os
 from pathlib import Path
@@ -25,7 +28,9 @@ if sha != EXPECTED_SHA:
         f"Demo.ipynb changed upstream ({sha}). Review the diff, then update EXPECTED_SHA."
     )
 
-os.environ["MPLBACKEND"] = "Agg"  # plt.show() becomes a no-op, plotting code still runs
+# MPLBACKEND left unset: ipykernel then uses the inline backend, so each plt.show() keeps
+# its figure as a cell output (saved to out/reference/ below)
+os.environ.pop("MPLBACKEND", None)
 os.environ["EXPLORER_DATA_DIR"] = str(ROOT / "app" / "public" / "data")
 
 nb = nbformat.read(NB, as_version=4)
@@ -36,3 +41,19 @@ NotebookClient(
     nb, timeout=None, kernel_name="python3", resources={"metadata": {"path": str(REPO)}}
 ).execute()
 nbformat.write(nb, ROOT / "pipeline" / "out" / "Demo.executed.ipynb")
+
+# the notebook's own figures, exactly as its plotting cells drew them
+REFERENCE = {
+    14: "01_rolling_spillover_index.png",
+    17: "02_net_small_multiples.png",
+    18: "03_net_pairwise_heatmaps.png",
+    19: "04_connectedness_network.png",
+    21: "05_last_200_weeks.png",
+    28: "periods_heatmaps.png",
+}
+ref_dir = ROOT / "pipeline" / "out" / "reference"
+ref_dir.mkdir(parents=True, exist_ok=True)
+for idx, name in REFERENCE.items():
+    pngs = [o["data"]["image/png"] for o in nb.cells[idx].get("outputs", []) if "image/png" in o.get("data", {})]
+    if pngs:
+        (ref_dir / name).write_bytes(base64.b64decode(pngs[0]))
