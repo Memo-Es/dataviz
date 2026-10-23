@@ -240,16 +240,10 @@ export class TimelineChart {
       .attr("stroke", t.gridline).attr("stroke-width", 1).attr("stroke-opacity", 0.6).attr("stroke-dasharray", "2,4");
     this.gGridX.selectAll("*").remove();
 
-    // period bands
-    this.gBands.attr("transform", `translate(${m.left},${m.top})`);
-    this.gBands
-      .selectAll("rect")
-      .data(d.periods)
-      .join("rect")
-      .attr("x", (p) => this.x(new Date(p.start)))
-      .attr("width", (p) => Math.max(0, this.x(new Date(p.end)) - this.x(new Date(p.start))))
-      .attr("y", 0).attr("height", ph)
-      .attr("fill", t.band);
+    // (period bands dropped from the redesign render -- adjacent periods shared one colour so
+    // they only ever read as a flat tint over the whole plot, boxing it in against the reference
+    // apps' plain white chart surface, without actually conveying the period boundaries)
+    this.gBands.selectAll("*").remove();
 
     // gradient area fill under the line -- per the reference charts (Brink's "Monthly Trend",
     // Pillow's duration curves): a soft wash fading to nothing at the baseline, not a flat tint.
@@ -286,8 +280,12 @@ export class TimelineChart {
       .attr("stroke", t.axis).attr("stroke-width", 1.2);
 
     // notable weeks: named episodes + the two largest week-over-week jumps + the series
-    // extremes. A soft full-height band (the style guide's own crisis recipe: "a soft band,
-    // not a hard line") plus a small rounded badge chip for the label.
+    // extremes, marked with a small rounded badge chip.
+    //
+    // This used to also draw a full-height tinted band per event -- with 6-7 events that read
+    // as venetian blinds striping the whole chart, nothing like the single bare curve in the
+    // reference apps (Brink's "Monthly Trend" has zero chart furniture besides the line itself).
+    // Dropped the bands; the ring marker + badge + leader line is enough to place each event.
     //
     // Badges used to float at each point's own y, which let close-together events (e.g. "peak"
     // landing right next to "euro-area crisis") draw on top of each other and eat the label
@@ -305,13 +303,9 @@ export class TimelineChart {
 
     for (const p of points) {
       this.gPulses
-        .append("rect")
-        .attr("x", p.px - 5).attr("width", 10).attr("y", 0).attr("height", ph)
-        .attr("rx", 5).attr("fill", p.color).attr("opacity", 0.1);
-      this.gPulses
         .append("circle")
-        .attr("cx", p.px).attr("cy", p.py).attr("r", 4)
-        .attr("fill", t.surface).attr("stroke", p.color).attr("stroke-width", 2);
+        .attr("cx", p.px).attr("cy", p.py).attr("r", 4.5)
+        .attr("fill", t.surface).attr("stroke", p.color).attr("stroke-width", 2.25);
     }
 
     const BASE_Y = 16;
@@ -370,9 +364,9 @@ export class TimelineChart {
     (this.axisY as any).call(d3.axisLeft(this.y).ticks(5).tickSizeOuter(0));
     this.styleAxisRedesign(this.axisY, t);
 
-    this.gPlot.selectAll("rect.spine").remove();
-    this.gPlot.append("line").attr("class", "spine").attr("x1", 0).attr("x2", 0).attr("y1", 0).attr("y2", ph).attr("stroke", t.axis).attr("stroke-width", 1);
-    this.gPlot.append("line").attr("class", "spine").attr("x1", 0).attr("x2", pw).attr("y1", ph).attr("y2", ph).attr("stroke", t.axis).attr("stroke-width", 1);
+    // no ruled axis spines -- the reference line charts (Brink's "Monthly Trend") carry no
+    // visible axis line at all, just tick labels floating next to the plot
+    this.gPlot.selectAll("line.spine").remove();
 
     this.ylabel.text("");
 

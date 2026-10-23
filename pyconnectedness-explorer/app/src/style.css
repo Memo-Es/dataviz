@@ -15,10 +15,10 @@
   --crisis: #d03b3b;
   --band: #eceae4;
   --edge: #52514e;
-  --card-shadow: 0 1px 2px rgba(11, 11, 11, 0.04), 0 10px 28px rgba(11, 11, 11, 0.07);
+  --card-shadow: 0 1px 2px rgba(11, 11, 11, 0.03), 0 14px 32px rgba(11, 11, 11, 0.06);
   --card-highlight: rgba(255, 255, 255, 0.6);
-  --radius-card: 18px;
-  --radius-chart: 14px;
+  --radius-card: 26px;
+  --radius-chart: 20px;
   --radius-pill: 999px;
   --f-display: "IBM Plex Sans", system-ui, sans-serif;
   --f-body: "IBM Plex Sans", system-ui, sans-serif;
@@ -42,8 +42,8 @@
     --crisis: #d03b3b;
     --band: #201f1c;
     --edge: #c3c2b7;
-    --card-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 16px 40px rgba(0, 0, 0, 0.55);
-    --card-highlight: rgba(255, 255, 255, 0.07);
+    --card-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 20px 48px rgba(0, 0, 0, 0.5);
+    --card-highlight: rgba(255, 255, 255, 0.06);
   }
 }
 
@@ -63,8 +63,8 @@
   --crisis: #d03b3b;
   --band: #201f1c;
   --edge: #c3c2b7;
-  --card-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 16px 40px rgba(0, 0, 0, 0.55);
-  --card-highlight: rgba(255, 255, 255, 0.07);
+  --card-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 20px 48px rgba(0, 0, 0, 0.5);
+  --card-highlight: rgba(255, 255, 255, 0.06);
 }
 
 * { box-sizing: border-box; }
@@ -80,10 +80,10 @@ html, body {
 #app {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 22px;
 }
 
 .topbar {
@@ -115,21 +115,25 @@ html, body {
   flex-wrap: wrap;
 }
 
+/* No hairline borders anywhere below -- none of the reference apps (Pillow, Fitbit, Brink,
+   Commons) outline a card, a pill or a button. Elevation comes from shadow and flat colour
+   contrast against the page alone; a 1px border on top of that is what made this read as a
+   bordered spreadsheet/report instead of a floating app surface. */
+
 .pill-group {
   display: inline-flex;
-  border: 1px solid var(--line);
   border-radius: var(--radius-pill);
   overflow: hidden;
-  background: var(--panel);
+  background: var(--panel-raised);
   box-shadow: var(--card-shadow);
 }
 
 .pill-group button {
   border: none;
   background: transparent;
-  color: var(--muted);
-  padding: 7px 15px;
-  font: 500 13px var(--f-body);
+  color: var(--secondary);
+  padding: 10px 18px;
+  font: 600 14px var(--f-body);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
@@ -140,49 +144,47 @@ html, body {
 }
 
 button.icon-btn {
-  border: 1px solid var(--line);
+  border: none;
   background: var(--panel-raised);
   color: var(--fg);
-  border-radius: 10px;
-  width: 32px;
-  height: 32px;
-  font-size: 14px;
+  border-radius: 14px;
+  width: 40px;
+  height: 40px;
+  font-size: 15px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   box-shadow: var(--card-shadow);
-  transition: transform 0.15s ease, border-color 0.15s ease;
+  transition: transform 0.15s ease;
 }
-button.icon-btn:hover { border-color: var(--muted); transform: translateY(-1px); }
+button.icon-btn:hover { transform: translateY(-1px); }
 
 select, .theme-toggle {
-  border: 1px solid var(--line);
+  border: none;
   background: var(--panel-raised);
   color: var(--fg);
-  border-radius: 10px;
-  padding: 7px 11px;
-  font: 500 13px var(--f-body);
+  border-radius: 14px;
+  padding: 10px 14px;
+  font: 600 14px var(--f-body);
   box-shadow: var(--card-shadow);
 }
 
 .banner {
-  border: 1px solid var(--line);
   background: var(--band);
-  color: var(--fg);
-  border-radius: var(--radius-chart);
-  padding: 11px 15px;
-  font-size: 12.5px;
+  color: var(--secondary);
+  border-radius: var(--radius-pill);
+  padding: 10px 18px;
+  font-size: 12px;
   line-height: 1.5;
 }
-.banner strong { font-weight: 600; }
-.banner.prototype { opacity: 0.9; }
+.banner strong { font-weight: 700; color: var(--fg); }
+.banner.prototype { opacity: 0.85; }
 
 .panel {
   background: var(--panel);
-  border: 1px solid var(--line);
   border-radius: var(--radius-card);
-  padding: 18px 20px 20px;
+  padding: 26px 28px 28px;
   box-shadow: var(--card-shadow);
   position: relative;
 }
@@ -199,19 +201,21 @@ select, .theme-toggle {
 
 .panel h2 {
   font-family: var(--f-body);
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--secondary);
-  margin: 0 0 12px;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+  margin: 0 0 16px;
 }
 
 .chart-card {
   background: #ffffff; /* chart bodies stay matplotlib-white, see encoding.ts BASELINE */
   border-radius: var(--radius-chart);
   overflow: auto;
-  box-shadow: var(--card-shadow), 0 0 0 1px var(--line);
+}
+:root[data-theme="dark"] .chart-card { box-shadow: 0 0 0 1px rgba(255,255,255,0.06); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .chart-card { box-shadow: 0 0 0 1px rgba(255,255,255,0.06); }
 }
 
 .grid {
@@ -229,7 +233,7 @@ select, .theme-toggle {
 
 .row {
   display: flex;
-  gap: 16px;
+  gap: 22px;
   flex-wrap: wrap;
 }
 .row > .panel { flex: 1 1 320px; }
@@ -270,26 +274,26 @@ select, .theme-toggle {
 .pill.recv { background: color-mix(in srgb, var(--recv) 18%, transparent); color: var(--recv); }
 
 /* list rows read as their own small elevated cards -- per Commons' "Largest emission
-   purchases" rows and Fitbit's "Top podcasts" bars: a leading colour dot standing in for an
-   icon badge, a rounded capsule track, a raised surface on hover. */
+   purchases" rows and Fitbit's "Top podcasts" bars: a filled colour-circle icon badge (not a
+   bare dot), a rounded capsule track, a raised surface on hover, generous row height. */
 .ranking-row {
   display: grid;
-  grid-template-columns: 10px 86px 1fr 52px;
+  grid-template-columns: 28px 92px 1fr 54px;
   align-items: center;
-  gap: 10px;
-  font-size: 12.5px;
-  padding: 7px 8px;
-  margin: 0 -8px;
-  border-radius: 10px;
+  gap: 12px;
+  font-size: 13.5px;
+  padding: 10px 10px;
+  margin: 0 -10px;
+  border-radius: 14px;
   cursor: pointer;
   transition: background 0.15s ease;
 }
 .ranking-row:hover { background: var(--panel-raised); }
 .ranking-row:hover .ranking-name { text-decoration: underline; }
-.ranking-dot { width: 8px; height: 8px; border-radius: 50%; }
-.ranking-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ranking-bar-track { position: relative; height: 10px; background: var(--grid); border-radius: var(--radius-pill); }
+.ranking-dot { width: 22px; height: 22px; border-radius: 50%; opacity: 1 !important; }
+.ranking-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ranking-bar-track { position: relative; height: 12px; background: var(--grid); border-radius: var(--radius-pill); }
 .ranking-bar { position: absolute; top: 0; bottom: 0; border-radius: var(--radius-pill); }
-.ranking-value { font-family: var(--f-data); text-align: right; }
+.ranking-value { font-family: var(--f-data); font-weight: 600; text-align: right; }
 
 svg text { font-family: inherit; }
