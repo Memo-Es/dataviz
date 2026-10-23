@@ -8,20 +8,28 @@ import { BentoLayout } from "./layouts/bento";
 import { ShellLayout } from "./layouts/shell";
 import { StoryLayout } from "./layouts/story";
 
-// Chrome is Fitbit's own: a bottom icon tab bar owns top-level navigation (the Today/Coach/You
-// pattern -- here, which layout) and a persistent circular FAB carries the one global action
-// that isn't a navigation choice (here, theme) exactly where Fitbit's own "+" FAB floats, above
-// the tab bar, bottom-right. The two remaining controls (chart style, measure) are secondary
-// *within* the current screen, so they stay in the header as the flat underline tabs Fitbit
-// itself uses for Day/Week/Month/Year -- see style.css's Fitbit-componentization comment.
+// Chrome follows the client's own Figma reference (node 17141:14591), not an outside app: a
+// thin breadcrumb-weight nav row (quiet title, no big display H1, a ghost icon button for the
+// one global action -- theme), then a second row of chip controls styled on that file's own
+// "Prompt button" component (pale outline at rest, solid accent fill selected) for everything
+// the reference has no equivalent of (layout/style/measure). No bottom tab bar, no FAB --
+// neither exists anywhere in the reference; both were an earlier pass's own invention.
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
   <div class="topbar">
     <div class="topbar-title">
-      <h1>PyConnectedness Explorer</h1>
-      <p class="subtitle">How shocks travel between 20 stock markets &mdash; from PyConnectedness's own Demo notebook output.</p>
+      <div>
+        <h1>PyConnectedness Explorer</h1>
+        <p class="subtitle">How shocks travel between 20 stock markets &mdash; from PyConnectedness's own Demo notebook output.</p>
+      </div>
+      <button class="icon-btn" id="theme-toggle" type="button" title="Toggle theme"></button>
     </div>
     <div class="controls">
+      <div class="pill-group" id="layout-group" title="Layout">
+        <button data-layout="bento" aria-pressed="false">Bento</button>
+        <button data-layout="shell" aria-pressed="false">Shell</button>
+        <button data-layout="story" aria-pressed="true">Story</button>
+      </div>
       <div class="pill-group" id="style-group">
         <button data-style="redesign" aria-pressed="true">Redesign</button>
         <button data-style="baseline" aria-pressed="false">Faithful baseline</button>
@@ -41,15 +49,6 @@ app.innerHTML = `
   <div id="layout-root"></div>
 
   <div class="footnote" id="footnote"></div>
-
-  <div class="chrome-dock">
-    <nav class="bottom-tabs" id="layout-group" title="Layout">
-      <button data-layout="bento" aria-pressed="false"><span class="bottom-tab-icon">&#8862;</span>Bento</button>
-      <button data-layout="shell" aria-pressed="false"><span class="bottom-tab-icon">&#9776;</span>Shell</button>
-      <button data-layout="story" aria-pressed="true"><span class="bottom-tab-icon">&#9711;</span>Story</button>
-    </nav>
-    <button class="fab" id="theme-toggle" type="button" title="Toggle theme"></button>
-  </div>
 `;
 
 const el = {

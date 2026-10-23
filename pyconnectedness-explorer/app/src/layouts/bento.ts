@@ -11,7 +11,6 @@ import { TimelineChart } from "../charts/timeline";
 import { HeatmapChart } from "../charts/heatmap";
 import { RankingList } from "../charts/ranking";
 import { REGION_OF } from "../encoding";
-import { ringSvg } from "../ui/ring";
 import type { World } from "../world";
 import type { LayoutController } from "./types";
 
@@ -39,15 +38,10 @@ export class BentoLayout implements LayoutController {
           <p class="tile-body" id="bn-body"></p>
         </div>
         <div class="tile t-metric">
-          <div class="metric-row metric-row-hero">
-            <div class="metric-row-main">
-              <div class="metric-row-label" id="bn-metric-eyebrow"></div>
-              <div class="metric-row-value metric-row-value-hero" id="bn-metric-value"></div>
-              <div class="metric-row-caption" id="bn-metric-label"></div>
-            </div>
-            <div class="metric-ring" id="bn-metric-ring"></div>
-          </div>
-          <span class="pill" id="bn-metric-tag"></span>
+          <div class="tile-eyebrow" id="bn-metric-eyebrow"></div>
+          <div class="stat-value" id="bn-metric-value"></div>
+          <p class="tile-body" id="bn-metric-label"></p>
+          <span class="tag" id="bn-metric-tag"></span>
         </div>
         <div class="tile t-network">
           <div class="tile-header"><h2>Who sends to whom</h2></div>
@@ -65,14 +59,9 @@ export class BentoLayout implements LayoutController {
           <div class="chart-card" id="bn-timeline"></div>
         </div>
         <div class="tile t-insight2">
-          <div class="metric-row metric-row-hero">
-            <div class="metric-row-main">
-              <div class="metric-row-label">Also moving</div>
-              <div class="metric-row-value" id="bn-metric2-value"></div>
-              <div class="metric-row-caption" id="bn-metric2-caption"></div>
-            </div>
-            <div class="metric-ring" id="bn-metric2-ring"></div>
-          </div>
+          <div class="tile-eyebrow">Also moving</div>
+          <div class="stat-value stat-value-sm" id="bn-metric2-value"></div>
+          <p class="tile-body" id="bn-metric2-caption"></p>
         </div>
         <div class="tile t-heatmap">
           <div class="tile-header">
@@ -114,11 +103,9 @@ export class BentoLayout implements LayoutController {
       metricValue: root.querySelector("#bn-metric-value")!,
       metricLabel: root.querySelector("#bn-metric-label")!,
       metricTag: root.querySelector("#bn-metric-tag")!,
-      metricRing: root.querySelector("#bn-metric-ring")!,
       timelineTitle: root.querySelector("#bn-timeline-title")!,
       metric2Value: root.querySelector("#bn-metric2-value")!,
       metric2Caption: root.querySelector("#bn-metric2-caption")!,
-      metric2Ring: root.querySelector("#bn-metric2-ring")!,
       matrixWindow: root.querySelector("#bn-matrix-window")!,
       matrixSort: root.querySelector("#bn-matrix-sort")!,
       ranking: root.querySelector("#bn-ranking")!,
@@ -174,17 +161,16 @@ export class BentoLayout implements LayoutController {
     this.el.headline.textContent = `${names[hi]} is sending the most risk`;
     this.el.body.textContent = `Net +${f.net[hi].toFixed(1)}% this week, while ${names[lo]} is absorbing the most at ${f.net[lo].toFixed(1)}%.`;
 
-    // --- metric tile: headline stat for the active measure, Fitbit ring-badge style ---
+    // --- metric tile: headline stat for the active measure, the reference's "Target Metric" card ---
     const total = totalAt(data, f.measure, f.t);
     const mean = f.full.total;
     const diff = total - mean;
     this.el.metricEyebrow.textContent = `${f.measure} spillover, this week`;
-    this.el.metricValue.innerHTML = `${total.toFixed(1)}<span class="metric-row-unit">%</span>`;
+    this.el.metricValue.innerHTML = `${total.toFixed(1)}<span class="stat-unit">%</span>`;
     this.el.metricLabel.textContent = `week of ${f.date}`;
-    this.el.metricRing.innerHTML = ringSvg(total / 100, "var(--ring-a)", 56, 5);
     const tag = this.el.metricTag;
     tag.textContent = `${diff >= 0 ? "▲" : "▼"} ${Math.abs(diff).toFixed(1)}pp vs ${mean.toFixed(1)}% average`;
-    tag.className = `pill ${diff >= 0 ? "send" : "recv"}`;
+    tag.className = "tag";
 
     // --- network ---
     this.network.render({
@@ -223,17 +209,16 @@ export class BentoLayout implements LayoutController {
       onScrub: (idx) => world.store.set({ t: idx }),
     });
 
-    // --- insight2 tile: the other measure's headline, for cross-reference, same ring pattern ---
+    // --- insight2 tile: the other measure's headline, for cross-reference ---
     const otherMeasure: Measure = f.measure === "returns" ? "volatility" : "returns";
     const otherT = world.dateIndexFor(otherMeasure, f.date);
     const otherTotal = totalAt(data, otherMeasure, otherT);
     const otherMean = data.meta.static[otherMeasure].full.total;
-    this.el.metric2Value.innerHTML = `${otherMeasure[0].toUpperCase()}${otherMeasure.slice(1)} <span class="metric-row-unit">${otherTotal.toFixed(1)}%</span>`;
+    this.el.metric2Value.innerHTML = `${otherTotal.toFixed(1)}<span class="stat-unit">%</span>`;
     this.el.metric2Caption.textContent =
       otherTotal >= otherMean
-        ? `Above its own ${otherMean.toFixed(1)}% average, same as ${MEASURE_WORD[f.measure]}.`
-        : `Below its own ${otherMean.toFixed(1)}% average, even while ${MEASURE_WORD[f.measure]} is elevated.`;
-    this.el.metric2Ring.innerHTML = ringSvg(otherTotal / 100, "var(--ring-b)", 44, 4);
+        ? `${otherMeasure[0].toUpperCase()}${otherMeasure.slice(1)} spillover -- above its own ${otherMean.toFixed(1)}% average, same as ${MEASURE_WORD[f.measure]}.`
+        : `${otherMeasure[0].toUpperCase()}${otherMeasure.slice(1)} spillover -- below its own ${otherMean.toFixed(1)}% average, even while ${MEASURE_WORD[f.measure]} is elevated.`;
 
     // --- ranking ---
     this.ranking.render({

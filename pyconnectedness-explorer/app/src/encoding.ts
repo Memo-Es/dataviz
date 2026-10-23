@@ -54,11 +54,12 @@ export const BASELINE = {
 } as const;
 
 export const FONTS = {
-  // Source Serif 4 read as an academic-paper byline next to the reference apps (Pillow, Fitbit,
-  // Brink, Commons) that set this pass's direction -- none of them touch a serif anywhere. Bold
-  // IBM Plex Sans carries the same "titles, never numbers" job without that editorial tell.
-  display: "'IBM Plex Sans', system-ui, sans-serif",
-  body: "'IBM Plex Sans', system-ui, sans-serif",
+  // The client's own Figma reference (node 17141:14591) sets titles and headline numbers in
+  // Aeonik; Plus Jakarta Sans is the closest Google-Fonts match to that geometric, confident
+  // character (earlier passes picked IBM Plex Sans off other apps' references instead of this
+  // one -- see CONTEXT.md's decision log for why that was wrong).
+  display: "'Plus Jakarta Sans', system-ui, sans-serif",
+  body: "'Plus Jakarta Sans', system-ui, sans-serif",
   data: "'B612 Mono', 'SFMono-Regular', monospace", // numbers, ticks, tabular figures -- client's own pick
 } as const;
 
@@ -89,8 +90,8 @@ export interface RedesignTokens {
 // cardHighlight are web-shell-only (the elevated-card chrome CONTEXT.md's decision log scopes
 // to "the app shell around the charts", same as border already was).
 export const REDESIGN_LIGHT: RedesignTokens = {
-  page: "#f3f2ef", // Fitbit's flat warm-grey page -- see style.css's Fitbit-componentization
-    // comment block for the rest of that pass; `page` and `cardShadow` are the two fields this
+  page: "#f8f7f0", // the client's own Figma reference (node 17141:14591): "base" token #F8F7F0,
+    // a warm off-white, not a cool grey -- `page` and `cardShadow` are the two fields this
     // repo's own rule (above) already scopes as web-shell-only, so both move freely here.
   surface: "#fcfcfb",
   surfaceRaised: "#ffffff", // nested rows (ranking, legend chips) read one step "closer"
@@ -105,12 +106,13 @@ export const REDESIGN_LIGHT: RedesignTokens = {
   mid: "#f0efec", // diverging midpoint (near zero)
   crisis: "#d03b3b", // status "critical" -- distinct from `send`, reserved for crisis emphasis
   band: "#eceae4", // neutral period shading
-  cardShadow: "none", // Fitbit's whole card system is flat fill-contrast, no drop shadow at all
+  cardShadow: "0 8px 12px rgba(0,0,0,0.06)", // the reference's own "Card" effect token, verbatim
   cardHighlight: "rgba(255,255,255,0.6)",
 } as const;
 
 export const REDESIGN_DARK: RedesignTokens = {
-  page: "#141412",
+  page: "#17140f", // same warm-brown family as the light "base" token, inverted -- the
+    // reference has no dark mode of its own to copy, so this keeps its hue, not Fitbit's cool one
   surface: "#1a1a19",
   surfaceRaised: "#242320", // Pillow-style elevated card: nested elements read lighter still
   primary: "#f0efec",
@@ -124,7 +126,7 @@ export const REDESIGN_DARK: RedesignTokens = {
   mid: "#383835",
   crisis: "#d03b3b",
   band: "#201f1c",
-  cardShadow: "none",
+  cardShadow: "0 8px 20px rgba(0,0,0,0.4)",
   cardHighlight: "rgba(255,255,255,0.07)",
 } as const;
 
