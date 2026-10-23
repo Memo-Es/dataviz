@@ -17,9 +17,9 @@ app.innerHTML = `
     </div>
     <div class="controls">
       <div class="pill-group" id="layout-group" title="Layout">
-        <button data-layout="bento" aria-pressed="true">Bento</button>
+        <button data-layout="bento" aria-pressed="false">Bento</button>
         <button data-layout="shell" aria-pressed="false">Shell</button>
-        <button data-layout="story" aria-pressed="false">Story</button>
+        <button data-layout="story" aria-pressed="true">Story</button>
       </div>
       <div class="pill-group" id="style-group">
         <button data-style="redesign" aria-pressed="true">Redesign</button>
@@ -73,7 +73,7 @@ async function main() {
     playing: false,
     theme: prefersDark() ? "dark" : "light",
     chartStyle: "redesign",
-    layout: "bento",
+    layout: "story",
   });
 
   const world = new World(data, store);
