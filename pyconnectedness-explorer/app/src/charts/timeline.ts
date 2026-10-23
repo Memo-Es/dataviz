@@ -35,7 +35,7 @@ export interface TimelineDatum {
 const W = 1300;
 const H = 420; // one axes, stacked by the caller
 const MARGIN_BASELINE = { top: 34, right: 16, bottom: 46, left: 56 };
-const MARGIN_REDESIGN = { top: 54, right: 100, bottom: 40, left: 48 };
+const MARGIN_REDESIGN = { top: 82, right: 100, bottom: 40, left: 48 };
 
 export class TimelineChart {
   private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
@@ -370,12 +370,25 @@ export class TimelineChart {
 
     this.ylabel.text("");
 
-    // hero number: the selected week's value, otherwise only ever printed to notebook output
+    // hero number: the selected week's value, otherwise only ever printed to notebook output.
+    // This is the stat the reference apps would lead the whole card with (Commons' "198 KG
+    // CO2E", Brink's "25 min") -- sized and chipped to actually read as the headline figure,
+    // not a small corner label.
     this.hero.selectAll("*").remove();
     const heroVal = d.total[Math.min(d.selectedIndex, d.total.length - 1)];
-    const heroG = this.hero.append("g").attr("transform", `translate(${W - m.right + 4},30)`);
-    heroG.append("text").attr("text-anchor", "end").attr("font-family", FONTS.body).attr("font-size", REDESIGN.heroPx).attr("font-weight", "800").attr("letter-spacing", "-0.02em").attr("fill", heroVal >= d.fullSampleTotal ? t.send : t.recv).text(`${heroVal.toFixed(1)}%`);
-    heroG.append("text").attr("y", 16).attr("text-anchor", "end").attr("font-family", FONTS.body).attr("font-size", 10.5).attr("fill", t.muted).text(d.measureLabel ? `${d.measureLabel} spillover, this week` : "this week");
+    const heroColor = heroVal >= d.fullSampleTotal ? t.send : t.recv;
+    const heroG = this.hero.append("g").attr("transform", `translate(${W - m.right},26)`);
+    const heroLabel = d.measureLabel ? `${d.measureLabel} spillover, this week` : "this week";
+    const valueText = `${heroVal.toFixed(1)}%`;
+    const chipW = Math.max(100, valueText.length * REDESIGN.heroPx * 0.62) + 28;
+    heroG.append("rect").attr("x", -chipW).attr("y", -10).attr("width", chipW).attr("height", 62)
+      .attr("rx", 18).attr("fill", heroColor).attr("fill-opacity", 0.12);
+    heroG.append("text").attr("x", -14).attr("y", 40).attr("text-anchor", "end")
+      .attr("font-family", FONTS.body).attr("font-size", REDESIGN.heroPx).attr("font-weight", "800")
+      .attr("letter-spacing", "-0.02em").attr("fill", heroColor).text(valueText);
+    heroG.append("text").attr("x", -14).attr("y", 54).attr("text-anchor", "end")
+      .attr("font-family", FONTS.body).attr("font-size", 10.5).attr("font-weight", "600")
+      .attr("fill", t.secondary).text(heroLabel);
 
     this.overlay.attr("width", pw).attr("height", ph)
       .on("click", (ev: MouseEvent) => this.scrubFromEvent(ev))

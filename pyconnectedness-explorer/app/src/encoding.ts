@@ -140,7 +140,7 @@ export const REDESIGN = {
   labelPx: 12,
   tickLabelPx: 11,
   networkLabelPx: 11.5,
-  heroPx: 34,
+  heroPx: 46,
   /** Diverging scale from the validated pair, two hues + neutral midpoint (not d3's RdBu,
    * which uses different, unvalidated hex values than the rest of this system). */
   divergingScale(maxAbs: number, t: RedesignTokens) {
