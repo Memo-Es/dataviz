@@ -1,53 +1,100 @@
 /**
- * Ranking by net[t] (SPEC.md section 6, view 4). No Figma/notebook reference for this view, so
- * it follows whichever chart-colour language is active, so colour carries one meaning across
- * the whole explorer either way. Row shape (a small send/recv dot, the name, a bold number --
- * no ring, no bar) matches the client's own Figma reference (node 17141:14591): nothing in that
- * file uses a progress ring or bar as a per-row indicator, so this stays in its plain, mostly-
- * text register instead of inventing a component the reference doesn't have.
+ * Net spillover per market (notebook cell 16's TO / FROM / NET table, as a diverging bar
+ * chart): senders above zero in red, receivers below in blue. Fixed domain across weeks.
  */
-import { BASELINE, FONTS, type RedesignTokens } from "../encoding";
-import type { ChartStyle } from "../state";
+import * as d3 from "d3";
+import type { Frame } from "../model";
+import { type Palette, fmtSigned } from "../encoding";
 
-export interface RankingDatum {
-  names: string[];
-  net: number[];
-  style: ChartStyle;
-  tokens: RedesignTokens;
-  selectedMarket?: string | null;
-  onSelect?: (name: string) => void;
-}
+const ROW = 26;
 
-export class RankingList {
-  constructor(private host: HTMLElement) {}
+export class RankingChart {
+  private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
+  private width = 360;
+  private last: Parameters<RankingChart["render"]> | null = null;
 
-  render(d: RankingDatum) {
-    const order = d.names
-      .map((name, i) => ({ name, net: d.net[i] }))
-      .sort((a, b) => b.net - a.net);
-    const isRedesign = d.style === "redesign";
-    const sendColor = isRedesign ? d.tokens.send : BASELINE.sendColor;
-    const recvColor = isRedesign ? d.tokens.recv : BASELINE.recvColor;
-    const nameFont = isRedesign ? FONTS.body : BASELINE.fontFamily;
-    const valueFont = isRedesign ? FONTS.data : BASELINE.fontFamily;
+  constructor(
+    host: HTMLElement,
+    private names: string[],
+    private onHover: (n: string | null) => void,
+    private onSelect: (n: string) => void
+  ) {
+    this.svg = d3.select(host).append("svg").attr("class", "ranking");
+    new ResizeObserver(() => {
+      const w = Math.round(host.clientWidth);
+      if (w && w !== this.width) {
+        this.width = w;
+        if (this.last) this.render(...this.last);
+      }
+    }).observe(host);
+  }
 
-    this.host.innerHTML = order
-      .map((o) => {
-        const color = o.net >= 0 ? sendColor : recvColor;
-        const selected = d.selectedMarket === o.name ? "font-weight:700;" : "";
-        return `
-          <div class="metric-row" data-market="${o.name}" style="font-family:${nameFont};${selected}">
-            <div class="metric-row-dot" style="background:${color}"></div>
-            <div class="metric-row-main">
-              <div class="metric-row-label">${o.name}</div>
-            </div>
-            <div class="metric-row-value" style="font-family:${valueFont}">${o.net.toFixed(1)}<span class="metric-row-unit">%</span></div>
-          </div>
-        `;
-      })
-      .join("");
-    this.host.querySelectorAll<HTMLElement>(".metric-row").forEach((row) => {
-      row.addEventListener("click", () => d.onSelect?.(row.dataset.market!));
-    });
+  render(frame: Frame, p: Palette, maxNet: number, focus: string | null, selected: string | null) {
+    this.last = [frame, p, maxNet, focus, selected];
+    const W = this.width;
+    const labelW = 96;
+    const valueW = 52;
+    const H = this.names.length * ROW + 8;
+    this.svg.attr("width", W).attr("height", H).attr("viewBox", `0 0 ${W} ${H}`);
+    const x = d3
+      .scaleLinear()
+      .domain([-maxNet, maxNet])
+      .range([labelW, W - valueW]);
+    const rows = this.names
+      .map((name, i) => ({ name, i, v: frame.net[i] }))
+      .sort((a, b) => b.v - a.v);
+
+    this.svg.selectAll("line.zero").data([0]).join("line").attr("class", "zero")
+      .attr("x1", x(0)).attr("x2", x(0)).attr("y1", 0).attr("y2", H).attr("stroke", p.axis);
+
+    const g = this.svg
+      .selectAll<SVGGElement, (typeof rows)[number]>("g.row")
+      .data(rows, (d) => d.name)
+      .join((enter) => {
+        const r = enter.append("g").attr("class", "row").attr("tabindex", 0).attr("role", "button");
+        r.append("rect").attr("class", "row-bg");
+        r.append("text").attr("class", "row-name");
+        r.append("rect").attr("class", "bar");
+        r.append("text").attr("class", "row-value");
+        r.on("mouseenter", (_e, d) => this.onHover(d.name))
+          .on("mouseleave", () => this.onHover(null))
+          .on("click", (_e, d) => this.onSelect(d.name))
+          .on("keydown", (ev: KeyboardEvent, d) => {
+            if (ev.key === "Enter" || ev.key === " ") {
+              ev.preventDefault();
+              this.onSelect(d.name);
+            }
+          });
+        return r;
+      });
+
+    g.attr("transform", (_d, i) => `translate(0,${4 + i * ROW})`)
+      .attr("aria-label", (d) => `${d.name}: net ${fmtSigned(d.v)} percentage points`)
+      .style("opacity", (d) => (focus && focus !== d.name ? 0.45 : 1));
+    g.select("rect.row-bg")
+      .attr("x", 0)
+      .attr("width", W)
+      .attr("height", ROW - 2)
+      .attr("rx", 6)
+      .attr("fill", (d) => (d.name === selected ? p.band : "transparent"));
+    g.select("text.row-name")
+      .attr("x", 8)
+      .attr("y", ROW / 2 - 1)
+      .attr("dy", "0.35em")
+      .attr("font-weight", (d) => (d.name === selected ? 700 : 500))
+      .text((d) => d.name);
+    g.select("rect.bar")
+      .attr("x", (d) => Math.min(x(0), x(d.v)))
+      .attr("width", (d) => Math.max(1, Math.abs(x(d.v) - x(0))))
+      .attr("y", 5)
+      .attr("height", ROW - 12)
+      .attr("rx", 3)
+      .attr("fill", (d) => (d.v >= 0 ? p.send : p.recv));
+    g.select("text.row-value")
+      .attr("x", W - 6)
+      .attr("y", ROW / 2 - 1)
+      .attr("dy", "0.35em")
+      .attr("text-anchor", "end")
+      .text((d) => fmtSigned(d.v));
   }
 }

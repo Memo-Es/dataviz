@@ -2,8 +2,8 @@
 Renders the three example figures in styleguide/STYLE_GUIDE.md: the same real library
 functions as the notebook (plot_connectedness_graph, spillover_heatmap, a plain line plot for
 the rolling index), restyled by recolouring their matplotlib output after the fact -- not by
-changing the library. Run after pipeline/run_on_synthetic.py (or run_demo.py for real data);
-reuses the same synthetic input so the numbers match what's in app/public/data/.
+changing the library. Run after pipeline/run_demo.py: it reads the Yahoo Finance download that
+run saved (app/public/data/raw_snapshot.csv.gz), so the numbers match what's in app/public/data/.
 """
 from __future__ import annotations
 
@@ -19,8 +19,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import synthetic_input as si  # noqa: E402
+import json  # noqa: E402
 
 from pyconnectedness import dynamic_connectedness, static_connectedness  # noqa: E402
 from pyconnectedness.viz import connectedness_graph, plot_connectedness_graph, spillover_heatmap  # noqa: E402
@@ -44,9 +43,10 @@ for font_file in (STYLEGUIDE / "fonts").glob("*.ttf") if (STYLEGUIDE / "fonts").
     fm.fontManager.addfont(str(font_file))
 plt.style.use(str(STYLEGUIDE / "pyconnectedness.mplstyle"))
 
-# ---- recompute from the same synthetic input run_on_synthetic.py used ----
-markets = {ticker: name for name, ticker in si.TICKERS.items()}
-raw = si.build_raw_frame(overall_scale=1.0)
+# ---- the notebook's own cell 6, on the raw download run_demo.py saved ----
+DATA = ROOT / "app" / "public" / "data"
+markets = {t: n for n, t in json.loads((DATA / "connectedness.json").read_text())["tickers"].items()}
+raw = pd.read_csv(DATA / "raw_snapshot.csv.gz", header=[0, 1], index_col=0, parse_dates=True)
 close = raw["Close"].rename(columns=markets)[list(markets.values())]
 high = raw["High"].rename(columns=markets)[list(markets.values())]
 low = raw["Low"].rename(columns=markets)[list(markets.values())]

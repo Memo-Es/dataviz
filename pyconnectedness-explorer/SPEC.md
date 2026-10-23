@@ -60,7 +60,6 @@ pyconnectedness-explorer/
     run_demo.py                ← executes Demo.ipynb unchanged + appends the export cell
     export_cell.py             ← the only code we add (section 3)
     validate.py                ← checks against the notebook's own printed outputs (section 5)
-    generate_placeholder.py    ← NOT in the original spec: synthetic stand-in data, see README
     out/Demo.executed.ipynb    ← executed copy, committed for audit (produced by a real run)
   app/                         ← Vite + TypeScript + D3 (section 6)
     public/data/               ← pipeline output, committed (connectedness.json, *.f32)

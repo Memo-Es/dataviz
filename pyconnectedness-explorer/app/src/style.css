@@ -1,885 +1,770 @@
-/* fg/secondary/muted/grid/axis/send/recv/mid/crisis/band mirror app/src/encoding.ts
-   REDESIGN_LIGHT/REDESIGN_DARK -- those are the validated, matplotlib-guide-matched chart
-   values (CONTEXT.md's decision log) and must not drift here on their own. bg/panel/
-   panel-raised, accent, card-shadow and the radii are the ones that file's own comment already
-   scopes as "web-shell-only" (chrome around the charts, never the charts' own canvas).
-   THESE VALUES ARE PULLED DIRECTLY from the client's own Figma file (node 17141:14591,
-   fileKey flAw99U6HT1zIKESVjmq3O) via get_variable_defs and get_design_context, not from an
-   outside reference app -- earlier passes styled this shell off Fitbit/Pillow/Commons/Google
-   Arts & Culture instead of the one reference that was actually authoritative. Source values,
-   verbatim: base #F8F7F0, r.Potential/Base/White #FFFFFF, r.Potential/Texts/Black #111111,
-   r.Potential/Base/Dark Grey #3F3F3D, r.Potential/Base/Grey #918C86, r.Potential/Base/Light
-   Grey #D3D3D2, r.Potential/Primary/Burnt Orange #E9580B, r.Potential/Secondary/Orange
-   #FF9D26, the Tag chip (#FFEDD4 bg / #CA3500 text), the "Card" effect
-   (0px 8px 12px rgba(0,0,0,0.06)), and 22.2px corner radius. Dark mode has no counterpart in
-   the file; it keeps the same warm-brown hue family and the same orange accent, inverted. */
+/* One token set for the whole page. Chart code reads these through encoding.ts readPalette(),
+   so charts and chrome can never drift apart. Base, accent and card shadow come from the
+   client's Figma file (base #F8F7F0, Burnt Orange #E9580B, "Card" effect); send/recv are the
+   validated diverging pair documented in styleguide/STYLE_GUIDE.md. */
 :root {
   --bg: #f8f7f0;
   --panel: #ffffff;
-  --panel-raised: #ffffff; /* the reference never uses a second fill tone -- card hierarchy on
-    its own white canvas comes from the border + "Card" shadow below, not a darker grey */
   --fg: #111111;
-  --secondary: #3f3f3d;
-  --muted: #918c86;
-  --line: rgba(211, 211, 210, 0.5);
-  --grid: #ececea;
+  --secondary: #4a4946;
+  --muted: #8c8882;
+  --line: rgba(17, 17, 17, 0.08);
+  --grid: #eeede8;
   --axis: #d3d3d2;
   --send: #e34948;
   --recv: #2a78d6;
   --mid: #f0efec;
-  --crisis: #d03b3b;
-  --band: #eceae4;
-  --edge: #52514e;
-  --accent: #e9580b; /* r.Potential/Primary/Burnt Orange, verbatim */
-  --accent-2: #ff9d26; /* r.Potential/Secondary/Orange -- the donut chart's second slice colour */
-  --accent-wash: rgba(233, 88, 11, 0.12);
-  --tag-bg: #ffedd4;
-  --tag-fg: #ca3500;
-  --chip-bg: rgba(255, 252, 250, 0.7);
-  --chip-border: rgba(233, 88, 11, 0.5);
-  --card-shadow: 0 8px 12px rgba(0, 0, 0, 0.06); /* the reference's own "Card" effect token */
-  --card-highlight: rgba(255, 255, 255, 0.6);
-  --radius-card: 22px;
-  --radius-chart: 18px;
-  --radius-pill: 999px;
-  --f-display: "Plus Jakarta Sans", system-ui, sans-serif;
-  --f-body: "Plus Jakarta Sans", system-ui, sans-serif;
-  --f-data: "B612 Mono", "SFMono-Regular", monospace;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #17140f;
-    --panel: #221e18;
-    --panel-raised: #2b261e;
-    --fg: #f5f1ea;
-    --secondary: #cdc6ba;
-    --muted: #9c9388;
-    --line: rgba(255, 255, 255, 0.08);
-    --grid: #2c2c2a;
-    --axis: #383835;
-    --send: #e66767;
-    --recv: #3987e5;
-    --mid: #383835;
-    --crisis: #d03b3b;
-    --band: #201f1c;
-    --edge: #c3c2b7;
-    --accent: #ff7a33;
-    --accent-2: #ffb15a;
-    --accent-wash: rgba(255, 122, 51, 0.16);
-    --tag-bg: rgba(255, 157, 38, 0.18);
-    --tag-fg: #ffb57a;
-    --chip-bg: rgba(255, 255, 255, 0.04);
-    --chip-border: rgba(255, 122, 51, 0.4);
-    --card-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
-    --card-highlight: rgba(255, 255, 255, 0.06);
-  }
+  --crisis: #6b6a66;
+  --band: #f1efe8;
+  --accent: #e9580b;
+  --accent-wash: rgba(233, 88, 11, 0.1);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.05);
+  --radius: 20px;
+  --f-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --f-serif: "Source Serif 4", Georgia, serif;
+  color-scheme: light;
 }
 
 :root[data-theme="dark"] {
-  --bg: #17140f;
-  --panel: #221e18;
-  --panel-raised: #2b261e;
-  --fg: #f5f1ea;
-  --secondary: #cdc6ba;
-  --muted: #9c9388;
+  --bg: #13120f;
+  --panel: #1c1b18;
+  --fg: #f3f1ec;
+  --secondary: #c9c5bc;
+  --muted: #8f8a82;
   --line: rgba(255, 255, 255, 0.08);
-  --grid: #2c2c2a;
-  --axis: #383835;
-  --send: #e66767;
-  --recv: #3987e5;
-  --mid: #383835;
-  --crisis: #d03b3b;
-  --band: #201f1c;
-  --edge: #c3c2b7;
+  --grid: #2a2926;
+  --axis: #3d3c38;
+  --send: #ee6b6a;
+  --recv: #4a95ef;
+  --mid: #34332f;
+  --crisis: #a9a59c;
+  --band: #262521;
   --accent: #ff7a33;
-  --accent-2: #ffb15a;
-  --accent-wash: rgba(255, 122, 51, 0.16);
-  --tag-bg: rgba(255, 157, 38, 0.18);
-  --tag-fg: #ffb57a;
-  --chip-bg: rgba(255, 255, 255, 0.04);
-  --chip-border: rgba(255, 122, 51, 0.4);
-  --card-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
-  --card-highlight: rgba(255, 255, 255, 0.06);
+  --accent-wash: rgba(255, 122, 51, 0.14);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+  color-scheme: dark;
 }
 
-* { box-sizing: border-box; }
-
-/* The whole app went through a Fitbit componentization pass and every control still fell back
-   to the raw browser-default blue focus ring -- the one colour nowhere else in this system,
-   landing hardest on exactly the controls that got the most redesign attention (the header
-   tabs). Keyboard/tab-order focus still needs a visible ring (accessibility, not taste), so
-   this gives every interactive element the app's own accent instead of the UA default, and
-   only on keyboard focus (:focus-visible), not on every mouse click. */
-*:focus { outline: none; }
-a:focus-visible, button:focus-visible, select:focus-visible, [tabindex]:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: 4px;
+* {
+  box-sizing: border-box;
 }
 
-html, body {
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
   margin: 0;
-  padding: 0;
   background: var(--bg);
   color: var(--fg);
-  font-family: var(--f-body);
+  font: 400 15px/1.5 var(--f-sans);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* The client's Figma reference is one big white rounded canvas (30px top corners on its Top
-   Nav) floating on the warm page background -- not an edge-to-edge flat page. #app IS that
-   canvas now. Deliberately ONE scroll surface: the canvas grows with its content and the page
-   itself scrolls; nothing inside gets its own independent max-height/overflow, which is what
-   produced the double scrollbar the inner ranking list had before (see that rule's removal
-   below). A fixed bottom tab bar + FAB stood in for navigation in the previous pass -- neither
-   exists anywhere in the reference, so both are gone; layout/style/measure are plain controls
-   in the nav row below instead. */
-
-#app {
-  max-width: 1400px;
-  margin: 32px auto;
-  background: var(--panel);
-  border-radius: 30px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 30px 60px rgba(17, 17, 17, 0.08);
-  padding: 24px 32px 40px;
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-}
-:root[data-theme="dark"] #app { box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 30px 70px rgba(0,0,0,0.55); }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) #app { box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 30px 70px rgba(0,0,0,0.55); }
+a {
+  color: inherit;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 3px;
 }
 
-/* The reference's own "Top Nav": one thin row, a breadcrumb-weight label (never a big display
-   H1), metadata text and a couple of ghost icon buttons on the right, bottom border, nothing
-   else. Our app needs more controls than that single row has room for (layout/style/measure
-   have no equivalent in the reference at all), so they live in a second row underneath using
-   the reference's own "Prompt button" chip -- its one real choice-control component. */
+code {
+  font: 500 0.9em ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--band);
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ---- top bar ---- */
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
   gap: 16px;
-  padding-bottom: 16px;
+  padding: 12px max(16px, calc((100vw - 1280px) / 2));
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  backdrop-filter: saturate(1.4) blur(12px);
   border-bottom: 1px solid var(--line);
 }
 
-.topbar-title {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.topbar h1 {
-  font-family: var(--f-display);
-  font-size: 15.5px;
-  font-weight: 600;
-  letter-spacing: -0.005em;
-  color: var(--fg);
-  margin: 0;
-}
-
-.topbar .subtitle {
-  color: var(--muted);
-  font-size: 13px;
-  margin: 0;
-}
-
-.controls {
+.brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
+  font-size: 15px;
+  letter-spacing: -0.01em;
 }
 
-/* The reference's "Prompt button" (Target Metric card's suggested-question chips): a pale,
-   warm-tinted outline, never a filled pill at rest -- selection is a solid accent fill, the
-   same treatment its own "Publish" button uses for a primary action. .pill-group keeps its
-   class name so every layout file already building one picks this up unchanged. */
-.pill-group {
+.brand svg {
+  width: 26px;
+  height: 26px;
+  color: var(--muted);
+}
+
+.brand b {
+  font-weight: 700;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.segmented {
   display: inline-flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  padding: 3px;
+  background: var(--band);
+  border-radius: 999px;
 }
 
-.pill-group button {
-  border: 1px solid var(--chip-border);
-  background: var(--chip-bg);
+.segmented button {
+  border: 0;
+  background: transparent;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 600;
   color: var(--secondary);
-  padding: 7px 14px;
-  border-radius: 12px;
-  font: 600 13px var(--f-body);
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s, color 0.15s;
 }
 
-.pill-group button[aria-pressed="true"] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-button.icon-btn {
-  border: 1px solid var(--line);
+.segmented button[aria-pressed="true"] {
   background: var(--panel);
-  color: var(--secondary);
-  border-radius: 50%;
+  color: var(--fg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
   width: 34px;
   height: 34px;
-  font-size: 13px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s ease;
-}
-button.icon-btn:hover { background: var(--grid); }
-/* the play/pause control is the one piece of transport chrome worth calling out in colour --
-   the reference's one filled control ("Publish") is a solid dark/accent pill, not a neutral tile */
-button.icon-btn#play {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-select {
   border: 1px solid var(--line);
   background: var(--panel);
-  color: var(--fg);
-  border-radius: 12px;
-  padding: 9px 14px;
-  font: 600 13px var(--f-body);
-}
-
-/* Dropped from a wall-of-text block down to a quiet one-line strip -- nothing in any reference
-   app carries paragraph-length disclaimer text above the fold. Full text stays (it's required
-   content), just no longer competing visually with the actual product. */
-.banner {
-  background: transparent;
-  color: var(--muted);
-  border-radius: 10px;
-  padding: 2px 0;
-  font-size: 11px;
-  line-height: 1.5;
-}
-.banner strong { font-weight: 600; color: var(--secondary); }
-.banner.prototype { opacity: 0.9; }
-
-/* Card anatomy straight off the reference's "Metric"/"Component header" nodes: a white card,
-   a 1px hairline border (not just a shadow), the "Card" shadow token, and a header row of
-   (label, maximize icon) -- the label sits in --secondary ink, medium weight, not a bold
-   --fg headline (the reference reserves --fg/black for the big number underneath it, not the
-   card's own title) and there's no colour-dot bullet in the source at all. */
-.panel {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  box-shadow: var(--card-shadow);
-  padding: 26px 28px 28px;
-  position: relative;
-}
-
-.panel h2 {
-  font-family: var(--f-body);
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -0.005em;
+  border-radius: 999px;
+  font-size: 16px;
+  line-height: 1;
   color: var(--secondary);
-  margin: 0 0 16px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-right: 28px; /* room for the maximize glyph below */
-}
-.panel h2::after {
-  content: "\2922"; /* nw-se open arrows, the reference's own "maximize-01" glyph shape */
-  position: absolute;
-  top: 24px;
-  right: 26px;
-  font-size: 15px;
-  color: var(--muted);
-  font-weight: 400;
 }
 
-.chart-card {
-  background: #ffffff; /* chart bodies stay matplotlib-white, see encoding.ts BASELINE */
-  border-radius: var(--radius-chart);
-  overflow: auto;
-  display: flex;
-  flex-direction: column; /* flex:1 below grows along height, not width */
+.icon-btn:hover {
+  color: var(--fg);
+  border-color: var(--axis);
 }
-/* flex, not height:100% -- percentage height on the svg doesn't reliably resolve as "definite"
-   against a flex-grown ancestor (Chromium keeps the svg at its intrinsic viewBox-ratio height
-   regardless), leaving blank space below the chart in any stretched container (bento tiles,
-   shell/story stages). A flex child with min-height:0 fills available space when the parent is
-   externally constrained, and still shrinks to the svg's natural size when it isn't (the plain
-   baseline layout, where .chart-card has no explicit height) -- correct in both cases. */
-.chart-card svg { display: block; width: 100%; flex: 1; min-height: 0; }
-:root[data-theme="dark"] .chart-card { box-shadow: 0 0 0 1px rgba(255,255,255,0.06); }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .chart-card { box-shadow: 0 0 0 1px rgba(255,255,255,0.06); }
+
+/* ---- layout ---- */
+main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 16px 40px;
+}
+
+.hero {
+  padding: 48px 0 28px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hero h1 {
+  margin: 0;
+  max-width: 980px;
+  font: 500 clamp(26px, 3.6vw, 44px) / 1.15 var(--f-serif);
+  letter-spacing: -0.015em;
+}
+
+.hl {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.hl-send {
+  color: var(--send);
+  font-weight: 600;
+}
+
+.lede {
+  max-width: 720px;
+  margin: 16px 0 0;
+  font-size: 16px;
+  color: var(--secondary);
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 32px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 20px;
+  background: var(--panel);
+  min-width: 0;
+}
+
+.k {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.kpi .v {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kpi .v small {
+  font-size: 0.55em;
+  font-weight: 600;
+  color: var(--muted);
+  margin-left: 2px;
+}
+
+.kpi .v.small {
+  font-size: 22px;
+  padding: 6px 0 3px;
+}
+
+.kpi .d {
+  font-size: 13px;
+  color: var(--secondary);
+}
+
+.kpi .d.up::before {
+  content: "▲ ";
+  color: var(--send);
+  font-size: 10px;
+}
+
+.kpi .d.down::before {
+  content: "▼ ";
+  color: var(--recv);
+  font-size: 10px;
+}
+
+.send {
+  color: var(--send);
+}
+
+.recv {
+  color: var(--recv);
+}
+
+.muted {
+  color: var(--muted);
 }
 
 .grid {
   display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 16px;
-}
-.grid .span-2 { grid-column: 1 / -1; }
-
-@media (max-width: 860px) {
-  .grid { grid-template-columns: 1fr; }
-  #app { padding: 12px; }
-  .topbar h1 { font-size: 19px; }
-}
-
-.row {
-  display: flex;
-  gap: 22px;
-  flex-wrap: wrap;
-}
-.row > .panel { flex: 1 1 320px; }
-
-.footnote {
-  color: var(--muted);
-  font-size: 11.5px;
-  line-height: 1.6;
-  font-family: var(--f-data);
-  padding: 4px 2px 16px;
-}
-
-.legend-note {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 6px;
-}
-
-.detail-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 13px;
-  padding: 6px 2px;
-  border-bottom: 1px solid var(--grid);
-}
-.detail-row:last-child { border-bottom: none; }
-.detail-row .k { color: var(--muted); }
-.detail-row .v { font-family: var(--f-data); }
-
-.pill {
-  display: inline-block;
-  border-radius: var(--radius-pill);
-  padding: 3px 11px;
-  font-size: 11.5px;
-  font-weight: 600;
-}
-.pill.send { background: color-mix(in srgb, var(--send) 18%, transparent); color: var(--send); }
-.pill.recv { background: color-mix(in srgb, var(--recv) 18%, transparent); color: var(--recv); }
-
-/* The reference's own "Tag" (the Target Metric card's "Medium Confidence (±5%)" badge),
-   verbatim: #FFEDD4 fill, #CA3500 text, 8px radius -- one warm status colour, not a diverging
-   send/recv pair, used for any badge that isn't itself encoding sender/receiver direction. */
-.tag {
-  display: inline-block;
-  background: var(--tag-bg);
-  color: var(--tag-fg);
-  border-radius: 8px;
-  padding: 5px 10px;
-  font-size: 12.5px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-}
-
-/* The reference's big headline number (Target Metric's "$10.8B", Projected Potential's
-   "€252M"): large, regular weight (not black/800), --fg ink -- the card header label carries
-   the weight instead (see .panel h2 / .tile-eyebrow above). */
-.stat-value {
-  font-family: var(--f-display);
-  font-size: 40px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  color: var(--fg);
-  line-height: 1.15;
-  margin: 10px 0 6px;
-}
-.stat-value-sm { font-size: 28px; margin: 8px 0 4px; }
-.stat-unit { font-size: 0.55em; font-weight: 600; color: var(--muted); margin-left: 2px; }
-
-/* A plain list row: a small send/recv dot, the name, and a big bold number -- no progress-ring
-   badge. The reference has no ranking view of its own to copy, but nothing in it uses a ring
-   or donut as a per-row indicator either (its one donut is a dedicated chart card, not a list
-   decoration), so this stays in its restrained, mostly-text register instead. */
-.metric-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 13.5px;
-  padding: 12px 10px;
-  margin: 0 -10px;
-  border-radius: 14px;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-.metric-row:hover { background: var(--grid); }
-.metric-row:hover .metric-row-label { text-decoration: underline; }
-.metric-row-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
-.metric-row-main { min-width: 0; flex: 1; }
-.metric-row-label {
-  font-weight: 600;
-  color: var(--secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 1px;
-}
-.metric-row-value {
-  font-family: var(--f-body);
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--fg);
-  line-height: 1.15;
-  flex: none;
-}
-.metric-row-unit { font-size: 13px; font-weight: 600; color: var(--muted); margin-left: 1px; }
-.metric-row-caption { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
-
-svg text { font-family: inherit; }
-
-/* ============================================================
-   Bento dashboard -- asymmetric grid of insight/metric/hero tiles
-   ============================================================ */
-.bento-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1.5fr;
-  grid-template-areas:
-    "insight  metric   network"
-    "timeline insight2 network"
-    "heatmap  heatmap  ranking";
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 20px;
-  /* "start", not "stretch": the network tile spans all 3 rows, and stretching every row to
-     match its height left the small text tiles with a lot of dead space under their content */
-  align-items: start;
+  margin: 20px 0;
 }
-.t-insight, .t-metric, .t-insight2 { min-height: 210px; }
-.t-network { min-height: 600px; }
-.t-timeline { min-height: 250px; }
-.t-heatmap, .t-ranking { min-height: 600px; }
-.tile {
+
+.card {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  box-shadow: var(--card-shadow);
-  padding: 24px;
-  position: relative;
-  display: flex;
-  flex-direction: column;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px 24px 20px;
   min-width: 0;
 }
-.t-insight { grid-area: insight; }
-.t-metric { grid-area: metric; }
-.t-network { grid-area: network; }
-.t-timeline { grid-area: timeline; }
-.t-insight2 { grid-area: insight2; }
-.t-heatmap { grid-area: heatmap; }
-/* no max-height/overflow here -- a scrollable tile nested inside an already-scrolling page is
-   a double scrollbar, which the reference never does (its own content frame is taller than its
-   viewport and scrolls as ONE surface). This tile just grows with its content instead. */
-.t-ranking { grid-area: ranking; }
-.t-network .chart-card, .t-timeline .chart-card, .t-heatmap .chart-card { flex: 1; margin-top: 14px; }
 
-/* the reference's card header is a plain secondary-ink label, not a small uppercase accent
-   tag -- see .panel h2 above, which this matches (and reuses the same maximize glyph). */
-.tile-eyebrow {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.005em;
-  color: var(--secondary);
-  padding-right: 24px;
+.span-12 {
+  grid-column: span 12;
 }
-.tile-eyebrow::after {
-  content: "\2922";
-  position: absolute;
-  top: 22px;
-  right: 22px;
-  font-size: 14px;
-  color: var(--muted);
+
+.span-7 {
+  grid-column: span 7;
 }
-.tile-headline {
-  font-family: var(--f-display);
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--fg);
-  margin: 10px 0 6px;
-  line-height: 1.25;
+
+.span-5 {
+  grid-column: span 5;
 }
-.tile-body {
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.card h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.sub {
+  margin: 4px 0 0;
   font-size: 13.5px;
   color: var(--secondary);
-  line-height: 1.55;
-  margin: 0;
+  max-width: 720px;
 }
-.t-metric .tag { align-self: flex-start; }
 
-.tile-header {
+.chart-host {
+  width: 100%;
+  min-width: 0;
+}
+
+svg {
+  display: block;
+  font-family: var(--f-sans);
+}
+
+/* ---- timeline ---- */
+.timeline {
+  touch-action: pan-y;
+  cursor: crosshair;
+}
+
+.axis-label {
+  font-size: 11px;
+  fill: var(--muted);
+}
+
+.episode-label {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ref-label {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.band-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.band-hit {
+  cursor: pointer;
+}
+
+.cursor-label {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.player {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
   gap: 8px;
 }
-.tile-header h2 { margin: 0; font-size: 18px; font-weight: 600; color: var(--secondary); letter-spacing: -0.005em; }
 
-@media (max-width: 1100px) {
-  .bento-grid {
-    grid-template-columns: 1fr 1fr;
-    grid-template-areas:
-      "insight  metric"
-      "network  network"
-      "timeline insight2"
-      "heatmap  heatmap"
-      "ranking  ranking";
-  }
-}
-@media (max-width: 680px) {
-  .bento-grid { grid-template-columns: 1fr; grid-template-areas: "insight" "metric" "network" "timeline" "insight2" "heatmap" "ranking"; }
+.play {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--fg);
+  color: var(--panel);
+  font-size: 13px;
+  letter-spacing: -2px;
 }
 
-.drilldown {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
+.play:hover {
+  background: var(--accent);
+}
+
+.windows {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-.drilldown[hidden] { display: none; } /* the explicit display:flex above otherwise beats the
-  browser's own [hidden]{display:none} default, leaving the overlay clickable while invisible */
-.drilldown-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(10, 10, 10, 0.45);
-  backdrop-filter: blur(6px);
-}
-.drilldown-card {
-  position: relative;
-  background: var(--panel);
-  border-radius: var(--radius-card);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
-  padding: 32px;
-  width: min(760px, 100%);
-  max-height: 86vh;
-  overflow: auto;
-}
-.drilldown-card h2 { margin: 4px 0 18px; font-size: 26px; letter-spacing: -0.01em; }
-.drilldown-close {
-  position: absolute;
-  top: 18px;
-  right: 18px;
-  font-size: 20px;
-  line-height: 1;
-}
-.drilldown-stats {
-  display: flex;
-  gap: 28px;
-  margin-bottom: 18px;
   flex-wrap: wrap;
-}
-.drill-stat-value { font-size: 28px; font-weight: 800; letter-spacing: -0.01em; }
-.drill-stat-label { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
-.drilldown-card .chart-card { height: 260px; }
-.drilldown-links {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  margin-top: 20px;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
 }
 
-/* ============================================================
-   App-shell split view -- persistent rail + single big chart pane
-   ============================================================ */
-.shell {
-  display: flex;
-  gap: 20px;
-  align-items: stretch;
-  min-height: 760px;
-}
-.shell-rail {
-  flex: 0 0 272px;
-  background: var(--panel);
+.windows button,
+.tabs button,
+.empty button {
   border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  box-shadow: var(--card-shadow);
-  padding: 22px 18px;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.shell-brand {
-  font-weight: 800;
-  font-size: 15px;
-  letter-spacing: -0.01em;
-  padding: 4px 10px 18px;
-}
-.shell-nav { display: flex; flex-direction: column; gap: 4px; margin-bottom: 22px; }
-.shell-nav-btn {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border: none;
   background: transparent;
+  padding: 6px 13px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--secondary);
-  font: 600 14px var(--f-body);
-  padding: 11px 12px;
-  border-radius: 12px;
-  cursor: pointer;
-  text-align: left;
-}
-.shell-nav-btn:hover { background: var(--panel-raised); }
-/* Fitbit never fills a selected nav row solid -- the active bottom tab just turns teal. A
-   soft tint + teal text/icon reads as "selected" the same way without a block of solid colour
-   competing with the ring-badge accents elsewhere on the same screen. */
-.shell-nav-btn.active { background: var(--accent-wash); color: var(--accent); font-weight: 700; }
-.shell-nav-icon { font-size: 10px; opacity: 0.8; width: 14px; display: inline-block; }
-.shell-rail-section {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-  padding: 0 10px 8px;
-}
-/* No overflow:auto here on purpose -- nested independent scroll inside a page that already
-   scrolls is a double scrollbar. The rail just grows with its content now, same as the rest
-   of the page; .shell-stage's own flex:1 grows the chart stage to match. */
-.shell-ranking { flex: 1; min-height: 0; }
-
-.shell-main {
-  flex: 1;
-  min-width: 0;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  box-shadow: var(--card-shadow);
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-}
-.shell-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-.shell-toolbar h2 { margin: 0; font-size: 20px; }
-.shell-stage { position: relative; flex: 1; min-height: 480px; }
-.shell-chart { position: absolute; inset: 0; }
-.shell-detail { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--grid); }
-
-@media (max-width: 900px) {
-  .shell { flex-direction: column; min-height: 0; }
-  .shell-rail { flex: none; }
-  .shell-ranking { max-height: 280px; }
 }
 
-/* ============================================================
-   Story / gallery viewer -- reskinned off a Google Arts & Culture scan: full-bleed "artwork"
-   (the chart) on the gallery wall, floating circular icon buttons sitting ON the image instead
-   of a toolbar beside it, and a gradient caption card overlaid directly on the image the way a
-   museum caption sits on an AR tour photo. See layouts/story.ts's header.
-   Every colour here is a token or a color-mix() of one, same as Bento/Shell -- the stage is the
-   same --panel surface the other two layouts build their cards from, just full-bleed instead of
-   inset, so this reads as one design system in a third arrangement, not a separate skin.
-   ============================================================ */
-.story-stage {
-  position: relative;
-  height: min(76vh, 760px);
-  min-height: 460px;
-  border-radius: var(--radius-card);
-  overflow: hidden;
-  background: var(--panel);
-  box-shadow: var(--card-shadow);
-}
-/* bottom inset reserves room for the caption scrim so chart content (e.g. the heatmap's last
-   rows and x-axis labels) never ends up hidden underneath it */
-.story-chart { position: absolute; top: 0; left: 0; right: 0; bottom: 104px; }
-.story-chart .chart-card { height: 100%; background: transparent; }
-
-.story-scrim {
-  position: absolute;
-  left: 0;
-  right: 0;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 18px 20px;
-  pointer-events: none; /* only the controls inside should catch clicks, not the gradient itself */
-}
-.story-scrim > * { pointer-events: auto; }
-/* Both scrims are built from --panel, not a hardcoded black -- in dark mode that's still a
-   near-black fade (--panel is #1a1a19); in light mode it fades from the same cream surface
-   every other card uses instead of punching a black vignette into a light theme. Legibility
-   for the floating controls comes from their own panel-raised chips below, not this gradient. */
-.story-scrim-top {
-  top: 0;
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--panel) 70%, transparent), transparent);
-}
-.story-scrim-bottom {
-  bottom: 0;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 14px;
-  padding-top: 56px;
-  background: linear-gradient(to top, color-mix(in srgb, var(--panel) 82%, transparent), transparent);
-}
-
-/* Flat solid chips, not glass -- Fitbit's own carousel-dot indicator (the Weight Trends hero
-   chart's "* * * *" strip) and its FAB/pill buttons are plain solid fills, never a blurred
-   translucent panel; dropping backdrop-filter here matches that and the rest of this pass. */
-.story-dots { display: flex; gap: 8px; }
-.story-dot {
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  border: none;
-  background: var(--panel-raised);
-  color: var(--muted);
-  font: 700 12px var(--f-body);
-}
-.story-dot.active { background: var(--accent); color: #fff; }
-
-.story-fab-group { display: flex; gap: 6px; }
-.story-fab-pill {
-  border: none;
-  background: var(--panel-raised);
-  color: var(--secondary);
-  font: 600 12.5px var(--f-body);
-  padding: 7px 13px;
-  border-radius: var(--radius-pill);
-  cursor: pointer;
-}
-.story-fab-pill[aria-pressed="true"] { background: var(--accent); color: #fff; }
-
-.story-fab {
-  border: none;
-  background: var(--panel-raised);
+.windows button:hover,
+.tabs button:hover,
+.empty button:hover {
+  border-color: var(--axis);
   color: var(--fg);
-  width: 44px; height: 44px;
-  border-radius: 50%;
-  font-size: 18px;
+}
+
+.windows button[aria-pressed="true"],
+.tabs button[aria-selected="true"] {
+  background: var(--fg);
+  border-color: var(--fg);
+  color: var(--panel);
+}
+
+.windows button:first-child[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ---- network ---- */
+.network-host {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.network .node {
   cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.network .node:focus-visible {
+  outline: none;
+}
+
+.network .node:focus-visible .dot {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+.node-label {
+  font-size: 13px;
+  fill: var(--fg);
+}
+
+.region-arc {
+  fill: none;
+  stroke: var(--axis);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.region-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  fill: var(--muted);
+  paint-order: stroke;
+  stroke: var(--panel);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.edges path {
+  transition: fill-opacity 0.15s;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--secondary);
+}
+
+.legend span {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  transition: background 0.15s ease;
-}
-.story-fab:hover { background: var(--grid); }
-.story-fab-sm { width: 36px; height: 36px; font-size: 14px; }
-.story-fab-prev, .story-fab-next {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 3;
-}
-.story-fab-prev { left: 16px; }
-.story-fab-next { right: 16px; }
-
-.story-float {
-  position: absolute;
-  top: 70px;
-  right: 18px;
-  z-index: 2;
-  display: none;
-  gap: 8px;
-}
-.story-float select {
-  background: var(--panel-raised);
-  color: var(--fg);
-  border: none;
-  box-shadow: none;
+  gap: 7px;
 }
 
-.story-caption-eyebrow {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--accent);
-  margin-bottom: 4px;
+.legend .dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: currentColor;
 }
-.story-caption h2 { margin: 0 0 4px; font-size: 22px; color: var(--fg); letter-spacing: -0.01em; }
-.story-caption p { margin: 0; font-size: 13px; color: var(--secondary); }
-.story-transport { display: flex; gap: 8px; align-self: flex-end; }
 
-/* market gallery -- the same varied-size masonry wall as Google Arts & Culture's collection
-   grids, with |net spillover| standing in for "image size": a bigger shock gets a bigger tile. */
-.gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  grid-auto-flow: dense;
-  gap: 12px;
+.legend .dot.send {
+  color: var(--send);
 }
-.gallery-card {
-  border: none;
+
+.legend .dot.recv {
+  color: var(--recv);
+}
+
+.legend .taper {
+  width: 30px;
+  height: 8px;
+  background: var(--secondary);
+  opacity: 0.6;
+  clip-path: polygon(0 0, 100% 45%, 100% 55%, 0 100%);
+}
+
+.legend .sizes {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.legend .sizes b {
+  display: block;
+  border-radius: 50%;
+  border: 1.5px solid var(--muted);
+}
+
+.legend .sizes b:nth-child(1) {
+  width: 6px;
+  height: 6px;
+}
+
+.legend .sizes b:nth-child(2) {
+  width: 10px;
+  height: 10px;
+}
+
+.legend .sizes b:nth-child(3) {
+  width: 15px;
+  height: 15px;
+}
+
+.legend .ramp i {
+  width: 90px;
+  height: 10px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--recv), var(--mid), var(--send));
+}
+
+.legend .outlined {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1.5px solid var(--fg);
+}
+
+/* ---- ranking ---- */
+.ranking .row {
   cursor: pointer;
-  border-radius: 16px;
-  padding: 14px;
-  text-align: left;
+  transition: opacity 0.15s;
+}
+
+.ranking .row:hover .row-bg {
+  fill: var(--band);
+}
+
+.row-name {
+  font-size: 13px;
+  fill: var(--fg);
+}
+
+.row-value {
+  font-size: 13px;
+  font-weight: 700;
+  fill: var(--fg);
+}
+
+/* ---- heatmap ---- */
+.heatmap {
+  max-width: 620px;
+  margin: 0 auto;
+}
+
+.heatmap .cell {
+  transition: opacity 0.15s;
+}
+
+.axis-name {
+  font-size: 11px;
+  fill: var(--secondary);
+  cursor: pointer;
+}
+
+/* ---- detail ---- */
+.detail .eyebrow {
+  margin-bottom: 2px;
+}
+
+.detail h2 {
+  font-size: 26px;
+}
+
+.trio {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 8px 0 18px;
+}
+
+.trio > div {
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-  min-height: 90px;
-  background: color-mix(in srgb, var(--gcolor) 16%, var(--panel-raised));
-  transition: transform 0.15s ease;
+  gap: 2px;
+  padding: 12px 14px;
+  background: var(--band);
+  border-radius: 14px;
 }
-.gallery-card:hover { transform: translateY(-2px); }
-.gallery-card.selected { box-shadow: 0 0 0 2px var(--gcolor); }
-.gallery-card.gallery-lg { grid-column: span 2; grid-row: span 2; min-height: 190px; background: color-mix(in srgb, var(--gcolor) 30%, var(--panel-raised)); }
-.gallery-card.gallery-md { grid-row: span 1; background: color-mix(in srgb, var(--gcolor) 22%, var(--panel-raised)); }
-.gallery-card-value { font-family: var(--f-data); font-weight: 700; font-size: 15px; color: var(--gcolor); }
-.gallery-card.gallery-lg .gallery-card-value { font-size: 22px; }
-.gallery-card-name { font-size: 12.5px; font-weight: 600; color: var(--fg); margin-top: 2px; }
 
-.story-drawer-handle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  width: 100%;
-  margin-top: 14px;
-  border: none;
-  background: var(--panel);
-  box-shadow: var(--card-shadow);
-  color: var(--secondary);
-  font: 600 13px var(--f-body);
-  padding: 14px;
-  border-radius: var(--radius-pill);
-  cursor: pointer;
+.trio .v {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
-.story-drawer-chevron { font-size: 10px; transition: transform 0.2s ease; display: inline-block; }
-.story-drawer-handle.open .story-drawer-chevron { transform: rotate(180deg); }
 
-.story-drawer {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.25s ease;
+.spark-k {
+  margin: 0 0 4px;
 }
-.story-drawer.open { max-height: 640px; overflow: auto; }
-.story-drawer-grid {
+
+.lists {
   display: grid;
-  grid-template-columns: 1.3fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 20px;
-  background: var(--panel);
-  border-radius: var(--radius-card);
-  box-shadow: var(--card-shadow);
-  padding: 24px;
-  margin-top: 10px;
+  margin-top: 18px;
 }
-.story-drawer-grid h2 { margin: 0 0 12px; font-size: 16px; }
-@media (max-width: 760px) {
-  .story-drawer-grid { grid-template-columns: 1fr; }
+
+.lists .k {
+  margin: 0 0 6px;
+}
+
+.lists ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lists li {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.empty {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* ---- notebook figures ---- */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.nb-figure {
+  margin: 0;
+  background: #fff;
+  border-radius: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+}
+
+.nb-figure img {
+  display: block;
+  max-width: 100%;
+  max-height: 760px;
+  margin: 0 auto;
+}
+
+.nb-figure figcaption {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: #6b6a66;
+  text-align: center;
+}
+
+/* ---- footer ---- */
+.footer {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 8px 16px 56px;
+  font-size: 13px;
+  color: var(--secondary);
+}
+
+.footer p {
+  max-width: 820px;
+  margin: 0 0 8px;
+}
+
+/* ---- small screens ---- */
+@media (max-width: 960px) {
+  .span-7,
+  .span-5 {
+    grid-column: span 12;
+  }
+
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .brand span {
+    display: none;
+  }
+
+  .hero {
+    padding-top: 28px;
+  }
+
+  .card {
+    padding: 18px 16px;
+  }
+
+  .card-head {
+    flex-direction: column;
+  }
+
+  .kpi .v {
+    font-size: 26px;
+  }
+
+  .lists {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
 }

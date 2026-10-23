@@ -3,10 +3,9 @@ Checks app/public/data/connectedness.json against the values the pinned notebook
 printed (SPEC.md section 5). Stop and report on any failure rather than loosening the
 tolerance -- see SPEC.md's non-negotiable rule.
 
-This only makes sense to run against a REAL run of run_demo.py (real Yahoo Finance data).
-It will not, and should not, pass against pipeline/run_on_synthetic.py's output: that output
-is clearly marked `"synthetic": true` in the JSON, and this script refuses to run on it so a
-synthetic run can never be mistaken for a validated one.
+Run after pipeline/run_demo.py. .github/workflows/notebook-data.yml runs both and only
+commits the data when every check here passes. It still refuses any file marked
+`"synthetic": true`, a leftover guard from when this build had no route to Yahoo Finance.
 """
 from __future__ import annotations
 

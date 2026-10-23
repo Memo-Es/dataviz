@@ -10,47 +10,36 @@ Start with `CONTEXT.md`, then `SPEC.md`. `CONTEXT.md` is the client's own brief 
 and `SPEC.md` disagree on anything. There's one place that happened (chart styling), logged at
 the bottom of `CONTEXT.md`.
 
-## The data is synthetic right now
+## Where the numbers come from
 
-SPEC.md is clear that every number should come from running `examples/Demo.ipynb` against real
-Yahoo Finance data. I couldn't do that here: this sandbox has no route to Yahoo Finance
-(`query1.finance.yahoo.com` gets blocked by the egress proxy, though `pypi.org` and `github.com`
-are fine). `pipeline/run_demo.py` and `export_cell.py` are written and ready to go the moment
-that access exists.
+Only from PyConnectedness's own code. `.github/workflows/notebook-data.yml` runs on a GitHub
+runner (which can reach Yahoo Finance):
 
-For now, `app/public/data/` comes from `pipeline/run_on_synthetic.py`, which:
+1. checks out the library at the pinned submodule commit `4cc953f` and installs it from there;
+2. runs `pipeline/run_demo.py`, which executes `examples/Demo.ipynb` **unchanged** (it stops if
+   the notebook's SHA256 differs) and appends one export cell, `pipeline/export_cell.py`, that
+   only reads objects the notebook already created;
+3. runs `pipeline/validate.py` against the numbers the notebook itself prints (78.34% / 73.74%,
+   1323 windows, the episode table, the 2.54% threshold and 20 edges, the period TCIs, ...);
+4. commits `app/public/data/` (including the notebook's own matplotlib figures, shown in the
+   app's last section) only if every check passes.
 
-1. Makes up a plausible 20-market weekly price panel (`pipeline/synthetic_input.py`), calibrated
-   so the full-sample totals land near the real notebook's printed 78.34% / 73.74% and nothing
-   more than that.
-2. Feeds it through the actual pyconnectedness 0.1.0 library — installed from the pinned
-   submodule commit `4cc953f`, not reimplemented — using the real `static_connectedness`,
-   `dynamic_connectedness`, `connectedness_graph`, `plot_connectedness_graph` and
-   `spillover_heatmap` functions, with every notebook cell copied over as-is.
-3. Runs `export_cell.py` unmodified at the end, same as `run_demo.py` would.
+It runs on every push that touches the pipeline, or by hand from the Actions tab. The app
+never computes a statistic itself: the one derived value is the strongest-10% cut-off, which
+applies the notebook's own rule (cells 19/21) to whichever matrix is on screen.
 
-So the numbers in `connectedness.json` are genuinely computed by the library, just on fake input
-prices. The JSON says so (`"synthetic": true`, plus a note), and the app shows a banner. Don't
-loosen `pipeline/validate.py` to make it pass against this output — it's only meaningful against
-a real `run_demo.py` run, and it already refuses to run on synthetic data.
+The earlier synthetic stand-in (`run_on_synthetic.py`, `synthetic_input.py`) is gone.
 
-`pipeline/out/reference/*.png` are the notebook's own matplotlib figures, rendered with the
-real plotting functions on this same synthetic data. Useful for checking the D3 charts in
-`app/src/charts/` against the real thing by eye.
-
-### Running it for real
+### Running it locally
 
 ```bash
 cd pipeline
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-pip install -e ../vendor/PyConnectedness   # or: pip install pyconnectedness==0.1.0
-python run_demo.py        # needs Yahoo Finance access, takes a few minutes
-python validate.py        # should pass before the app uses the data
+pip install ../vendor/PyConnectedness   # the pinned library, not a reimplementation
+python run_demo.py        # needs Yahoo Finance access
+python validate.py
 ```
-
-This overwrites `app/public/data/` with the real thing, and the app's banner and footnote pick
-that up automatically.
 
 ## Running the app
 
@@ -63,17 +52,17 @@ npm run build   # static build, deployed by .github/workflows/pages.yml
 
 `public/data/` is committed, so neither the app nor CI ever calls Yahoo.
 
-## Two looks, one toggle
+## The app
 
-The app opens in the redesign; the top-right toggle switches to the faithful baseline (a pixel
-match of the library's own matplotlib defaults) and back. See `CONTEXT.md`'s decision log for
-why both exist. `styleguide/` has the matplotlib-portable version of the redesign's colour and
-type system -- `styleguide/STYLE_GUIDE.md` is the actual deliverable for the library itself, not
-just the web prototype.
+One page, top to bottom: a headline finding for the selected window, the rolling spillover
+timeline (click/drag or press play to move through the weeks, click a period to compare), the
+network grouped by region, net senders and receivers, the full pair matrix, a detail panel for
+the selected market, and the notebook's own figures for comparison. Returns/volatility and
+light/dark sit in the top bar. `styleguide/` has the matplotlib-portable version of the same
+colour system.
 
 ## Layout
 
 See `SPEC.md` section 2. Short version: `pipeline/` is what turns the notebook's output into
-the app's data (`run_demo.py` for the real run, `run_on_synthetic.py` + `synthetic_input.py` for
-what this sandbox actually did instead). `app/` is the Vite + TypeScript + D3 explorer.
+the app's data (`run_demo.py`, `export_cell.py`, `validate.py`). `app/` is the Vite + TypeScript + D3 explorer.
 `vendor/PyConnectedness` is the pinned submodule the pipeline installs and imports.

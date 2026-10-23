@@ -169,3 +169,14 @@ method). That's now in the app (top right) and in `styleguide/` as a matplotlib-
 version of the same colour/type system, documented in `styleguide/STYLE_GUIDE.md`. The web
 redesign's network layout and heatmap cell style go further than the matplotlib guide does, on
 purpose -- see that file's "What's not here" section for why.
+
+Oct 23: two changes, at Memo's request.
+
+1. Data now comes only from the notebook. A GitHub Actions workflow runs `Demo.ipynb`
+   unchanged on live Yahoo Finance data and commits it only if `validate.py` passes (it did:
+   all 11 checks, 78.34% / 73.74%). The synthetic generator is deleted.
+2. The front end is rebuilt as one page instead of three layouts plus a D3 replica of
+   matplotlib. The faithful baseline is now the notebook's own PNGs from the same run, shown
+   in the app's last section, which is more faithful than any replica. The network went back
+   to a circle (grouped by region, edges tapering toward the receiver) because the grid
+   layout's right-angle edges ran through other nodes and hid direction.

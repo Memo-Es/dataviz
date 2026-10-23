@@ -1,456 +1,264 @@
 /**
- * Two renderers sharing one data shape (see CONTEXT.md's decision log):
- *
- * - baseline: cell 14 of the pinned notebook -- `dyn.total.plot(color="black", lw=1)`, a
- *   dashed grey full-sample mean, `grid(alpha=0.3)`. No crisis markers in the notebook itself;
- *   the scrub cursor and episode ticks here are this explorer's own interaction layer.
- * - redesign: fixes what Miljana named directly -- "a bare black line with no crisis markers
- *   or highlighted peaks." Each named episode and the largest week-over-week jumps get a
- *   banded "pulse" stem (inspired by a reference the client sent: a chromatic variable-width
- *   line piece), but built from the validated red/blue pair, not an unconstrained rainbow --
- *   see encoding.ts. A hero number calls out the selected week's value, which was otherwise
- *   only ever printed to notebook output.
+ * "When markets became fragile": the rolling total spillover index (notebook cell 14), with the
+ * notebook's own episode dates (cell 15) marked and the four sub-periods (cells 26/27) shaded
+ * underneath. Click or drag anywhere on it to pick a week; everything else follows.
  */
 import * as d3 from "d3";
-import { BASELINE, EPISODE_LABELS, FONTS, REDESIGN, type RedesignTokens } from "../encoding";
-import { hideTooltip, showTooltip } from "../tooltip";
-import type { ChartStyle } from "../state";
+import type { DynamicBlock, StaticBlock } from "../data";
+import { EPISODE_LABELS, type Palette, fmtDate, parseDate } from "../encoding";
 
-export interface TimelineDatum {
-  dates: string[]; // ISO, dynamic.<measure>.dates
-  total: number[];
-  fullSampleTotal: number;
-  title: string;
-  ylabel: string;
-  episodes: string[]; // ISO dates
-  periods: { start: string; end: string; label: string }[];
-  selectedIndex: number;
-  showXAxis: boolean;
-  style: ChartStyle;
-  tokens: RedesignTokens;
-  measureLabel?: string; // "return" | "volatility" -- for the redesign hero number
-  onScrub?: (index: number) => void;
+const H = 300;
+const M = { top: 46, right: 18, bottom: 54, left: 44 };
+
+export interface PeriodBand {
+  key: string;
+  start: Date;
+  end: Date;
+  label: string;
+  total: number;
 }
-
-const W = 1300;
-const H = 420; // one axes, stacked by the caller
-const MARGIN_BASELINE = { top: 34, right: 16, bottom: 46, left: 56 };
-const MARGIN_REDESIGN = { top: 82, right: 100, bottom: 40, left: 48 };
 
 export class TimelineChart {
   private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
-  private gPlot: d3.Selection<SVGGElement, unknown, null, undefined>;
-  private gBands: d3.Selection<SVGGElement, unknown, null, undefined>;
-  private gGridX: d3.Selection<SVGGElement, unknown, null, undefined>;
-  private gGridY: d3.Selection<SVGGElement, unknown, null, undefined>;
-  private area: d3.Selection<SVGPathElement, unknown, null, undefined>;
-  private path: d3.Selection<SVGPathElement, unknown, null, undefined>;
-  private meanLine: d3.Selection<SVGLineElement, unknown, null, undefined>;
-  private cursor: d3.Selection<SVGLineElement, unknown, null, undefined>;
-  private gEpisodes: d3.Selection<SVGGElement, unknown, null, undefined>;
-  private gPulses: d3.Selection<SVGGElement, unknown, null, undefined>;
-  private axisX: d3.Selection<SVGGElement, unknown, null, undefined>;
-  private axisY: d3.Selection<SVGGElement, unknown, null, undefined>;
-  private title: d3.Selection<SVGTextElement, unknown, null, undefined>;
-  private subtitle: d3.Selection<SVGTextElement, unknown, null, undefined>;
-  private ylabel: d3.Selection<SVGTextElement, unknown, null, undefined>;
-  private hero: d3.Selection<SVGGElement, unknown, null, undefined>;
-  private overlay: d3.Selection<SVGRectElement, unknown, null, undefined>;
-  private x = d3.scaleTime();
-  private y = d3.scaleLinear();
-  private data: TimelineDatum | null = null;
+  private width = 900;
+  private dates: Date[] = [];
+  private last: Parameters<TimelineChart["render"]> | null = null;
 
-  constructor(host: HTMLElement) {
-    this.svg = d3
-      .select(host)
-      .append("svg")
-      .attr("viewBox", `0 0 ${W} ${H}`)
-      .attr("width", "100%")
-      .style("display", "block") as any;
+  constructor(
+    private host: HTMLElement,
+    private onPick: (t: number) => void,
+    private onPickPeriod: (key: string) => void
+  ) {
+    this.svg = d3.select(host).append("svg").attr("class", "timeline").attr("height", H);
+    new ResizeObserver(() => {
+      const w = Math.round(host.clientWidth);
+      if (w && w !== this.width) {
+        this.width = w;
+        if (this.last) this.render(...this.last);
+      }
+    }).observe(host);
 
-    this.title = this.svg.append("text").attr("x", 0).attr("text-anchor", "start") as any;
-    this.subtitle = this.svg.append("text").attr("x", 0).attr("text-anchor", "start") as any;
-    this.hero = this.svg.append("g") as any;
-
-    this.gBands = this.svg.append("g") as any;
-    this.gPlot = this.svg.append("g") as any;
-    this.gGridX = this.gPlot.append("g") as any;
-    this.gGridY = this.gPlot.append("g") as any;
-    this.gEpisodes = this.gPlot.append("g") as any;
-    this.gPulses = this.gPlot.append("g") as any;
-
-    this.gPlot.append("rect").attr("class", "plotbg").lower();
-
-    this.meanLine = this.gPlot.append("line").attr("stroke-dasharray", "6,4") as any;
-    this.area = this.gPlot.append("path").attr("stroke", "none") as any;
-    this.path = this.gPlot.append("path").attr("fill", "none") as any;
-    this.cursor = this.gPlot.append("line") as any;
-
-    this.axisX = this.gPlot.append("g") as any;
-    this.axisY = this.gPlot.append("g") as any;
-
-    this.ylabel = this.svg.append("text").attr("text-anchor", "middle") as any;
-
-    this.overlay = this.gPlot.append("rect").attr("fill", "transparent").style("cursor", "crosshair") as any;
-  }
-
-  render(d: TimelineDatum) {
-    this.data = d;
-    if (d.style === "baseline") this.renderBaseline(d);
-    else this.renderRedesign(d);
-  }
-
-  // ---------------------------------------------------------------- baseline ----
-  private renderBaseline(d: TimelineDatum) {
-    this.svg.style("background", BASELINE.figureBg);
-    this.hero.selectAll("*").remove();
-    this.area.attr("d", null);
-    const m = MARGIN_BASELINE;
-    const pw = W - m.left - m.right;
-    const ph = H - m.top - m.bottom;
-
-    this.title
-      .attr("x", W / 2)
-      .attr("y", 20)
-      .attr("text-anchor", "middle")
-      .attr("font-family", BASELINE.fontFamily)
-      .attr("font-size", BASELINE.titlePx)
-      .attr("font-weight", "normal")
-      .attr("fill", BASELINE.textColor)
-      .text(d.title);
-    this.subtitle.text("");
-
-    const dates = d.dates.map((s) => new Date(s));
-    this.x.domain(d3.extent(dates) as [Date, Date]).range([0, pw]);
-    const [vmin, vmax] = d3.extent(d.total) as [number, number];
-    const pad = (vmax - vmin) * 0.08 || 1;
-    this.y.domain([vmin - pad, vmax + pad]).range([ph, 0]);
-
-    this.gPlot.attr("transform", `translate(${m.left},${m.top})`);
-    this.gPlot.select("rect.plotbg").attr("width", pw).attr("height", ph).attr("fill", BASELINE.axesBg);
-
-    this.gGridY
-      .selectAll("line")
-      .data(this.y.ticks(6))
-      .join("line")
-      .attr("x1", 0).attr("x2", pw).attr("y1", (v) => this.y(v)).attr("y2", (v) => this.y(v))
-      .attr("stroke", BASELINE.gridColor).attr("stroke-opacity", BASELINE.gridAlpha).attr("stroke-width", 1);
-
-    const yearTicks = this.x.ticks(d3.timeYear.every(5)!);
-    this.gGridX
-      .selectAll("line")
-      .data(yearTicks)
-      .join("line")
-      .attr("y1", 0).attr("y2", ph).attr("x1", (v) => this.x(v)).attr("x2", (v) => this.x(v))
-      .attr("stroke", BASELINE.gridColor).attr("stroke-opacity", BASELINE.gridAlpha).attr("stroke-width", 1);
-
-    this.gBands.selectAll("*").remove();
-    this.gPulses.selectAll("*").remove();
-
-    const line = d3.line<number>().x((_v, i) => this.x(dates[i])).y((v) => this.y(v));
-    this.path.attr("d", line(d.total)).attr("stroke", BASELINE.dataLineColor).attr("stroke-width", BASELINE.dataLineWidthPx);
-
-    this.meanLine
-      .attr("x1", 0).attr("x2", pw)
-      .attr("y1", this.y(d.fullSampleTotal)).attr("y2", this.y(d.fullSampleTotal))
-      .attr("stroke", BASELINE.meanLineColor).attr("stroke-width", BASELINE.meanLineWidthPx);
-
-    const epSel = this.gEpisodes.selectAll<SVGGElement, string>("g").data(d.episodes);
-    epSel.exit().remove();
-    const epEnter = epSel.enter().append("g");
-    epEnter.append("line").attr("class", "tick");
-    epEnter.append("text").attr("class", "label").attr("text-anchor", "start");
-    const epMerged = epEnter.merge(epSel as any);
-    epMerged.attr("transform", (iso) => `translate(${this.x(new Date(iso))},0)`);
-    epMerged.select("line.tick").attr("y1", 0).attr("y2", ph).attr("stroke", "#808080").attr("stroke-dasharray", "2,3").attr("stroke-opacity", 0.5);
-    epMerged.select("text.label").attr("x", 3).attr("y", 12).attr("font-family", BASELINE.fontFamily).attr("font-size", 9.5).attr("fill", "#666").text((iso) => EPISODE_LABELS[iso] ?? "");
-
-    const cx = this.x(dates[Math.min(d.selectedIndex, dates.length - 1)] ?? dates[0]);
-    this.cursor.attr("x1", cx).attr("x2", cx).attr("y1", 0).attr("y2", ph).attr("stroke", "#c2462e").attr("stroke-width", 1.4);
-
-    this.axisX.attr("transform", `translate(0,${ph})`);
-    if (d.showXAxis) {
-      (this.axisX as any).call(d3.axisBottom(this.x).tickValues(yearTicks).tickFormat((v) => String((v as Date).getFullYear())).tickSizeOuter(0));
-    } else {
-      this.axisX.selectAll("*").remove();
-    }
-    this.styleAxisBaseline(this.axisX);
-    (this.axisY as any).call(d3.axisLeft(this.y).ticks(6).tickSizeOuter(0));
-    this.styleAxisBaseline(this.axisY);
-
-    this.gPlot.selectAll("rect.spine").remove();
-    this.gPlot.append("rect").attr("class", "spine").attr("width", pw).attr("height", ph).attr("fill", "none").attr("stroke", BASELINE.spineColor).attr("stroke-width", BASELINE.spineWidthPx);
-
-    this.ylabel.attr("transform", `translate(16,${m.top + ph / 2}) rotate(-90)`).attr("font-family", BASELINE.fontFamily).attr("font-size", BASELINE.labelPx).attr("fill", BASELINE.textColor).text(d.ylabel);
-
-    this.overlay.attr("width", pw).attr("height", ph).on("click", (ev: MouseEvent) => this.scrubFromEvent(ev)).on("mousemove", (ev: MouseEvent) => {
-      if ((ev.buttons & 1) === 1) this.scrubFromEvent(ev);
-    }).on("mouseenter", null).on("mouseleave", null);
-  }
-
-  private styleAxisBaseline(sel: d3.Selection<SVGGElement, unknown, null, undefined>) {
-    sel.selectAll("path.domain").attr("stroke", "none");
-    sel.selectAll("line").attr("stroke", BASELINE.tickColor).attr("stroke-width", BASELINE.tickWidthPx);
-    sel.selectAll("text").attr("font-family", BASELINE.fontFamily).attr("font-size", BASELINE.tickLabelPx).attr("fill", BASELINE.textColor);
-  }
-
-  // ---------------------------------------------------------------- redesign ----
-  private renderRedesign(d: TimelineDatum) {
-    const t = d.tokens;
-    this.svg.style("background", t.surface);
-    const m = MARGIN_REDESIGN;
-    const pw = W - m.left - m.right;
-    const ph = H - m.top - m.bottom;
-
-    this.title
-      .attr("x", m.left)
-      .attr("y", 26)
-      .attr("text-anchor", "start")
-      .attr("font-family", FONTS.display)
-      .attr("font-size", REDESIGN.titlePx)
-      .attr("font-weight", "800")
-      .attr("letter-spacing", "-0.01em")
-      .attr("fill", t.primary)
-      .text(d.title);
-    this.subtitle
-      .attr("x", m.left)
-      .attr("y", 44)
-      .attr("text-anchor", "start")
-      .attr("font-family", FONTS.body)
-      .attr("font-size", REDESIGN.subtitlePx)
-      .attr("fill", t.secondary)
-      .text(d.ylabel);
-
-    const dates = d.dates.map((s) => new Date(s));
-    this.x.domain(d3.extent(dates) as [Date, Date]).range([0, pw]);
-    const [vmin, vmax] = d3.extent(d.total) as [number, number];
-    const pad = (vmax - vmin) * 0.12 || 1;
-    this.y.domain([vmin - pad, vmax + pad]).range([ph, 0]);
-
-    this.gPlot.attr("transform", `translate(${m.left},${m.top})`);
-    this.gPlot.select("rect.plotbg").attr("width", pw).attr("height", ph).attr("fill", "transparent");
-
-    // minimal grid: per the reference charts (Brink/Commons), just enough horizontal structure
-    // to read values by eye, not a full ruled sheet -- 3 ticks instead of 5, faint.
-    this.gGridY
-      .selectAll("line")
-      .data(this.y.ticks(3))
-      .join("line")
-      .attr("x1", 0).attr("x2", pw).attr("y1", (v) => this.y(v)).attr("y2", (v) => this.y(v))
-      .attr("stroke", t.gridline).attr("stroke-width", 1).attr("stroke-opacity", 0.6).attr("stroke-dasharray", "2,4");
-    this.gGridX.selectAll("*").remove();
-
-    // (period bands dropped from the redesign render -- adjacent periods shared one colour so
-    // they only ever read as a flat tint over the whole plot, boxing it in against the reference
-    // apps' plain white chart surface, without actually conveying the period boundaries)
-    this.gBands.selectAll("*").remove();
-
-    // gradient area fill under the line -- per the reference charts (Brink's "Monthly Trend",
-    // Pillow's duration curves): a soft wash fading to nothing at the baseline, not a flat tint.
-    // tie the wash to the same trend colour as the hero number (above/below full-sample mean)
-    // instead of flat ink -- a near-black fill over a near-white card reads as a dirty smear,
-    // not a wash
-    const heroValForFill = d.total[Math.min(d.selectedIndex, d.total.length - 1)];
-    const areaColor = heroValForFill >= d.fullSampleTotal ? t.send : t.recv;
-    let defs = this.svg.select<SVGDefsElement>("defs");
-    if (defs.empty()) defs = this.svg.append("defs");
-    const gradId = "tl-area-grad";
-    let grad = defs.select<SVGLinearGradientElement>(`#${gradId}`);
-    if (grad.empty()) grad = defs.append("linearGradient").attr("id", gradId) as any;
-    grad.attr("x1", "0").attr("x2", "0").attr("y1", "0").attr("y2", "1");
-    grad
-      .selectAll("stop")
-      .data([
-        { o: 0, c: areaColor, a: 0.14 },
-        { o: 1, c: areaColor, a: 0 },
-      ])
-      .join("stop")
-      .attr("offset", (s) => `${s.o * 100}%`)
-      .attr("stop-color", (s) => s.c)
-      .attr("stop-opacity", (s) => s.a);
-
-    const line = d3.line<number>().x((_v, i) => this.x(dates[i])).y((v) => this.y(v));
-    const area = d3.area<number>().x((_v, i) => this.x(dates[i])).y0(ph).y1((v) => this.y(v));
-    this.area.attr("d", area(d.total)).attr("fill", `url(#${gradId})`);
-    this.path.attr("d", line(d.total)).attr("stroke", t.primary).attr("stroke-width", REDESIGN.lineWidthPx).attr("stroke-linejoin", "round").attr("stroke-linecap", "round");
-
-    this.meanLine
-      .attr("x1", 0).attr("x2", pw)
-      .attr("y1", this.y(d.fullSampleTotal)).attr("y2", this.y(d.fullSampleTotal))
-      .attr("stroke", t.axis).attr("stroke-width", 1.2);
-
-    // notable weeks: named episodes + the two largest week-over-week jumps + the series
-    // extremes, marked with a small rounded badge chip.
-    //
-    // This used to also draw a full-height tinted band per event -- with 6-7 events that read
-    // as venetian blinds striping the whole chart, nothing like the single bare curve in the
-    // reference apps (Brink's "Monthly Trend" has zero chart furniture besides the line itself).
-    // Dropped the bands; the ring marker + badge + leader line is enough to place each event.
-    //
-    // Badges used to float at each point's own y, which let close-together events (e.g. "peak"
-    // landing right next to "euro-area crisis") draw on top of each other and eat the label
-    // underneath. Badges now live in stacked lanes along a fixed baseline near the top of the
-    // chart, with a thin leader line down to the actual point -- greedy interval placement
-    // (sorted left to right, first lane with room wins) guarantees no two ever overlap.
-    this.gPulses.selectAll("*").remove();
-    const notable = notableIndices(d);
-    const points = notable.map((n) => ({
-      n,
-      px: this.x(dates[n.index]),
-      py: this.y(d.total[n.index]),
-      color: n.kind === "low" ? t.recv : t.send,
-    }));
-
-    for (const p of points) {
-      this.gPulses
-        .append("circle")
-        .attr("cx", p.px).attr("cy", p.py).attr("r", 4.5)
-        .attr("fill", t.surface).attr("stroke", p.color).attr("stroke-width", 2.25);
-    }
-
-    const BASE_Y = 16;
-    const ROW_H = 22;
-    const GAP = 8;
-    const labeled = points
-      .filter((p) => p.n.label)
-      .map((p) => {
-        const padX = 7;
-        const halfW = (p.n.label!.length * 5.6 + padX * 2) / 2;
-        const cx = Math.min(pw - halfW - 2, Math.max(halfW + 2, p.px));
-        return { ...p, cx, halfW };
+    let dragging = false;
+    const pick = (ev: PointerEvent) => {
+      const [mx] = d3.pointer(ev, this.svg.node());
+      const x = this.x();
+      const d = x.invert(mx);
+      const i = d3.bisector((v: Date) => v).center(this.dates, d);
+      if (i >= 0 && i < this.dates.length) this.onPick(i);
+    };
+    this.svg
+      .on("pointerdown", (ev: PointerEvent) => {
+        if ((ev.target as Element).closest(".band-hit")) return;
+        dragging = true;
+        (ev.target as Element).setPointerCapture?.(ev.pointerId);
+        pick(ev);
       })
-      .sort((a, b) => a.cx - b.cx);
+      .on("pointermove", (ev: PointerEvent) => dragging && pick(ev))
+      .on("pointerup pointercancel", () => (dragging = false));
+  }
 
-    const laneRightEdge: number[] = [];
-    for (const b of labeled) {
-      let row = laneRightEdge.findIndex((edge) => edge < b.cx - b.halfW - GAP);
-      if (row === -1) { row = laneRightEdge.length; laneRightEdge.push(-Infinity); }
-      laneRightEdge[row] = b.cx + b.halfW;
+  private x() {
+    return d3
+      .scaleUtc()
+      .domain(d3.extent(this.dates) as [Date, Date])
+      .range([M.left, this.width - M.right]);
+  }
 
-      const by = BASE_Y + row * ROW_H;
-      const leaderBottom = Math.max(by + 9, b.py - 7); // never draw past the dot
-      this.gPulses
-        .append("line")
-        .attr("x1", b.cx).attr("y1", by + 9).attr("x2", b.px).attr("y2", leaderBottom)
-        .attr("stroke", t.axis).attr("stroke-width", 1).attr("stroke-dasharray", "1.5,2");
-      const badge = this.gPulses.append("g").attr("transform", `translate(${b.cx},${by})`);
-      badge
-        .append("rect")
-        .attr("x", -b.halfW).attr("y", -9).attr("width", b.halfW * 2).attr("height", 18)
-        .attr("rx", 9).attr("fill", t.surfaceRaised).attr("stroke", t.border).attr("stroke-width", 1);
-      badge
-        .append("text")
+  render(
+    dyn: DynamicBlock,
+    full: StaticBlock,
+    episodes: string[],
+    periods: PeriodBand[],
+    t: number | null,
+    activePeriod: string | null,
+    p: Palette
+  ) {
+    this.last = [dyn, full, episodes, periods, t, activePeriod, p];
+    this.dates = dyn.dates.map((d) => parseDate(d)!);
+    const W = this.width;
+    this.svg.attr("width", W).attr("viewBox", `0 0 ${W} ${H}`);
+    const x = this.x();
+    const lo = Math.min(d3.min(dyn.total)!, full.total);
+    const hi = Math.max(d3.max(dyn.total)!, full.total);
+    const y = d3
+      .scaleLinear()
+      .domain([Math.floor((lo - 2) / 5) * 5, Math.ceil((hi + 1) / 5) * 5])
+      .range([H - M.bottom, M.top]);
+    const svg = this.svg;
+    svg.selectAll("*").remove();
+
+    // sub-period bands, a strip under the axis that doubles as a picker
+    const bandY = H - M.bottom + 22;
+    const bands = svg.append("g");
+    for (const b of periods) {
+      const x0 = Math.max(M.left, x(b.start));
+      const x1 = Math.min(W - M.right, x(b.end));
+      if (x1 <= x0) continue;
+      const active = b.key === activePeriod;
+      if (active) {
+        bands
+          .append("rect")
+          .attr("x", x0)
+          .attr("width", x1 - x0)
+          .attr("y", M.top)
+          .attr("height", H - M.bottom - M.top)
+          .attr("fill", p.band);
+      }
+      const g = bands
+        .append("g")
+        .attr("class", "band-hit")
+        .attr("role", "button")
+        .attr("tabindex", 0)
+        .attr("aria-label", `Show ${b.label} on every chart`)
+        .on("click", () => this.onPickPeriod(b.key))
+        .on("keydown", (ev: KeyboardEvent) => {
+          if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            this.onPickPeriod(b.key);
+          }
+        });
+      g.append("rect")
+        .attr("x", x0 + 1)
+        .attr("width", x1 - x0 - 2)
+        .attr("y", bandY)
+        .attr("height", 24)
+        .attr("rx", 6)
+        .attr("fill", active ? p.fg : p.band);
+      g.append("text")
+        .attr("x", (x0 + x1) / 2)
+        .attr("y", bandY + 12)
+        .attr("dy", "0.35em")
         .attr("text-anchor", "middle")
-        .attr("y", 4)
-        .attr("font-family", FONTS.body)
-        .attr("font-size", 9.5)
-        .attr("font-weight", "600")
-        .attr("letter-spacing", "0.02em")
-        .attr("fill", t.secondary)
-        .text(b.n.label!);
+        .attr("class", "band-label")
+        .attr("fill", active ? p.panel : p.secondary)
+        .text(x1 - x0 > 150 ? `${b.label} · ${b.total.toFixed(1)}%` : x1 - x0 > 70 ? b.label : "");
     }
 
-    const cx = this.x(dates[Math.min(d.selectedIndex, dates.length - 1)] ?? dates[0]);
-    this.cursor.attr("x1", cx).attr("x2", cx).attr("y1", 0).attr("y2", ph).attr("stroke", t.primary).attr("stroke-width", 1).attr("stroke-dasharray", "3,2");
+    // grid + axes
+    const yTicks = y.ticks(5);
+    svg
+      .append("g")
+      .selectAll("line")
+      .data(yTicks)
+      .join("line")
+      .attr("x1", M.left)
+      .attr("x2", W - M.right)
+      .attr("y1", (d) => y(d))
+      .attr("y2", (d) => y(d))
+      .attr("stroke", p.grid);
+    svg
+      .append("g")
+      .attr("class", "axis-label")
+      .selectAll("text")
+      .data(yTicks)
+      .join("text")
+      .attr("x", M.left - 8)
+      .attr("y", (d) => y(d))
+      .attr("dy", "0.35em")
+      .attr("text-anchor", "end")
+      .text((d) => `${d}%`);
+    const xTicks = x.ticks(W < 600 ? 5 : 10);
+    svg
+      .append("g")
+      .attr("class", "axis-label")
+      .selectAll("text")
+      .data(xTicks)
+      .join("text")
+      .attr("x", (d) => x(d))
+      .attr("y", H - M.bottom + 14)
+      .attr("text-anchor", "middle")
+      .text((d) => d3.utcFormat("%Y")(d));
 
-    const yearTicks = this.x.ticks(d3.timeYear.every(5)!);
-    this.axisX.attr("transform", `translate(0,${ph})`);
-    if (d.showXAxis) {
-      (this.axisX as any).call(d3.axisBottom(this.x).tickValues(yearTicks).tickFormat((v) => String((v as Date).getFullYear())).tickSizeOuter(0));
-    } else {
-      this.axisX.selectAll("*").remove();
+    // episodes: the notebook's own six dates
+    const epi = svg.append("g").attr("class", "episodes");
+    const epData = episodes.map((e) => ({ d: parseDate(e)!, label: EPISODE_LABELS[e] ?? e }));
+    // pack labels into up to three rows; narrow screens use the short names
+    const rowRight = [-Infinity, -Infinity, -Infinity];
+    for (const e of epData) {
+      const ex = x(e.d);
+      const text = W < 700 ? e.label.split(" ")[0] : e.label;
+      const textW = text.length * 6.4 + 8;
+      let row = rowRight.findIndex((r) => ex - textW / 2 > r);
+      if (row < 0) row = 0;
+      rowRight[row] = ex + textW / 2;
+      e.label = text;
+      epi
+        .append("line")
+        .attr("x1", ex)
+        .attr("x2", ex)
+        .attr("y1", M.top - 6 - row * 15)
+        .attr("y2", H - M.bottom)
+        .attr("stroke", p.secondary)
+        .attr("stroke-opacity", 0.5)
+        .attr("stroke-dasharray", "2 3");
+      epi
+        .append("text")
+        .attr("x", ex)
+        .attr("y", M.top - 10 - row * 15)
+        .attr("text-anchor", "middle")
+        .attr("class", "episode-label")
+        .attr("fill", p.secondary)
+        .text(e.label);
     }
-    this.styleAxisRedesign(this.axisX, t);
-    (this.axisY as any).call(d3.axisLeft(this.y).ticks(5).tickSizeOuter(0));
-    this.styleAxisRedesign(this.axisY, t);
 
-    // no ruled axis spines -- the reference line charts (Brink's "Monthly Trend") carry no
-    // visible axis line at all, just tick labels floating next to the plot
-    this.gPlot.selectAll("line.spine").remove();
+    // full-sample reference line (cell 14's dashed grey mean)
+    svg
+      .append("line")
+      .attr("x1", M.left)
+      .attr("x2", W - M.right)
+      .attr("y1", y(full.total))
+      .attr("y2", y(full.total))
+      .attr("stroke", p.muted)
+      .attr("stroke-dasharray", "5 4");
+    svg
+      .append("text")
+      .attr("class", "ref-label")
+      .attr("x", M.left + 6)
+      .attr("y", y(full.total) - 6)
+      .attr("fill", p.muted)
+      .text(`Full sample ${full.total.toFixed(1)}%`);
 
-    this.ylabel.text("");
+    const pts = dyn.total.map((v, i) => [x(this.dates[i]), y(v)] as [number, number]);
+    svg
+      .append("path")
+      .attr("d", d3.area<[number, number]>().x((d) => d[0]).y0(H - M.bottom).y1((d) => d[1])(pts)!)
+      .attr("fill", p.accent)
+      .attr("fill-opacity", 0.08);
+    svg
+      .append("path")
+      .attr("d", d3.line<[number, number]>()(pts)!)
+      .attr("fill", "none")
+      .attr("stroke", p.fg)
+      .attr("stroke-width", 1.6)
+      .attr("stroke-linejoin", "round");
 
-    // hero number: the selected week's value, otherwise only ever printed to notebook output.
-    // This is the stat the reference apps would lead the whole card with (Commons' "198 KG
-    // CO2E", Brink's "25 min") -- sized and chipped to actually read as the headline figure,
-    // not a small corner label.
-    this.hero.selectAll("*").remove();
-    const heroVal = d.total[Math.min(d.selectedIndex, d.total.length - 1)];
-    const heroColor = heroVal >= d.fullSampleTotal ? t.send : t.recv;
-    const heroG = this.hero.append("g").attr("transform", `translate(${W - m.right},26)`);
-    const heroLabel = d.measureLabel ? `${d.measureLabel} spillover, this week` : "this week";
-    const valueText = `${heroVal.toFixed(1)}%`;
-    const chipW = Math.max(100, valueText.length * REDESIGN.heroPx * 0.62) + 28;
-    heroG.append("rect").attr("x", -chipW).attr("y", -10).attr("width", chipW).attr("height", 62)
-      .attr("rx", 18).attr("fill", heroColor).attr("fill-opacity", 0.12);
-    heroG.append("text").attr("x", -14).attr("y", 40).attr("text-anchor", "end")
-      .attr("font-family", FONTS.body).attr("font-size", REDESIGN.heroPx).attr("font-weight", "800")
-      .attr("letter-spacing", "-0.02em").attr("fill", heroColor).text(valueText);
-    heroG.append("text").attr("x", -14).attr("y", 54).attr("text-anchor", "end")
-      .attr("font-family", FONTS.body).attr("font-size", 10.5).attr("font-weight", "600")
-      .attr("fill", t.secondary).text(heroLabel);
-
-    this.overlay.attr("width", pw).attr("height", ph)
-      .on("click", (ev: MouseEvent) => this.scrubFromEvent(ev))
-      .on("mousemove", (ev: MouseEvent) => {
-        if ((ev.buttons & 1) === 1) this.scrubFromEvent(ev);
-        this.hoverTooltip(ev, d, t);
-      })
-      .on("mouseleave", () => hideTooltip());
+    // the selected week
+    if (t !== null) {
+      const cx = x(this.dates[t]);
+      const cy = y(dyn.total[t]);
+      svg
+        .append("line")
+        .attr("x1", cx)
+        .attr("x2", cx)
+        .attr("y1", M.top)
+        .attr("y2", H - M.bottom)
+        .attr("stroke", p.accent)
+        .attr("stroke-width", 1.5);
+      svg.append("circle").attr("cx", cx).attr("cy", cy).attr("r", 5.5).attr("fill", p.accent).attr("stroke", p.panel).attr("stroke-width", 2);
+      const label = `${dyn.total[t].toFixed(1)}% · ${fmtDate(this.dates[t])}`;
+      const lw = label.length * 7 + 16;
+      const lx = Math.min(Math.max(cx - lw / 2, M.left), W - M.right - lw);
+      const ly = cy - 34 < M.top ? cy + 12 : cy - 34;
+      svg.append("rect").attr("x", lx).attr("y", ly).attr("width", lw).attr("height", 22).attr("rx", 11).attr("fill", p.accent);
+      svg
+        .append("text")
+        .attr("class", "cursor-label")
+        .attr("x", lx + lw / 2)
+        .attr("y", ly + 11)
+        .attr("dy", "0.35em")
+        .attr("text-anchor", "middle")
+        .attr("fill", "#fff")
+        .text(label);
+    }
   }
-
-  private hoverTooltip(ev: MouseEvent, d: TimelineDatum, t: RedesignTokens) {
-    const [mx] = d3.pointer(ev, this.gPlot.node());
-    const dates = d.dates.map((s) => new Date(s).getTime());
-    const target = this.x.invert(mx).getTime();
-    let idx = 0;
-    for (let i = 1; i < dates.length; i++) if (Math.abs(dates[i] - target) < Math.abs(dates[idx] - target)) idx = i;
-    showTooltip(ev.clientX, ev.clientY, d.dates[idx], [
-      { label: "total spillover", value: `${d.total[idx].toFixed(2)}%`, swatch: t.primary },
-    ]);
-  }
-
-  private styleAxisRedesign(sel: d3.Selection<SVGGElement, unknown, null, undefined>, t: RedesignTokens) {
-    sel.selectAll("path.domain").attr("stroke", "none");
-    sel.selectAll("line").attr("stroke", "none");
-    sel.selectAll("text").attr("font-family", FONTS.data).attr("font-size", REDESIGN.tickLabelPx).attr("fill", t.muted);
-  }
-
-  private scrubFromEvent(ev: MouseEvent) {
-    if (!this.data) return;
-    const [mx] = d3.pointer(ev, this.gPlot.node());
-    const date = this.x.invert(mx);
-    const dates = this.data.dates.map((s) => new Date(s).getTime());
-    const t = date.getTime();
-    let lo = 0;
-    for (let i = 1; i < dates.length; i++) if (Math.abs(dates[i] - t) < Math.abs(dates[lo] - t)) lo = i;
-    this.data.onScrub?.(lo);
-  }
-}
-
-interface Notable {
-  index: number;
-  label: string | null;
-  kind: "episode" | "jump" | "low";
-}
-
-function notableIndices(d: TimelineDatum): Notable[] {
-  const out: Notable[] = [];
-  const dateIndex = (iso: string) => {
-    let idx = d.dates.findIndex((x) => x >= iso);
-    if (idx === -1) idx = d.dates.length - 1;
-    return idx;
-  };
-  for (const iso of d.episodes) {
-    out.push({ index: dateIndex(iso), label: EPISODE_LABELS[iso] ?? null, kind: "episode" });
-  }
-  // the single highest and lowest weeks in the series, if not already an episode
-  let hi = 0, lo = 0;
-  d.total.forEach((v, i) => {
-    if (v > d.total[hi]) hi = i;
-    if (v < d.total[lo]) lo = i;
-  });
-  if (!out.some((n) => n.index === hi)) out.push({ index: hi, label: "peak", kind: "jump" });
-  if (!out.some((n) => n.index === lo)) out.push({ index: lo, label: "low", kind: "low" });
-  return out;
 }

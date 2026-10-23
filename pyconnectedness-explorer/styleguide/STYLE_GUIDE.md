@@ -169,9 +169,8 @@ palette above already clears the accessibility checks on its own.
 
 ## Examples
 
-Rendered by `pipeline/render_styleguide_examples.py` against the same synthetic input
-`pipeline/run_on_synthetic.py` uses (see `../README.md` for why synthetic input, not Yahoo
-Finance, in this environment) -- re-run it against real data once `run_demo.py` can reach Yahoo.
+Rendered by `pipeline/render_styleguide_examples.py` from the real Yahoo Finance download that
+`pipeline/run_demo.py` saved when it executed the notebook.
 
 - `examples/network_restyled.png`
 - `examples/heatmap_restyled.png`

@@ -1,567 +1,245 @@
 /**
- * Two renderers sharing one data shape (see CONTEXT.md's decision log):
+ * "Who sends risk to whom": the connectedness network, drawn from the same rule as the
+ * library's connectedness_graph() -- one edge per pair, from net transmitter to net receiver,
+ * keeping only flows above the strongest-10% cut-off (notebook cells 19/21).
  *
- * - baseline: a port of plot_connectedness_graph + connectedness_graph
- *   (src/pyconnectedness/viz/network.py). Notebook-order circular layout (position carries no
- *   meaning -- deliberate, matches the library), tab:red/tab:blue at 0.85 alpha, grey edges,
- *   9pt labels on the nodes, no legend.
- * - redesign: the actual deliverable. Fixes the three things Miljana named as weak -- faint
- *   arrows, no size legend, a circle in no meaningful order -- with a region-grouped layout,
- *   a node-size legend, clearer edges, labels off the node, and the validated red/blue pair
- *   shared with the heatmap (same meaning, same colour, finally).
- *
- * Both use a FIXED domain for node size / edge width across every rolling window
- * (CONTEXT.md review finding 5), not the per-frame max the library itself uses.
+ * Changes from plot_connectedness_graph, all for readability (CONTEXT.md's style analysis):
+ * - markets sit on the circle grouped by region, so position means something;
+ * - edges taper from sender to receiver, so direction reads without hunting for arrowheads;
+ * - node size and edge width use fixed domains across every week (review finding 5), so
+ *   scrubbing or playing never rescales the picture.
  */
 import * as d3 from "d3";
-import { BASELINE, FONTS, REDESIGN, REGION_OF, type RedesignTokens, type Region } from "../encoding";
+import type { Frame } from "../model";
+import { type Palette, REGION_OF, REGION_ORDER, fmtSigned, regionOrder } from "../encoding";
 import { hideTooltip, showTooltip } from "../tooltip";
-import type { ChartStyle } from "../state";
 
-export interface NetworkDatum {
-  names: string[]; // notebook order
-  pairwiseNet: number[][]; // k x k, [i][j] = i sends to j
-  net: number[]; // k
-  threshold: number;
-  globalMaxAbsNet: number;
-  globalMaxAbsPairwise: number;
-  nodeScale?: number; // area of the largest node, pt^2 (matches node_scale kwarg)
-  edgeScale?: number; // width of the strongest edge, pt (matches edge_scale kwarg)
-  title: string;
-  weekLabel?: string; // e.g. "week of 2026-09-04" -- redesign subtitle
-  style: ChartStyle;
-  tokens: RedesignTokens;
-  onSelectMarket?: (name: string | null) => void;
-  onSelectPair?: (pair: [string, string] | null) => void;
-  selectedMarket?: string | null;
-  selectedPair?: [string, string] | null;
-}
-
-const SIZE = 1000; // internal viewBox units (square, like figsize=(X,X))
+const SIZE = 720;
+const C = SIZE / 2;
+const R = 220; // node ring radius
+const NODE_MIN = 5;
+const NODE_MAX = 22;
+const EDGE_MAX = 11;
+const GAP_SLOTS = 1.4; // empty slots between regions
 
 interface Pos {
+  name: string;
+  idx: number;
+  angle: number;
   x: number;
   y: number;
-  angle: number;
 }
 
-function notebookOrderLayout(names: string[], cx: number, cy: number, r: number): Pos[] {
-  const k = names.length;
-  // nx.circular_layout: node i at angle i/k*2pi, starting at (1,0), counterclockwise in
-  // standard math orientation (y-up); negate sin to reproduce that visually in SVG's y-down
-  // coordinate system.
-  return names.map((_, i) => {
-    const theta = (i / k) * 2 * Math.PI;
-    return { x: cx + r * Math.cos(theta), y: cy - r * Math.sin(theta), angle: theta };
-  });
+interface Edge {
+  s: number;
+  r: number;
+  v: number;
 }
 
-/** Grid-snapped, per-region layout -- per the client's network reference: nodes on a loose
- * grid instead of a circle, grouped into zones by region so position still carries meaning.
- * Zones don't touch, leaving the reference's airy, gapped look rather than a packed grid. */
-const GRID_COLS = 7;
-const GRID_ROWS = 5;
-interface Zone {
-  region: Region;
-  c0: number;
-  c1: number;
-  r0: number;
-  r1: number;
-}
-const ZONES: Zone[] = [
-  { region: "Europe", c0: 1, c1: 6, r0: 0, r1: 1 },
-  { region: "Americas", c0: 0, c1: 2, r0: 2, r1: 4 },
-  { region: "Asia Pacific", c0: 3, c1: 6, r0: 2, r1: 4 },
-];
-
-interface GridPos extends Pos {
-  col: number;
-  row: number;
-}
-
-function gridLayout(names: string[], gx0: number, gy0: number, cw: number, ch: number): GridPos[] {
-  const pos: GridPos[] = new Array(names.length);
-  for (const zone of ZONES) {
-    const group = names.filter((n) => REGION_OF[n] === zone.region);
-    const cells: [number, number][] = [];
-    for (let r = zone.r0; r <= zone.r1; r++) for (let c = zone.c0; c <= zone.c1; c++) cells.push([c, r]);
-    // pick `group.length` cells evenly spread through the zone, not packed into one corner
-    const n = group.length;
-    const picks =
-      n === 1
-        ? [Math.floor((cells.length - 1) / 2)]
-        : Array.from({ length: n }, (_, i) => Math.round((i * (cells.length - 1)) / (n - 1)));
-    group.forEach((name, i) => {
-      const [c, r] = cells[picks[i]];
-      const idx = names.indexOf(name);
-      pos[idx] = { x: gx0 + (c + 0.5) * cw, y: gy0 + (r + 0.5) * ch, angle: 0, col: c, row: r };
-    });
-  }
-  return pos;
+export interface NetworkCallbacks {
+  onHover(name: string | null): void;
+  onSelect(name: string | null): void;
 }
 
 export class NetworkChart {
   private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
   private gEdges: d3.Selection<SVGGElement, unknown, null, undefined>;
-  private gRegionLabels: d3.Selection<SVGGElement, unknown, null, undefined>;
-  private gGlow: d3.Selection<SVGGElement, unknown, null, undefined>;
   private gNodes: d3.Selection<SVGGElement, unknown, null, undefined>;
-  private gLabels: d3.Selection<SVGGElement, unknown, null, undefined>;
-  private gLegend: d3.Selection<SVGGElement, unknown, null, undefined>;
-  private title: d3.Selection<SVGTextElement, unknown, null, undefined>;
-  private subtitle: d3.Selection<SVGTextElement, unknown, null, undefined>;
+  private gRegions: d3.Selection<SVGGElement, unknown, null, undefined>;
+  private pos: Pos[];
+  private byIdx: Pos[];
 
-  constructor(host: HTMLElement) {
+  constructor(
+    host: HTMLElement,
+    private names: string[],
+    private cb: NetworkCallbacks
+  ) {
     this.svg = d3
       .select(host)
       .append("svg")
+      .attr("class", "network")
       .attr("viewBox", `0 0 ${SIZE} ${SIZE}`)
-      .attr("width", "100%")
-      .style("display", "block") as any;
-
-    const defs = this.svg.append("defs");
-    defs
-      .append("marker")
-      .attr("id", "net-arrow")
-      .attr("viewBox", "0 0 10 10")
-      .attr("refX", 9)
-      .attr("refY", 5)
-      .attr("markerWidth", 7)
-      .attr("markerHeight", 7)
-      .attr("orient", "auto-start-reverse")
-      .append("path")
-      .attr("d", "M 0 0 L 10 5 L 0 10 z");
-
-    // soft halo behind each node, per the dark-elevated references (Pillow's glowing rings,
-    // Brink/Commons' soft ring charts) -- a blurred, larger, low-opacity copy of the node itself
-    defs
-      .append("filter")
-      .attr("id", "node-glow")
-      .attr("x", "-150%").attr("y", "-150%").attr("width", "400%").attr("height", "400%")
-      .append("feGaussianBlur")
-      .attr("stdDeviation", 9);
-
-    this.title = this.svg.append("text").attr("x", SIZE / 2).attr("text-anchor", "middle") as any;
-    this.subtitle = this.svg.append("text").attr("x", SIZE / 2).attr("text-anchor", "middle") as any;
-
-    this.gEdges = this.svg.append("g").attr("class", "edges") as any;
-    this.gRegionLabels = this.svg.append("g").attr("class", "region-labels") as any;
-    this.gGlow = this.svg.append("g").attr("class", "glow").style("filter", "url(#node-glow)") as any;
-    this.gNodes = this.svg.append("g").attr("class", "nodes") as any;
-    this.gLabels = this.svg.append("g").attr("class", "labels") as any;
-    this.gLegend = this.svg.append("g").attr("class", "legend") as any;
-  }
-
-  render(d: NetworkDatum) {
-    if (d.style === "baseline") this.renderBaseline(d);
-    else this.renderRedesign(d);
-  }
-
-  private clearChrome() {
-    this.gLegend.selectAll("*").remove();
-    this.gRegionLabels.selectAll("*").remove();
-    this.gGlow.selectAll("*").remove();
-  }
-
-  // ---------------------------------------------------------------- baseline ----
-  private renderBaseline(d: NetworkDatum) {
-    this.clearChrome();
-    this.svg.style("background", BASELINE.figureBg);
-    const { names, pairwiseNet, net, threshold } = d;
-    const k = names.length;
-    const nodeScale = d.nodeScale ?? 1600;
-    const edgeScale = d.edgeScale ?? 4;
-
-    this.title
-      .attr("y", BASELINE.titlePx + 3)
-      .attr("font-family", BASELINE.fontFamily)
-      .attr("font-size", BASELINE.titlePx)
-      .attr("fill", BASELINE.textColor)
-      .attr("font-weight", "normal")
-      .text(d.title);
-    this.subtitle.text("");
-
-    const cx = SIZE / 2;
-    const cy = SIZE / 2 + 20;
-    const r = SIZE * 0.38;
-    const pos = notebookOrderLayout(names, cx, cy, r);
-
-    const maxAbsNet = d.globalMaxAbsNet || 1e-9;
-    const ptToPxLocal = (pt: number) => pt * (SIZE / 700);
-    const radii = net.map((v) => {
-      const frac = 0.25 + 0.75 * (Math.abs(v) / maxAbsNet);
-      const areaPt2 = nodeScale * frac;
-      const areaPx2 = areaPt2 * ptToPxLocal(1) ** 2 * 0.5;
-      return Math.sqrt(Math.max(areaPx2, 4) / Math.PI);
+      .attr("role", "img")
+      .attr("aria-label", "Network of the strongest net spillovers between markets");
+    this.svg.on("click", (ev) => {
+      if (ev.target === this.svg.node()) cb.onSelect(null);
     });
+    this.gEdges = this.svg.append("g").attr("class", "edges");
+    this.gRegions = this.svg.append("g").attr("class", "regions");
+    this.gNodes = this.svg.append("g").attr("class", "nodes");
 
-    type Edge = { i: number; j: number; w: number };
-    const edges: Edge[] = [];
-    for (let i = 0; i < k; i++)
-      for (let j = 0; j < k; j++) {
-        if (i === j) continue;
-        const w = pairwiseNet[i][j];
-        if (w > threshold) edges.push({ i, j, w });
+    const order = regionOrder(names);
+    const slots = order.length + GAP_SLOTS * REGION_ORDER.length;
+    let slot = GAP_SLOTS / 2;
+    let prevRegion = REGION_OF[order[0]];
+    this.pos = order.map((name) => {
+      if (REGION_OF[name] !== prevRegion) {
+        slot += GAP_SLOTS;
+        prevRegion = REGION_OF[name];
       }
-    const maxAbsPairwise = d.globalMaxAbsPairwise || 1e-9;
-
-    this.svg.select("marker#net-arrow path").attr("fill", BASELINE.edgeColor);
-
-    const edgeSel = this.gEdges.selectAll<SVGPathElement, Edge>("path").data(edges, (e) => `${e.i}-${e.j}`);
-    edgeSel.exit().remove();
-    const edgeEnter = edgeSel
-      .enter()
-      .append("path")
-      .attr("fill", "none")
-      .attr("marker-end", "url(#net-arrow)");
-    edgeEnter
-      .merge(edgeSel as any)
-      .attr("stroke", BASELINE.edgeColor)
-      .attr("stroke-width", (e) => Math.max(0.6, ptToPxLocal((edgeScale * e.w) / maxAbsPairwise)))
-      .attr("d", (e) => arcPath(pos[e.i], pos[e.j], radii[e.i], radii[e.j], BASELINE.edgeCurveRad, BASELINE.edgeArrowSizePx))
-      .style("cursor", "pointer")
-      .on("click", (_ev, e) => d.onSelectPair?.([names[e.i], names[e.j]]))
-      .attr("opacity", (e) => edgeOpacity(e, d.selectedMarket, d.selectedPair, names));
-
-    const nodeSel = this.gNodes.selectAll<SVGCircleElement, number>("circle").data(d3.range(k));
-    nodeSel.exit().remove();
-    nodeSel
-      .enter()
-      .append("circle")
-      .style("cursor", "pointer")
-      .merge(nodeSel as any)
-      .attr("cx", (i) => pos[i].x)
-      .attr("cy", (i) => pos[i].y)
-      .attr("r", (i) => radii[i])
-      .attr("fill", (i) => (net[i] >= 0 ? BASELINE.sendColor : BASELINE.recvColor))
-      .attr("fill-opacity", BASELINE.nodeAlpha)
-      .attr("stroke", (i) => (d.selectedMarket === names[i] ? BASELINE.textColor : "none"))
-      .attr("stroke-width", 2)
-      .on("click", (_ev, i) => d.onSelectMarket?.(d.selectedMarket === names[i] ? null : names[i]))
-      .attr("opacity", (i) => (!d.selectedMarket || names[i] === d.selectedMarket ? 1 : 0.35));
-
-    const labelSel = this.gLabels.selectAll<SVGTextElement, number>("text").data(d3.range(k));
-    labelSel.exit().remove();
-    labelSel
-      .enter()
-      .append("text")
-      .attr("text-anchor", "middle")
-      .attr("dominant-baseline", "central")
-      .style("pointer-events", "none")
-      .merge(labelSel as any)
-      .attr("font-family", BASELINE.fontFamily)
-      .attr("font-size", BASELINE.networkLabelPx)
-      .attr("fill", BASELINE.textColor)
-      .attr("x", (i) => pos[i].x)
-      .attr("y", (i) => pos[i].y)
-      .text((i) => names[i]);
+      const angle = -Math.PI / 2 + (slot / slots) * 2 * Math.PI;
+      slot += 1;
+      return { name, idx: names.indexOf(name), angle, x: C + R * Math.cos(angle), y: C + R * Math.sin(angle) };
+    });
+    this.byIdx = [];
+    for (const p of this.pos) this.byIdx[p.idx] = p;
+    this.drawRegions(slots);
   }
 
-  // ---------------------------------------------------------------- redesign ----
-  private renderRedesign(d: NetworkDatum) {
-    const t = d.tokens;
-    this.svg.style("background", t.surface);
-    const { names, pairwiseNet, net, threshold } = d;
-    const k = names.length;
-    const nodeScale = d.nodeScale ?? 1600;
-    const edgeScale = d.edgeScale ?? 4;
-
-    this.title
-      .attr("y", 34)
-      .attr("font-family", FONTS.display)
-      .attr("font-size", REDESIGN.titlePx)
-      .attr("font-weight", "800")
-      .attr("letter-spacing", "-0.01em")
-      .attr("fill", t.primary)
-      .text(d.title);
-    this.subtitle
-      .attr("y", 54)
-      .attr("font-family", FONTS.body)
-      .attr("font-size", REDESIGN.subtitlePx)
-      .attr("fill", t.secondary)
-      .text(d.weekLabel ?? "");
-
-    const gx0 = 44, gy0 = 110;
-    const gx1 = SIZE - 44, gy1 = 740;
-    const cw = (gx1 - gx0) / GRID_COLS;
-    const ch = (gy1 - gy0) / GRID_ROWS;
-    const pos = gridLayout(names, gx0, gy0, cw, ch);
-
-    // one badge chip per zone, above its top-left corner -- per the reference apps' category
-    // badges (Fitbit's "FOOD & DRINK", Commons' category rows): a rounded pill, not bare text.
-    for (const zone of ZONES) {
-      const label = zone.region.toUpperCase();
-      const w = label.length * 6.1 + 20;
-      const g = this.gRegionLabels
-        .append("g")
-        .attr("transform", `translate(${gx0 + zone.c0 * cw},${gy0 + zone.r0 * ch - 28})`);
-      g.append("rect")
-        .attr("width", w).attr("height", 20).attr("rx", 10)
-        .attr("fill", t.surfaceRaised).attr("stroke", t.border).attr("stroke-width", 1);
-      g.append("text")
-        .attr("x", w / 2).attr("y", 13.5)
-        .attr("text-anchor", "middle")
-        .attr("font-family", FONTS.body)
-        .attr("font-size", 10)
-        .attr("font-weight", "600")
-        .attr("letter-spacing", "0.05em")
-        .attr("fill", t.secondary)
-        .text(label);
-    }
-
-    const maxAbsNet = d.globalMaxAbsNet || 1e-9;
-    const ptToPxLocal = (pt: number) => pt * (SIZE / 700);
-    const radiusFor = (v: number) => {
-      const frac = 0.28 + 0.72 * (Math.abs(v) / maxAbsNet);
-      const areaPt2 = nodeScale * frac;
-      const areaPx2 = areaPt2 * ptToPxLocal(1) ** 2 * 0.5;
-      return Math.sqrt(Math.max(areaPx2, 5) / Math.PI);
-    };
-    const radii = net.map(radiusFor);
-
-    type Edge = { i: number; j: number; w: number };
-    const edges: Edge[] = [];
-    for (let i = 0; i < k; i++)
-      for (let j = 0; j < k; j++) {
-        if (i === j) continue;
-        const w = pairwiseNet[i][j];
-        if (w > threshold) edges.push({ i, j, w });
-      }
-    const maxAbsPairwise = d.globalMaxAbsPairwise || 1e-9;
-
-    this.svg.select("marker#net-arrow path").attr("fill", t.secondary);
-
-    const edgeSel = this.gEdges.selectAll<SVGPathElement, Edge>("path").data(edges, (e) => `${e.i}-${e.j}`);
-    edgeSel.exit().remove();
-    const edgeEnter = edgeSel.enter().append("path").attr("fill", "none").attr("marker-end", "url(#net-arrow)");
-    edgeEnter
-      .merge(edgeSel as any)
-      .attr("stroke", t.secondary)
-      .attr("stroke-linecap", "round")
-      .attr("stroke-width", (e) => Math.max(1, ptToPxLocal((edgeScale * e.w) / maxAbsPairwise) * 1.1))
-      .attr("d", (e) => kinkedPath(pos[e.i], pos[e.j], radii[e.i], radii[e.j], REDESIGN.edgeArrowSizePx))
-      .attr("opacity", (e) => REDESIGN.edgeAlpha * edgeOpacity(e, d.selectedMarket, d.selectedPair, names))
-      .style("cursor", "pointer")
-      .on("click", (_ev, e) => d.onSelectPair?.([names[e.i], names[e.j]]))
-      .on("mousemove", (ev: MouseEvent, e) => {
-        showTooltip(ev.clientX, ev.clientY, `${names[e.i]} → ${names[e.j]}`, [
-          { label: "net flow", value: `${e.w.toFixed(2)}%`, swatch: t.secondary },
-        ]);
-      })
-      .on("mouseleave", () => hideTooltip());
-
-    const glowSel = this.gGlow.selectAll<SVGCircleElement, number>("circle").data(d3.range(k));
-    glowSel.exit().remove();
-    glowSel
-      .enter()
-      .append("circle")
-      .merge(glowSel as any)
-      .attr("cx", (i) => pos[i].x)
-      .attr("cy", (i) => pos[i].y)
-      .attr("r", (i) => radii[i] * 1.6)
-      .attr("fill", (i) => (net[i] >= 0 ? t.send : t.recv))
-      .attr("opacity", (i) => (!d.selectedMarket || names[i] === d.selectedMarket ? 0.55 : 0.18));
-
-    const nodeSel = this.gNodes.selectAll<SVGCircleElement, number>("circle").data(d3.range(k));
-    nodeSel.exit().remove();
-    nodeSel
-      .enter()
-      .append("circle")
-      .style("cursor", "pointer")
-      .merge(nodeSel as any)
-      .attr("cx", (i) => pos[i].x)
-      .attr("cy", (i) => pos[i].y)
-      .attr("r", (i) => radii[i])
-      .attr("fill", (i) => (net[i] >= 0 ? t.send : t.recv))
-      .attr("fill-opacity", REDESIGN.nodeAlpha)
-      .attr("stroke", t.surface)
-      .attr("stroke-width", (i) => (d.selectedMarket === names[i] ? 3 : REDESIGN.markerRingPx))
-      .attr("stroke-opacity", (i) => (d.selectedMarket === names[i] ? 1 : 0.9))
-      .on("click", (_ev, i) => d.onSelectMarket?.(d.selectedMarket === names[i] ? null : names[i]))
-      .on("mousemove", (ev: MouseEvent, i) => {
-        showTooltip(ev.clientX, ev.clientY, names[i], [
-          { label: REGION_OF[names[i]], value: "" },
-          { label: "net", value: `${net[i].toFixed(2)}%`, swatch: net[i] >= 0 ? t.send : t.recv },
-        ]);
-      })
-      .on("mouseleave", () => hideTooltip())
-      .attr("opacity", (i) => (!d.selectedMarket || names[i] === d.selectedMarket ? 1 : 0.3));
-
-    const labelSel = this.gLabels.selectAll<SVGTextElement, number>("text").data(d3.range(k));
-    labelSel.exit().remove();
-    labelSel
-      .enter()
-      .append("text")
-      .style("pointer-events", "none")
-      .merge(labelSel as any)
-      .attr("font-family", FONTS.body)
-      .attr("font-size", REDESIGN.networkLabelPx)
-      .attr("font-weight", (i) => (d.selectedMarket === names[i] ? "600" : "400"))
-      .attr("fill", t.primary)
-      .attr("text-anchor", "middle")
-      .attr("dominant-baseline", "hanging")
-      .attr("x", (i) => pos[i].x)
-      .attr("y", (i) => pos[i].y + radii[i] + 7)
-      .text((i) => names[i]);
-
-    this.drawLegend(d, t, maxAbsNet);
-  }
-
-  private drawLegend(d: NetworkDatum, t: RedesignTokens, maxAbsNet: number) {
-    this.gLegend.selectAll("*").remove();
-    const x0 = 24;
-    const y0 = SIZE - 128;
-    const g = this.gLegend.append("g").attr("transform", `translate(${x0},${y0})`);
-
-    g.append("text")
-      .attr("font-family", FONTS.body)
-      .attr("font-size", 11)
-      .attr("font-weight", "600")
-      .attr("fill", t.muted)
-      .attr("letter-spacing", "0.03em")
-      .text("NET SPILLOVER");
-
-    // diverging swatch
-    const barW = 150, barH = 10;
-    const grad = this.svg.select("defs").selectAll("linearGradient#net-legend-grad").data([null]);
-    const gradEnter = grad.enter().append("linearGradient").attr("id", "net-legend-grad");
-    const gradSel = gradEnter.merge(grad as any);
-    gradSel.selectAll("stop").remove();
-    gradSel
-      .selectAll("stop")
-      .data([0, 0.5, 1])
-      .join("stop")
-      .attr("offset", (s) => `${s * 100}%`)
-      .attr("stop-color", (s) => (s < 0.5 ? t.recv : s > 0.5 ? t.send : t.mid));
-    g.append("rect").attr("y", 14).attr("width", barW).attr("height", barH).attr("rx", 3).attr("fill", "url(#net-legend-grad)");
-    g.append("text").attr("x", 0).attr("y", 40).attr("font-family", FONTS.data).attr("font-size", 10.5).attr("fill", t.secondary).text(`−${maxAbsNet.toFixed(0)}%`);
-    g.append("text").attr("x", barW).attr("y", 40).attr("text-anchor", "end").attr("font-family", FONTS.data).attr("font-size", 10.5).attr("fill", t.secondary).text(`+${maxAbsNet.toFixed(0)}%`);
-    g.append("text").attr("x", barW / 2).attr("y", 40).attr("text-anchor", "middle").attr("font-family", FONTS.body).attr("font-size", 10).attr("fill", t.muted).text("receiver ↔ sender");
-
-    // node-size legend -- named as a missing piece by the client
-    const sizeG = g.append("g").attr("transform", "translate(0,58)");
-    sizeG
-      .append("text")
-      .attr("font-family", FONTS.body)
-      .attr("font-size", 11)
-      .attr("font-weight", "600")
-      .attr("fill", t.muted)
-      .attr("letter-spacing", "0.03em")
-      .text("NODE SIZE = |NET|");
-    const steps = [0.3, 0.6, 1.0];
-    const ptToPxLocal = (pt: number) => pt * (SIZE / 700);
-    const nodeScale = d.nodeScale ?? 1600;
-    let cxAcc = 10;
-    steps.forEach((frac) => {
-      const areaPt2 = nodeScale * (0.28 + 0.72 * frac);
-      const areaPx2 = areaPt2 * ptToPxLocal(1) ** 2 * 0.5;
-      const rr = Math.sqrt(Math.max(areaPx2, 5) / Math.PI) * 0.6; // legend scale-down
-      sizeG.append("circle").attr("cx", cxAcc).attr("cy", 28).attr("r", rr).attr("fill", t.muted).attr("fill-opacity", 0.5);
-      sizeG
+  private drawRegions(slots: number) {
+    const rr = R + NODE_MAX + 7;
+    for (const region of REGION_ORDER) {
+      const members = this.pos.filter((p) => REGION_OF[p.name] === region);
+      const pad = (0.5 / slots) * 2 * Math.PI;
+      const a0 = members[0].angle - pad;
+      const a1 = members[members.length - 1].angle + pad;
+      const mid = (a0 + a1) / 2;
+      const pt = (a: number, rad: number) => [C + rad * Math.cos(a), C + rad * Math.sin(a)];
+      const [x0, y0] = pt(a0, rr);
+      const [x1, y1] = pt(a1, rr);
+      const large = a1 - a0 > Math.PI ? 1 : 0;
+      this.gRegions
+        .append("path")
+        .attr("class", "region-arc")
+        .attr("d", `M${x0},${y0} A${rr},${rr} 0 ${large} 1 ${x1},${y1}`);
+      // name sits just inside the ring, at the region's middle, with a halo over the edges
+      const [tx, ty] = pt(mid, R - NODE_MAX - 46);
+      this.gRegions
         .append("text")
-        .attr("x", cxAcc)
-        .attr("y", 28 + rr + 13)
+        .attr("class", "region-label")
+        .attr("x", tx)
+        .attr("y", ty)
+        .attr("dy", "0.35em")
         .attr("text-anchor", "middle")
-        .attr("font-family", FONTS.data)
-        .attr("font-size", 9.5)
-        .attr("fill", t.secondary)
-        .text(`${Math.round(frac * maxAbsNet)}%`);
-      cxAcc += 46;
-    });
-  }
-}
-
-function edgeOpacity(
-  e: { i: number; j: number },
-  selectedMarket: string | null | undefined,
-  selectedPair: [string, string] | null | undefined,
-  names: string[]
-): number {
-  if (!selectedMarket && !selectedPair) return 1;
-  if (selectedPair) return selectedPair[0] === names[e.i] && selectedPair[1] === names[e.j] ? 1 : 0.12;
-  if (selectedMarket) return names[e.i] === selectedMarket || names[e.j] === selectedMarket ? 1 : 0.1;
-  return 1;
-}
-
-/** Deterministic pseudo-random value in [-1, 1] from two points, for per-edge jitter -- so
- * parallel/collinear edges fan out instead of stacking exactly on top of each other. */
-function edgeHash(a: { x: number; y: number }, b: { x: number; y: number }): number {
-  const h = Math.sin(a.x * 12.9898 + a.y * 78.233 + b.x * 37.719 + b.y * 91.317) * 43758.5453;
-  return (h - Math.floor(h)) * 2 - 1;
-}
-
-/** Rounds the corners of a polyline: trims each segment near its interior joints and bridges
- * them with a quadratic curve through the original joint, so sharp elbows read as soft kinks. */
-function roundedPolylinePath(pts: { x: number; y: number }[], cornerRadius: number): string {
-  const out: string[] = [`M ${pts[0].x},${pts[0].y}`];
-  for (let i = 1; i < pts.length; i++) {
-    const isLast = i === pts.length - 1;
-    const prev = pts[i - 1];
-    const cur = pts[i];
-    if (isLast) {
-      out.push(`L ${cur.x},${cur.y}`);
-      continue;
+        .text(region.toUpperCase());
     }
-    const next = pts[i + 1];
-    const d1 = Math.hypot(cur.x - prev.x, cur.y - prev.y) || 1;
-    const d2 = Math.hypot(next.x - cur.x, next.y - cur.y) || 1;
-    const r = Math.min(cornerRadius, d1 / 2, d2 / 2);
-    const p1x = cur.x - ((cur.x - prev.x) / d1) * r;
-    const p1y = cur.y - ((cur.y - prev.y) / d1) * r;
-    const p2x = cur.x + ((next.x - cur.x) / d2) * r;
-    const p2y = cur.y + ((next.y - cur.y) / d2) * r;
-    out.push(`L ${p1x},${p1y} Q ${cur.x},${cur.y} ${p2x},${p2y}`);
-  }
-  return out.join(" ");
-}
-
-function trimmed(a: { x: number; y: number }, b: { x: number; y: number }, r: number): { x: number; y: number } {
-  const d = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-  return { x: a.x + ((b.x - a.x) / d) * r, y: a.y + ((b.y - a.y) / d) * r };
-}
-
-/** Elbow route per the client's network reference: straight runs with angular kinks, not a
- * smooth arc. Aligned pairs (same row/column) bow out to the side instead of cutting straight
- * through whatever else shares that row or column; other pairs travel via a jittered lane so
- * they don't run exactly along the grid lines the nodes themselves sit on. */
-function kinkedPath(a: { x: number; y: number }, b: { x: number; y: number }, ra: number, rb: number, arrowSizePx: number): string {
-  const rbEff = rb + arrowSizePx * 0.5;
-  const jitter = edgeHash(a, b);
-  const start = trimmed(a, b, ra);
-
-  if (Math.abs(a.x - b.x) < 1 || Math.abs(a.y - b.y) < 1) {
-    // aligned -- bow out instead of a straight line through whoever else is on that row/column
-    const dx = b.x - a.x, dy = b.y - a.y;
-    const dist = Math.hypot(dx, dy) || 1;
-    const bow = Math.max(22, dist * 0.1) * (jitter >= 0 ? 1 : -1);
-    const mx = (a.x + b.x) / 2 - (bow * dy) / dist;
-    const my = (a.y + b.y) / 2 + (bow * dx) / dist;
-    const end = trimmed(b, { x: mx, y: my }, rbEff);
-    return `M ${start.x},${start.y} Q ${mx},${my} ${end.x},${end.y}`;
   }
 
-  const laneY = a.y + (b.y - a.y) * 0.5 + jitter * 16;
-  const end = trimmed(b, { x: b.x, y: laneY }, rbEff);
-  const pts = [start, { x: a.x, y: laneY }, { x: b.x, y: laneY }, end];
-  return roundedPolylinePath(pts, 16);
-}
+  render(frame: Frame, p: Palette, maxNet: number, maxPair: number, focus: string | null, selected: string | null) {
+    const k = this.names.length;
+    const nodeR = d3.scaleSqrt().domain([0, maxNet]).range([NODE_MIN, NODE_MAX]).clamp(true);
+    const width = d3.scaleLinear().domain([0, maxPair]).range([1, EDGE_MAX]).clamp(true);
+    const focusIdx = focus ? this.names.indexOf(focus) : -1;
 
-/** matplotlib connectionstyle="arc3,rad=<rad>": control point at the midpoint, shifted
- * perpendicular to the chord by rad * chord length. Endpoints trimmed to the node boundary
- * along the (approximate) tangent so the arrowhead lands on the circle, not the center. */
-function arcPath(a: Pos, b: Pos, ra: number, rb: number, rad: number, arrowSizePx: number): string {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const mx = (a.x + b.x) / 2 - rad * dy;
-  const my = (a.y + b.y) / 2 + rad * dx;
-  const ux0 = mx - a.x, uy0 = my - a.y;
-  const d0 = Math.hypot(ux0, uy0) || 1;
-  const sx = a.x + (ux0 / d0) * ra;
-  const sy = a.y + (uy0 / d0) * ra;
-  const ux1 = b.x - mx, uy1 = b.y - my;
-  const d1 = Math.hypot(ux1, uy1) || 1;
-  const rbEff = rb + arrowSizePx * 0.5;
-  const ex = b.x - (ux1 / d1) * rbEff;
-  const ey = b.y - (uy1 / d1) * rbEff;
-  return `M ${sx},${sy} Q ${mx},${my} ${ex},${ey}`;
+    const edges: Edge[] = [];
+    for (let s = 0; s < k; s++)
+      for (let r = 0; r < k; r++) if (frame.matrix[s][r] > frame.threshold) edges.push({ s, r, v: frame.matrix[s][r] });
+    edges.sort((a, b) => a.v - b.v); // strongest on top
+
+    const edgeStyle = (e: Edge) => {
+      if (focusIdx < 0) return { fill: p.secondary, op: 0.42 };
+      if (e.s === focusIdx) return { fill: p.send, op: 0.85 };
+      if (e.r === focusIdx) return { fill: p.recv, op: 0.85 };
+      return { fill: p.secondary, op: 0.07 };
+    };
+
+    this.gEdges
+      .selectAll<SVGPathElement, Edge>("path")
+      .data(edges, (e) => `${e.s}-${e.r}`)
+      .join("path")
+      .attr("d", (e) => this.taper(e, nodeR(Math.abs(frame.net[e.s])), nodeR(Math.abs(frame.net[e.r])), width(e.v)))
+      .attr("fill", (e) => edgeStyle(e).fill)
+      .attr("fill-opacity", (e) => edgeStyle(e).op)
+      .on("mousemove", (ev: MouseEvent, e) => {
+        showTooltip(ev.clientX, ev.clientY, `${this.names[e.s]} → ${this.names[e.r]}`, [
+          { label: "Net flow", value: `${e.v.toFixed(2)} pp` },
+          { label: "Cut-off (strongest 10%)", value: `${frame.threshold.toFixed(2)} pp` },
+        ]);
+      })
+      .on("mouseleave", hideTooltip)
+      .order();
+
+    const linked = new Set<number>();
+    if (focusIdx >= 0) {
+      linked.add(focusIdx);
+      for (const e of edges) {
+        if (e.s === focusIdx) linked.add(e.r);
+        if (e.r === focusIdx) linked.add(e.s);
+      }
+    }
+
+    const nodes = this.gNodes
+      .selectAll<SVGGElement, Pos>("g.node")
+      .data(this.pos, (d) => d.name)
+      .join((enter) => {
+        const g = enter.append("g").attr("class", "node").attr("tabindex", 0).attr("role", "button");
+        g.append("circle").attr("class", "hit");
+        g.append("circle").attr("class", "dot");
+        g.append("text").attr("class", "node-label");
+        g.on("mouseenter", (_ev, d) => this.cb.onHover(d.name))
+          .on("mouseleave", () => {
+            this.cb.onHover(null);
+            hideTooltip();
+          })
+          .on("click", (ev, d) => {
+            ev.stopPropagation();
+            this.cb.onSelect(d.name);
+          })
+          .on("keydown", (ev: KeyboardEvent, d) => {
+            if (ev.key === "Enter" || ev.key === " ") {
+              ev.preventDefault();
+              this.cb.onSelect(d.name);
+            }
+          });
+        return g;
+      });
+
+    nodes.attr("aria-label", (d) => `${d.name}, net ${fmtSigned(frame.net[d.idx])} percentage points`);
+    nodes.style("opacity", (d) => (focusIdx < 0 || linked.has(d.idx) ? 1 : 0.28));
+    nodes
+      .select<SVGCircleElement>("circle.hit")
+      .attr("cx", (d) => d.x)
+      .attr("cy", (d) => d.y)
+      .attr("r", NODE_MAX + 4)
+      .attr("fill", "transparent");
+    nodes
+      .select<SVGCircleElement>("circle.dot")
+      .attr("cx", (d) => d.x)
+      .attr("cy", (d) => d.y)
+      .attr("r", (d) => nodeR(Math.abs(frame.net[d.idx])))
+      .attr("fill", (d) => (frame.net[d.idx] >= 0 ? p.send : p.recv))
+      .attr("stroke", (d) => (d.name === selected ? p.fg : p.panel))
+      .attr("stroke-width", (d) => (d.name === selected ? 2.5 : 1.5));
+    nodes
+      .select<SVGTextElement>("text.node-label")
+      .attr("x", (d) => C + (R + NODE_MAX + 22) * Math.cos(d.angle))
+      .attr("y", (d) => C + (R + NODE_MAX + 22) * Math.sin(d.angle))
+      .attr("dy", "0.35em")
+      .attr("text-anchor", (d) => {
+        const c = Math.cos(d.angle);
+        return c > 0.25 ? "start" : c < -0.25 ? "end" : "middle";
+      })
+      .attr("font-weight", (d) => (d.name === selected || d.idx === focusIdx ? 700 : 500))
+      .text((d) => d.name);
+  }
+
+  /** A filled, tapered quadratic curve from sender s to receiver r, bent toward the centre. */
+  private taper(e: Edge, rs: number, rr: number, w: number): string {
+    const a = this.byIdx[e.s];
+    const b = this.byIdx[e.r];
+    const mx = (a.x + b.x) / 2;
+    const my = (a.y + b.y) / 2;
+    const cx = mx + (C - mx) * 0.55;
+    const cy = my + (C - my) * 0.55;
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const t0 = Math.min(0.45, (rs + 2) / len);
+    const t1 = 1 - Math.min(0.45, (rr + 3) / len);
+    const n = 24;
+    const left: [number, number][] = [];
+    const right: [number, number][] = [];
+    for (let i = 0; i <= n; i++) {
+      const t = t0 + ((t1 - t0) * i) / n;
+      const u = 1 - t;
+      const x = u * u * a.x + 2 * u * t * cx + t * t * b.x;
+      const y = u * u * a.y + 2 * u * t * cy + t * t * b.y;
+      const dx = 2 * u * (cx - a.x) + 2 * t * (b.x - cx);
+      const dy = 2 * u * (cy - a.y) + 2 * t * (b.y - cy);
+      const dl = Math.hypot(dx, dy) || 1;
+      const half = (w * (1 - i / n) + 0.6 * (i / n)) / 2;
+      left.push([x - (dy / dl) * half, y + (dx / dl) * half]);
+      right.push([x + (dy / dl) * half, y - (dx / dl) * half]);
+    }
+    const pts = left.concat(right.reverse());
+    return `M${pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join("L")}Z`;
+  }
 }

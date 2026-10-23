@@ -3,7 +3,7 @@
  * chart is interactive by default, tooltips enhance but never gate -- every value here is also
  * reachable through the detail panel). Line-key swatches, value leads the row, textContent only.
  */
-import { FONTS, REDESIGN_LIGHT } from "./encoding";
+
 
 let el: HTMLDivElement | null = null;
 
@@ -19,7 +19,7 @@ function ensure(): HTMLDivElement {
     border: "1px solid var(--line, rgba(11,11,11,.1))",
     borderRadius: "8px",
     padding: "7px 10px",
-    font: `500 12px ${FONTS.body}`,
+    font: "500 12px var(--f-sans)",
     boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
     opacity: "0",
     transition: "opacity 80ms ease",
@@ -42,7 +42,7 @@ export function showTooltip(x: number, y: number, title: string, rows: TooltipRo
   const titleEl = document.createElement("div");
   titleEl.style.fontWeight = "600";
   titleEl.style.marginBottom = rows.length ? "4px" : "0";
-  titleEl.style.fontFamily = FONTS.body;
+  titleEl.style.fontFamily = "var(--f-sans)";
   titleEl.textContent = title; // textContent only -- labels are untrusted data
   node.appendChild(titleEl);
 
@@ -62,11 +62,11 @@ export function showTooltip(x: number, y: number, title: string, rows: TooltipRo
       row.appendChild(key);
     }
     const label = document.createElement("span");
-    label.style.color = "var(--secondary, " + REDESIGN_LIGHT.secondary + ")";
+    label.style.color = "var(--secondary)";
     label.textContent = r.label;
     row.appendChild(label);
     const value = document.createElement("span");
-    value.style.fontFamily = FONTS.data;
+    value.style.fontWeight = "700";
     value.style.fontWeight = "600";
     value.style.marginLeft = "auto";
     value.textContent = r.value;

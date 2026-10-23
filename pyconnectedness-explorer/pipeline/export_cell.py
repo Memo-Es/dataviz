@@ -1,7 +1,6 @@
 # ---- export (not in the notebook; only reads objects the notebook already created) ----
-# Appended to Demo.ipynb by run_demo.py. Smoke tested against the library code at the pinned
-# commit (synthetic data, small windows): two checks passed, each rolling pairwise_net[t]
-# equals static_connectedness on the same 200 weeks, and net equals the row sum of pairwise_net.
+# Appended to Demo.ipynb by run_demo.py; validate.py then checks the result against the numbers
+# the notebook itself printed.
 import json
 import os
 from pathlib import Path

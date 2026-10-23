@@ -51,9 +51,12 @@ REFERENCE = {
     21: "05_last_200_weeks.png",
     28: "periods_heatmaps.png",
 }
-ref_dir = ROOT / "pipeline" / "out" / "reference"
-ref_dir.mkdir(parents=True, exist_ok=True)
+# out/reference/ for checking by eye, app/public/data/figures/ so the app can show them as-is
+targets = [ROOT / "pipeline" / "out" / "reference", ROOT / "app" / "public" / "data" / "figures"]
+for d in targets:
+    d.mkdir(parents=True, exist_ok=True)
 for idx, name in REFERENCE.items():
     pngs = [o["data"]["image/png"] for o in nb.cells[idx].get("outputs", []) if "image/png" in o.get("data", {})]
     if pngs:
-        (ref_dir / name).write_bytes(base64.b64decode(pngs[0]))
+        for d in targets:
+            (d / name).write_bytes(base64.b64decode(pngs[0]))
