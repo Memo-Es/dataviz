@@ -105,6 +105,19 @@
 
 * { box-sizing: border-box; }
 
+/* The whole app went through a Fitbit componentization pass and every control still fell back
+   to the raw browser-default blue focus ring -- the one colour nowhere else in this system,
+   landing hardest on exactly the controls that got the most redesign attention (the header
+   tabs). Keyboard/tab-order focus still needs a visible ring (accessibility, not taste), so
+   this gives every interactive element the app's own accent instead of the UA default, and
+   only on keyboard focus (:focus-visible), not on every mouse click. */
+*:focus { outline: none; }
+a:focus-visible, button:focus-visible, select:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -183,12 +196,15 @@ html, body {
   box-shadow: 0 6px 18px rgba(11, 11, 11, 0.22);
 }
 
+/* First pass at this header kept the title and the tab controls side by side on one baseline,
+   fighting for the same line the way a generic SaaS dashboard header does -- Fitbit never
+   does that. Its header is always stacked: a title row, then its own full-width tab row
+   underneath with real weight and room (see e.g. the Cardio Load screen's Day/Week/Month/Year
+   row). This rebuilds it that way: title on its own row, controls on a second, dedicated row. */
 .topbar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px 24px;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .topbar h1 {
@@ -208,8 +224,10 @@ html, body {
 .controls {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 32px;
   flex-wrap: wrap;
+  padding-top: 2px;
+  border-top: 1px solid var(--line);
 }
 
 /* Fitbit componentization pass: no card anywhere below carries a drop shadow, a glassy top
@@ -217,22 +235,21 @@ html, body {
    fill-contrast, and its time/measure switches (Day/Week/Month/Year on every trend screen) are
    plain text tabs with a teal underline, not capsule buttons. .pill-group below is restyled
    in place to that underline-tab pattern rather than renamed, so every layout file that already
-   builds a <div class="pill-group"> picks this up with no markup changes. */
+   builds a <div class="pill-group"> picks this up with no markup changes. Full-width, roomy and
+   bold enough to read as a real control, not a thin row of links squeezed into a header corner. */
 
 .pill-group {
   display: inline-flex;
-  gap: 20px;
-  border-bottom: 2px solid var(--line);
+  gap: 28px;
 }
 
 .pill-group button {
   border: none;
   background: transparent;
   color: var(--muted);
-  padding: 9px 1px 7px;
-  margin-bottom: -2px;
-  border-bottom: 2px solid transparent;
-  font: 600 13.5px var(--f-body);
+  padding: 13px 2px 11px;
+  border-bottom: 3px solid transparent;
+  font: 700 14.5px var(--f-body);
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }

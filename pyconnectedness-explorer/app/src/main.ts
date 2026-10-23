@@ -17,7 +17,7 @@ import { StoryLayout } from "./layouts/story";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
   <div class="topbar">
-    <div>
+    <div class="topbar-title">
       <h1>PyConnectedness Explorer</h1>
       <p class="subtitle">How shocks travel between 20 stock markets &mdash; from PyConnectedness's own Demo notebook output.</p>
     </div>
