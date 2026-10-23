@@ -1,9 +1,14 @@
 /**
- * Diverging bar ranking by net[t] (SPEC.md section 6, view 4). No Figma/notebook reference for
- * this view, so it follows whichever chart-colour language is active, so colour carries one
- * meaning across the whole explorer either way.
+ * Ranking by net[t] (SPEC.md section 6, view 4). No Figma/notebook reference for this view, so
+ * it follows whichever chart-colour language is active, so colour carries one meaning across
+ * the whole explorer either way. Redesign style renders Fitbit's own list-row pattern -- label,
+ * big bold number, ring badge on the right -- instead of a dot-plus-horizontal-bar; baseline
+ * keeps the plain bar-track version since it has no Figma reference to match either way and
+ * the bar reads the diverging sign at a glance, which baseline's unstyled brief cares about
+ * more than redesign's component fidelity does.
  */
 import { BASELINE, FONTS, type RedesignTokens } from "../encoding";
+import { ringSvg } from "../ui/ring";
 import type { ChartStyle } from "../state";
 
 export interface RankingDatum {
@@ -29,54 +34,24 @@ export class RankingList {
     const nameFont = isRedesign ? FONTS.body : BASELINE.fontFamily;
     const valueFont = isRedesign ? FONTS.data : BASELINE.fontFamily;
 
-    this.host.innerHTML = "";
-    for (const o of order) {
-      const row = document.createElement("div");
-      row.className = "ranking-row";
-      row.style.fontFamily = nameFont;
-      if (d.selectedMarket === o.name) row.style.fontWeight = "600";
-      row.onclick = () => d.onSelect?.(o.name);
-
-      const dot = document.createElement("div");
-      dot.className = "ranking-dot";
-      dot.style.background = o.net >= 0 ? sendColor : recvColor;
-      dot.style.opacity = String(isRedesign ? 0.9 : BASELINE.nodeAlpha);
-
-      const name = document.createElement("div");
-      name.className = "ranking-name";
-      name.textContent = o.name;
-
-      const track = document.createElement("div");
-      track.className = "ranking-bar-track";
-      const bar = document.createElement("div");
-      bar.className = "ranking-bar";
-      const frac = Math.abs(o.net) / maxAbs;
-      bar.style.background = o.net >= 0 ? sendColor : recvColor;
-      bar.style.opacity = String(isRedesign ? 0.9 : BASELINE.nodeAlpha);
-      if (o.net >= 0) {
-        bar.style.left = "50%";
-        bar.style.width = `${frac * 50}%`;
-      } else {
-        bar.style.right = "50%";
-        bar.style.width = `${frac * 50}%`;
-      }
-      track.appendChild(bar);
-      const zero = document.createElement("div");
-      zero.style.position = "absolute";
-      zero.style.left = "50%";
-      zero.style.top = "0";
-      zero.style.bottom = "0";
-      zero.style.width = "1px";
-      zero.style.background = "var(--axis, var(--line))";
-      track.appendChild(zero);
-
-      const value = document.createElement("div");
-      value.className = "ranking-value";
-      value.style.fontFamily = valueFont;
-      value.textContent = o.net.toFixed(1);
-
-      row.append(dot, name, track, value);
-      this.host.appendChild(row);
-    }
+    this.host.innerHTML = order
+      .map((o) => {
+        const color = o.net >= 0 ? sendColor : recvColor;
+        const frac = Math.abs(o.net) / maxAbs;
+        const selected = d.selectedMarket === o.name ? "font-weight:700;" : "";
+        return `
+          <div class="metric-row" data-market="${o.name}" style="font-family:${nameFont};${selected}">
+            <div class="metric-row-main">
+              <div class="metric-row-label">${o.name}</div>
+              <div class="metric-row-value" style="font-family:${valueFont}">${o.net.toFixed(1)}<span class="metric-row-unit">%</span></div>
+            </div>
+            <div class="metric-ring">${ringSvg(frac, color, 40, 4)}</div>
+          </div>
+        `;
+      })
+      .join("");
+    this.host.querySelectorAll<HTMLElement>(".metric-row").forEach((row) => {
+      row.addEventListener("click", () => d.onSelect?.(row.dataset.market!));
+    });
   }
 }

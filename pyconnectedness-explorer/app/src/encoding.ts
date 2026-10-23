@@ -89,7 +89,9 @@ export interface RedesignTokens {
 // cardHighlight are web-shell-only (the elevated-card chrome CONTEXT.md's decision log scopes
 // to "the app shell around the charts", same as border already was).
 export const REDESIGN_LIGHT: RedesignTokens = {
-  page: "#f9f9f7",
+  page: "#f3f2ef", // Fitbit's flat warm-grey page -- see style.css's Fitbit-componentization
+    // comment block for the rest of that pass; `page` and `cardShadow` are the two fields this
+    // repo's own rule (above) already scopes as web-shell-only, so both move freely here.
   surface: "#fcfcfb",
   surfaceRaised: "#ffffff", // nested rows (ranking, legend chips) read one step "closer"
   primary: "#0b0b0b",
@@ -103,12 +105,12 @@ export const REDESIGN_LIGHT: RedesignTokens = {
   mid: "#f0efec", // diverging midpoint (near zero)
   crisis: "#d03b3b", // status "critical" -- distinct from `send`, reserved for crisis emphasis
   band: "#eceae4", // neutral period shading
-  cardShadow: "0 1px 2px rgba(11,11,11,0.04), 0 10px 28px rgba(11,11,11,0.07)",
+  cardShadow: "none", // Fitbit's whole card system is flat fill-contrast, no drop shadow at all
   cardHighlight: "rgba(255,255,255,0.6)",
 } as const;
 
 export const REDESIGN_DARK: RedesignTokens = {
-  page: "#0d0d0d",
+  page: "#141412",
   surface: "#1a1a19",
   surfaceRaised: "#242320", // Pillow-style elevated card: nested elements read lighter still
   primary: "#f0efec",
@@ -122,7 +124,7 @@ export const REDESIGN_DARK: RedesignTokens = {
   mid: "#383835",
   crisis: "#d03b3b",
   band: "#201f1c",
-  cardShadow: "0 1px 0 rgba(255,255,255,0.05) inset, 0 16px 40px rgba(0,0,0,0.55)",
+  cardShadow: "none",
   cardHighlight: "rgba(255,255,255,0.07)",
 } as const;
 

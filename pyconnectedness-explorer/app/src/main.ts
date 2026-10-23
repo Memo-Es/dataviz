@@ -8,6 +8,12 @@ import { BentoLayout } from "./layouts/bento";
 import { ShellLayout } from "./layouts/shell";
 import { StoryLayout } from "./layouts/story";
 
+// Chrome is Fitbit's own: a bottom icon tab bar owns top-level navigation (the Today/Coach/You
+// pattern -- here, which layout) and a persistent circular FAB carries the one global action
+// that isn't a navigation choice (here, theme) exactly where Fitbit's own "+" FAB floats, above
+// the tab bar, bottom-right. The two remaining controls (chart style, measure) are secondary
+// *within* the current screen, so they stay in the header as the flat underline tabs Fitbit
+// itself uses for Day/Week/Month/Year -- see style.css's Fitbit-componentization comment.
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
   <div class="topbar">
@@ -16,11 +22,6 @@ app.innerHTML = `
       <p class="subtitle">How shocks travel between 20 stock markets &mdash; from PyConnectedness's own Demo notebook output.</p>
     </div>
     <div class="controls">
-      <div class="pill-group" id="layout-group" title="Layout">
-        <button data-layout="bento" aria-pressed="false">Bento</button>
-        <button data-layout="shell" aria-pressed="false">Shell</button>
-        <button data-layout="story" aria-pressed="true">Story</button>
-      </div>
       <div class="pill-group" id="style-group">
         <button data-style="redesign" aria-pressed="true">Redesign</button>
         <button data-style="baseline" aria-pressed="false">Faithful baseline</button>
@@ -29,7 +30,6 @@ app.innerHTML = `
         <button data-measure="returns" aria-pressed="true">Returns</button>
         <button data-measure="volatility" aria-pressed="false">Volatility</button>
       </div>
-      <button class="theme-toggle" id="theme-toggle" type="button">Theme</button>
     </div>
   </div>
 
@@ -41,6 +41,15 @@ app.innerHTML = `
   <div id="layout-root"></div>
 
   <div class="footnote" id="footnote"></div>
+
+  <div class="chrome-dock">
+    <nav class="bottom-tabs" id="layout-group" title="Layout">
+      <button data-layout="bento" aria-pressed="false"><span class="bottom-tab-icon">&#8862;</span>Bento</button>
+      <button data-layout="shell" aria-pressed="false"><span class="bottom-tab-icon">&#9776;</span>Shell</button>
+      <button data-layout="story" aria-pressed="true"><span class="bottom-tab-icon">&#9711;</span>Story</button>
+    </nav>
+    <button class="fab" id="theme-toggle" type="button" title="Toggle theme"></button>
+  </div>
 `;
 
 const el = {
@@ -122,6 +131,7 @@ async function main() {
     el.measureGroup.querySelectorAll("button").forEach((b) => {
       b.setAttribute("aria-pressed", String(b.getAttribute("data-measure") === s.measure));
     });
+    el.themeToggle.textContent = s.theme === "dark" ? "☾" : "☀";
 
     controllers[activeKey].render();
     el.footnote.innerHTML = world.footnoteHtml();

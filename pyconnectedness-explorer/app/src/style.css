@@ -1,12 +1,19 @@
-/* Mirrors app/src/encoding.ts REDESIGN_LIGHT/REDESIGN_DARK -- keep both in sync by hand. */
+/* fg/secondary/muted/grid/axis/send/recv/mid/crisis/band mirror app/src/encoding.ts
+   REDESIGN_LIGHT/REDESIGN_DARK -- those are the validated, matplotlib-guide-matched chart
+   values (CONTEXT.md's decision log) and must not drift here on their own. bg/panel/
+   panel-raised, accent, the ring colours, card-shadow and the radii are the ones that file's own comment already
+   scopes as "web-shell-only" (chrome around the charts, never the charts' own canvas) -- this
+   pass (see the "Fitbit componentization" rule below) rebuilds exactly those into Fitbit's flat,
+   shadow-less, warm-grey card system instead of the previous glassy elevated-card one, same
+   split the Story fix above already relies on. */
 :root {
-  --bg: #f9f9f7;
-  --panel: #fcfcfb;
-  --panel-raised: #ffffff;
+  --bg: #f3f2ef;
+  --panel: #f9f8f5;
+  --panel-raised: #edebe6;
   --fg: #0b0b0b;
   --secondary: #52514e;
   --muted: #898781;
-  --line: rgba(11, 11, 11, 0.08);
+  --line: rgba(11, 11, 11, 0.06);
   --grid: #e1e0d9;
   --axis: #c3c2b7;
   --send: #e34948;
@@ -15,14 +22,25 @@
   --crisis: #d03b3b;
   --band: #eceae4;
   --edge: #52514e;
-  --accent: var(--recv); /* the one saturated colour the chrome itself leans on, not just the
-    charts -- the references (Brink, Commons, Fitbit) use real colour everywhere, not just as a
-    thin data accent on an otherwise grayscale page */
-  --accent-wash: rgba(42, 120, 214, 0.12);
-  --card-shadow: 0 1px 2px rgba(11, 11, 11, 0.03), 0 14px 32px rgba(11, 11, 11, 0.06);
+  /* Fitbit's own brand teal -- decoupled from --recv (which stays the validated diverging
+     "net receiver" data colour): one colour now has one job, chrome accent vs. data meaning,
+     instead of the old chrome reusing the chart's blue because it happened to be the only
+     saturated colour on hand. Validated via the dataviz skill's CVD script (ΔE 14.5 deutan /
+     21.1 normal vs --ring-b, both >= the >=8 floor; see the ring-* pair just below). */
+  --accent: #0e9f93;
+  --accent-wash: rgba(14, 159, 147, 0.12);
+  /* Fitbit's per-metric ring-badge colours (Today screen: teal steps/cardio rings, lavender
+     sleep/mindfulness rings) -- two fixed, always-labelled metrics (returns vs. volatility),
+     never a cycled series identity, so this doesn't touch the categorical-hue rule. */
+  --ring-a: #0e9f93;
+  --ring-b: #7c6fdb;
+  --ring-a-wash: rgba(14, 159, 147, 0.14);
+  --ring-b-wash: rgba(124, 111, 219, 0.14);
+  --ring-track: var(--grid);
+  --card-shadow: none; /* Fitbit's cards carry zero drop shadow -- flat fill-contrast only */
   --card-highlight: rgba(255, 255, 255, 0.6);
-  --radius-card: 26px;
-  --radius-chart: 20px;
+  --radius-card: 18px;
+  --radius-chart: 16px;
   --radius-pill: 999px;
   --f-display: "IBM Plex Sans", system-ui, sans-serif;
   --f-body: "IBM Plex Sans", system-ui, sans-serif;
@@ -31,13 +49,13 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0d0d0d;
-    --panel: #1a1a19;
-    --panel-raised: #242320;
+    --bg: #141412;
+    --panel: #1c1c19;
+    --panel-raised: #262521;
     --fg: #f0efec;
     --secondary: #c3c2b7;
     --muted: #898781;
-    --line: rgba(255, 255, 255, 0.08);
+    --line: rgba(255, 255, 255, 0.07);
     --grid: #2c2c2a;
     --axis: #383835;
     --send: #e66767;
@@ -46,21 +64,26 @@
     --crisis: #d03b3b;
     --band: #201f1c;
     --edge: #c3c2b7;
-    --accent: var(--recv);
-    --accent-wash: rgba(57, 135, 229, 0.18);
-    --card-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 20px 48px rgba(0, 0, 0, 0.5);
+    --accent: #13a89c;
+    --accent-wash: rgba(19, 168, 156, 0.18);
+    --ring-a: #13a89c;
+    --ring-b: #8f7fe0;
+    --ring-a-wash: rgba(19, 168, 156, 0.16);
+    --ring-b-wash: rgba(143, 127, 224, 0.16);
+    --ring-track: var(--grid);
+    --card-shadow: none;
     --card-highlight: rgba(255, 255, 255, 0.06);
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #0d0d0d;
-  --panel: #1a1a19;
-  --panel-raised: #242320;
+  --bg: #141412;
+  --panel: #1c1c19;
+  --panel-raised: #262521;
   --fg: #f0efec;
   --secondary: #c3c2b7;
   --muted: #898781;
-  --line: rgba(255, 255, 255, 0.08);
+  --line: rgba(255, 255, 255, 0.07);
   --grid: #2c2c2a;
   --axis: #383835;
   --send: #e66767;
@@ -69,9 +92,14 @@
   --crisis: #d03b3b;
   --band: #201f1c;
   --edge: #c3c2b7;
-  --accent: var(--recv);
-  --accent-wash: rgba(57, 135, 229, 0.18);
-  --card-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 20px 48px rgba(0, 0, 0, 0.5);
+  --accent: #13a89c;
+  --accent-wash: rgba(19, 168, 156, 0.18);
+  --ring-a: #13a89c;
+  --ring-b: #8f7fe0;
+  --ring-a-wash: rgba(19, 168, 156, 0.16);
+  --ring-b-wash: rgba(143, 127, 224, 0.16);
+  --ring-track: var(--grid);
+  --card-shadow: none;
   --card-highlight: rgba(255, 255, 255, 0.06);
 }
 
@@ -88,10 +116,71 @@ html, body {
 #app {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px 24px 94px; /* bottom clears the fixed bottom-tabs bar below */
   display: flex;
   flex-direction: column;
   gap: 22px;
+}
+
+/* ============================================================
+   Bottom tab bar + FAB -- Fitbit's own Today/Coach/You bar and persistent "+" action,
+   literally: fixed icon+label tabs own top-level navigation (here, layout), and the one
+   global action that isn't a navigation choice (theme) is the circular accent FAB floating
+   above it, bottom-right. See main.ts's comment above the markup for the full rationale.
+   ============================================================ */
+.chrome-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+.chrome-dock > * { pointer-events: auto; }
+
+.bottom-tabs {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  gap: 36px;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  padding: 9px 24px calc(9px + env(safe-area-inset-bottom, 0px));
+}
+.bottom-tabs button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: 600 11px var(--f-body);
+  padding: 5px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.bottom-tab-icon { font-size: 19px; line-height: 1; }
+.bottom-tabs button[aria-pressed="true"] { color: var(--accent); }
+
+.fab {
+  position: absolute;
+  right: max(24px, calc((100% - 1400px) / 2 + 24px));
+  bottom: 76px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 19px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(11, 11, 11, 0.22);
 }
 
 .topbar {
@@ -123,65 +212,66 @@ html, body {
   flex-wrap: wrap;
 }
 
-/* No hairline borders anywhere below -- none of the reference apps (Pillow, Fitbit, Brink,
-   Commons) outline a card, a pill or a button. Elevation comes from shadow and flat colour
-   contrast against the page alone; a 1px border on top of that is what made this read as a
-   bordered spreadsheet/report instead of a floating app surface. */
+/* Fitbit componentization pass: no card anywhere below carries a drop shadow, a glassy top
+   highlight or a filled pill background for a nav control -- Fitbit's whole chrome is flat
+   fill-contrast, and its time/measure switches (Day/Week/Month/Year on every trend screen) are
+   plain text tabs with a teal underline, not capsule buttons. .pill-group below is restyled
+   in place to that underline-tab pattern rather than renamed, so every layout file that already
+   builds a <div class="pill-group"> picks this up with no markup changes. */
 
 .pill-group {
   display: inline-flex;
-  border-radius: var(--radius-pill);
-  overflow: hidden;
-  background: var(--panel-raised);
-  box-shadow: var(--card-shadow);
+  gap: 20px;
+  border-bottom: 2px solid var(--line);
 }
 
 .pill-group button {
   border: none;
   background: transparent;
-  color: var(--secondary);
-  padding: 10px 18px;
-  font: 600 14px var(--f-body);
+  color: var(--muted);
+  padding: 9px 1px 7px;
+  margin-bottom: -2px;
+  border-bottom: 2px solid transparent;
+  font: 600 13.5px var(--f-body);
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
 
 .pill-group button[aria-pressed="true"] {
-  background: var(--accent);
-  color: #fff;
+  color: var(--fg);
+  border-bottom-color: var(--accent);
 }
 
 button.icon-btn {
   border: none;
   background: var(--panel-raised);
-  color: var(--fg);
-  border-radius: 14px;
-  width: 40px;
-  height: 40px;
-  font-size: 15px;
+  color: var(--secondary);
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  font-size: 14px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--card-shadow);
-  transition: transform 0.15s ease;
+  transition: background 0.15s ease;
 }
-button.icon-btn:hover { transform: translateY(-1px); }
+button.icon-btn:hover { background: var(--grid); }
 /* the play/pause control is the one piece of transport chrome worth calling out in colour --
-   every reference app's primary action button is a solid accent fill, not a neutral grey tile */
+   Fitbit's own primary actions ("Log Weight", the + FAB) are a solid accent fill, not a
+   neutral grey tile */
 button.icon-btn#play {
   background: var(--accent);
   color: #fff;
 }
 
-select, .theme-toggle {
+select {
   border: none;
   background: var(--panel-raised);
   color: var(--fg);
-  border-radius: 14px;
+  border-radius: 12px;
   padding: 10px 14px;
-  font: 600 14px var(--f-body);
-  box-shadow: var(--card-shadow);
+  font: 600 13.5px var(--f-body);
 }
 
 /* Dropped from a wall-of-text block down to a quiet one-line strip -- nothing in any reference
@@ -202,18 +292,7 @@ select, .theme-toggle {
   background: var(--panel);
   border-radius: var(--radius-card);
   padding: 26px 28px 28px;
-  box-shadow: var(--card-shadow);
   position: relative;
-}
-.panel::before {
-  /* a hairline top highlight, the glassy "elevated card" edge the Pillow/Brink/Commons
-     references all share -- a flip of the shadow, not a second border */
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow: inset 0 1px 0 var(--card-highlight);
-  pointer-events: none;
 }
 
 .panel h2 {
@@ -310,28 +389,47 @@ select, .theme-toggle {
 .pill.send { background: color-mix(in srgb, var(--send) 18%, transparent); color: var(--send); }
 .pill.recv { background: color-mix(in srgb, var(--recv) 18%, transparent); color: var(--recv); }
 
-/* list rows read as their own small elevated cards -- per Commons' "Largest emission
-   purchases" rows and Fitbit's "Top podcasts" bars: a filled colour-circle icon badge (not a
-   bare dot), a rounded capsule track, a raised surface on hover, generous row height. */
-.ranking-row {
-  display: grid;
-  grid-template-columns: 28px 92px 1fr 54px;
+/* Fitbit's own list-row pattern (Today screen's "Steps / Hourly activity / Distance / Energy
+   burned" stack): flat full-width row, label + big bold number on the left, a tinted ring
+   badge on the right -- not a dot-plus-horizontal-bar. See ui/ring.ts for the ring markup this
+   pairs with. */
+.metric-row {
+  display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 14px;
   font-size: 13.5px;
-  padding: 10px 10px;
+  padding: 12px 10px;
   margin: 0 -10px;
   border-radius: 14px;
   cursor: pointer;
   transition: background 0.15s ease;
 }
-.ranking-row:hover { background: var(--panel-raised); }
-.ranking-row:hover .ranking-name { text-decoration: underline; }
-.ranking-dot { width: 22px; height: 22px; border-radius: 50%; opacity: 1 !important; }
-.ranking-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ranking-bar-track { position: relative; height: 12px; background: var(--grid); border-radius: var(--radius-pill); }
-.ranking-bar { position: absolute; top: 0; bottom: 0; border-radius: var(--radius-pill); }
-.ranking-value { font-family: var(--f-data); font-weight: 600; text-align: right; }
+.metric-row:hover { background: var(--panel-raised); }
+.metric-row:hover .metric-row-label { text-decoration: underline; }
+.metric-row-main { min-width: 0; }
+.metric-row-label {
+  font-weight: 600;
+  color: var(--secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 1px;
+}
+.metric-row-value {
+  font-family: var(--f-body);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+  line-height: 1.15;
+}
+.metric-row-unit { font-size: 13px; font-weight: 600; color: var(--muted); margin-left: 1px; }
+.metric-row-caption { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+.metric-ring { position: relative; flex: none; display: inline-flex; }
+.metric-ring .ring-svg { transform: rotate(-90deg); }
+.metric-ring .ring-track { fill: none; stroke: var(--ring-track); }
+.metric-ring .ring-fill { fill: none; stroke-linecap: round; transition: stroke-dasharray 0.3s ease; }
 
 svg text { font-family: inherit; }
 
@@ -393,15 +491,15 @@ svg text { font-family: inherit; }
   line-height: 1.55;
   margin: 0;
 }
-.t-metric .metric-value {
-  font-family: var(--f-body);
-  font-size: 44px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  margin: 8px 0 2px;
-  line-height: 1;
-}
-.t-metric .tile-body { margin-bottom: 14px; }
+/* the two numeric tiles (headline measure + "also moving") are Fitbit's own stat-row component,
+   just not clickable list rows -- cancel the hover/cursor .metric-row carries for the ranking
+   list, and let the headline tile's number run bigger, matching Fitbit's own "0 of 10,000
+   steps" treatment where the hero number on the Today screen's top card is the largest text
+   on it. */
+.metric-row-hero { cursor: default; padding: 0; margin: 0; }
+.metric-row-hero:hover { background: none; }
+.metric-row-value-hero { font-size: 40px; }
+.t-metric .metric-row-hero { margin-bottom: 14px; }
 .t-metric .pill { align-self: flex-start; }
 
 .tile-header {
@@ -519,7 +617,10 @@ svg text { font-family: inherit; }
   text-align: left;
 }
 .shell-nav-btn:hover { background: var(--panel-raised); }
-.shell-nav-btn.active { background: var(--accent); color: #fff; }
+/* Fitbit never fills a selected nav row solid -- the active bottom tab just turns teal. A
+   soft tint + teal text/icon reads as "selected" the same way without a block of solid colour
+   competing with the ring-badge accents elsewhere on the same screen. */
+.shell-nav-btn.active { background: var(--accent-wash); color: var(--accent); font-weight: 700; }
 .shell-nav-icon { font-size: 10px; opacity: 0.8; width: 14px; display: inline-block; }
 .shell-rail-section {
   font-size: 11px;
@@ -612,35 +713,35 @@ svg text { font-family: inherit; }
   background: linear-gradient(to top, color-mix(in srgb, var(--panel) 82%, transparent), transparent);
 }
 
+/* Flat solid chips, not glass -- Fitbit's own carousel-dot indicator (the Weight Trends hero
+   chart's "* * * *" strip) and its FAB/pill buttons are plain solid fills, never a blurred
+   translucent panel; dropping backdrop-filter here matches that and the rest of this pass. */
 .story-dots { display: flex; gap: 8px; }
 .story-dot {
-  width: 30px; height: 30px;
+  width: 28px; height: 28px;
   border-radius: 50%;
-  border: 1.5px solid var(--line);
-  background: color-mix(in srgb, var(--panel-raised) 78%, transparent);
-  color: var(--secondary);
+  border: none;
+  background: var(--panel-raised);
+  color: var(--muted);
   font: 700 12px var(--f-body);
-  cursor: pointer;
-  backdrop-filter: blur(6px);
 }
-.story-dot.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.story-dot.active { background: var(--accent); color: #fff; }
 
 .story-fab-group { display: flex; gap: 6px; }
 .story-fab-pill {
   border: none;
-  background: color-mix(in srgb, var(--panel-raised) 78%, transparent);
+  background: var(--panel-raised);
   color: var(--secondary);
   font: 600 12.5px var(--f-body);
   padding: 7px 13px;
   border-radius: var(--radius-pill);
   cursor: pointer;
-  backdrop-filter: blur(6px);
 }
 .story-fab-pill[aria-pressed="true"] { background: var(--accent); color: #fff; }
 
 .story-fab {
   border: none;
-  background: color-mix(in srgb, var(--panel-raised) 78%, transparent);
+  background: var(--panel-raised);
   color: var(--fg);
   width: 44px; height: 44px;
   border-radius: 50%;
@@ -649,10 +750,9 @@ svg text { font-family: inherit; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(6px);
   transition: background 0.15s ease;
 }
-.story-fab:hover { background: var(--panel-raised); }
+.story-fab:hover { background: var(--grid); }
 .story-fab-sm { width: 36px; height: 36px; font-size: 14px; }
 .story-fab-prev, .story-fab-next {
   position: absolute;
@@ -672,10 +772,9 @@ svg text { font-family: inherit; }
   gap: 8px;
 }
 .story-float select {
-  background: color-mix(in srgb, var(--panel-raised) 78%, transparent);
+  background: var(--panel-raised);
   color: var(--fg);
-  border: 1px solid var(--line);
-  backdrop-filter: blur(6px);
+  border: none;
   box-shadow: none;
 }
 
