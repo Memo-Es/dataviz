@@ -119,6 +119,18 @@ export function staticBlock(data: ExplorerData, measure: Measure, window: Exclud
   return table[window];
 }
 
+/** Net pairwise value for one specific pair (i sends to j), over every rolling window -- read
+ * straight out of the flat Float32Array, not recomputed. Powers the bento layout's pair
+ * drill-down sparkline, reusing TimelineChart instead of a new chart type. */
+export function pairSeriesAt(data: ExplorerData, measure: Measure, i: number, j: number): number[] {
+  const { k } = data;
+  const flat = data.pairwise[measure];
+  const T = flat.length / (k * k);
+  const out = new Array(T);
+  for (let t = 0; t < T; t++) out[t] = flat[t * k * k + i * k + j];
+  return out;
+}
+
 export function dateIndex(data: ExplorerData, measure: Measure, isoDate: string): number {
   const dates = data.meta.dynamic[measure].dates;
   let idx = dates.findIndex((d) => d >= isoDate);

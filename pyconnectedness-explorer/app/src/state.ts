@@ -7,6 +7,11 @@ export interface Selection {
 
 export type ChartStyle = "baseline" | "redesign";
 
+/** Three structurally different arrangements of the same charts -- see CONTEXT.md's decision
+ * log. Only meaningful when chartStyle is "redesign"; the faithful baseline always uses the
+ * plain stacked layout regardless of this setting, since its whole point is an unstyled replica. */
+export type LayoutMode = "bento" | "shell" | "story";
+
 export interface ExplorerState {
   t: number; // index into dynamic.<measure>.dates
   measure: Measure;
@@ -17,6 +22,7 @@ export interface ExplorerState {
   playing: boolean;
   theme: "light" | "dark";
   chartStyle: ChartStyle; // faithful matplotlib baseline, or the redesign -- see CONTEXT.md
+  layout: LayoutMode;
 }
 
 type Listener = (s: ExplorerState) => void;

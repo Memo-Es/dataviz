@@ -240,7 +240,16 @@ select, .theme-toggle {
   background: #ffffff; /* chart bodies stay matplotlib-white, see encoding.ts BASELINE */
   border-radius: var(--radius-chart);
   overflow: auto;
+  display: flex;
+  flex-direction: column; /* flex:1 below grows along height, not width */
 }
+/* flex, not height:100% -- percentage height on the svg doesn't reliably resolve as "definite"
+   against a flex-grown ancestor (Chromium keeps the svg at its intrinsic viewBox-ratio height
+   regardless), leaving blank space below the chart in any stretched container (bento tiles,
+   shell/story stages). A flex child with min-height:0 fills available space when the parent is
+   externally constrained, and still shrinks to the svg's natural size when it isn't (the plain
+   baseline layout, where .chart-card has no explicit height) -- correct in both cases. */
+.chart-card svg { display: block; width: 100%; flex: 1; min-height: 0; }
 :root[data-theme="dark"] .chart-card { box-shadow: 0 0 0 1px rgba(255,255,255,0.06); }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .chart-card { box-shadow: 0 0 0 1px rgba(255,255,255,0.06); }
@@ -325,3 +334,313 @@ select, .theme-toggle {
 .ranking-value { font-family: var(--f-data); font-weight: 600; text-align: right; }
 
 svg text { font-family: inherit; }
+
+/* ============================================================
+   Bento dashboard -- asymmetric grid of insight/metric/hero tiles
+   ============================================================ */
+.bento-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.5fr;
+  grid-template-areas:
+    "insight  metric   network"
+    "timeline insight2 network"
+    "heatmap  heatmap  ranking";
+  gap: 20px;
+  /* "start", not "stretch": the network tile spans all 3 rows, and stretching every row to
+     match its height left the small text tiles with a lot of dead space under their content */
+  align-items: start;
+}
+.t-insight, .t-metric, .t-insight2 { min-height: 210px; }
+.t-network { min-height: 600px; }
+.t-timeline { min-height: 250px; }
+.t-heatmap, .t-ranking { min-height: 600px; }
+.tile {
+  background: var(--panel);
+  border-radius: var(--radius-card);
+  box-shadow: var(--card-shadow);
+  padding: 24px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.t-insight { grid-area: insight; }
+.t-metric { grid-area: metric; }
+.t-network { grid-area: network; }
+.t-timeline { grid-area: timeline; }
+.t-insight2 { grid-area: insight2; }
+.t-heatmap { grid-area: heatmap; }
+.t-ranking { grid-area: ranking; max-height: 640px; overflow: auto; }
+.t-network .chart-card, .t-timeline .chart-card, .t-heatmap .chart-card { flex: 1; margin-top: 14px; }
+
+.tile-eyebrow {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+}
+.tile-headline {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 10px 0 6px;
+  line-height: 1.25;
+}
+.tile-body {
+  font-size: 13.5px;
+  color: var(--secondary);
+  line-height: 1.55;
+  margin: 0;
+}
+.t-metric .metric-value {
+  font-family: var(--f-body);
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 8px 0 2px;
+  line-height: 1;
+}
+.t-metric .tile-body { margin-bottom: 14px; }
+.t-metric .pill { align-self: flex-start; }
+
+.tile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tile-header h2 { margin: 0; font-size: 18px; }
+
+@media (max-width: 1100px) {
+  .bento-grid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "insight  metric"
+      "network  network"
+      "timeline insight2"
+      "heatmap  heatmap"
+      "ranking  ranking";
+  }
+}
+@media (max-width: 680px) {
+  .bento-grid { grid-template-columns: 1fr; grid-template-areas: "insight" "metric" "network" "timeline" "insight2" "heatmap" "ranking"; }
+}
+
+.drilldown {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.drilldown[hidden] { display: none; } /* the explicit display:flex above otherwise beats the
+  browser's own [hidden]{display:none} default, leaving the overlay clickable while invisible */
+.drilldown-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 10, 10, 0.45);
+  backdrop-filter: blur(6px);
+}
+.drilldown-card {
+  position: relative;
+  background: var(--panel);
+  border-radius: var(--radius-card);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+  padding: 32px;
+  width: min(760px, 100%);
+  max-height: 86vh;
+  overflow: auto;
+}
+.drilldown-card h2 { margin: 4px 0 18px; font-size: 26px; letter-spacing: -0.01em; }
+.drilldown-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  font-size: 20px;
+  line-height: 1;
+}
+.drilldown-stats {
+  display: flex;
+  gap: 28px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.drill-stat-value { font-size: 28px; font-weight: 800; letter-spacing: -0.01em; }
+.drill-stat-label { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.drilldown-card .chart-card { height: 260px; }
+.drilldown-links {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 20px;
+}
+
+/* ============================================================
+   App-shell split view -- persistent rail + single big chart pane
+   ============================================================ */
+.shell {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+  min-height: 760px;
+}
+.shell-rail {
+  flex: 0 0 272px;
+  background: var(--panel);
+  border-radius: var(--radius-card);
+  box-shadow: var(--card-shadow);
+  padding: 22px 18px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.shell-brand {
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  padding: 4px 10px 18px;
+}
+.shell-nav { display: flex; flex-direction: column; gap: 4px; margin-bottom: 22px; }
+.shell-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  background: transparent;
+  color: var(--secondary);
+  font: 600 14px var(--f-body);
+  padding: 11px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.shell-nav-btn:hover { background: var(--panel-raised); }
+.shell-nav-btn.active { background: var(--accent); color: #fff; }
+.shell-nav-icon { font-size: 10px; opacity: 0.8; width: 14px; display: inline-block; }
+.shell-rail-section {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  padding: 0 10px 8px;
+}
+.shell-ranking { flex: 1; overflow: auto; min-height: 0; }
+
+.shell-main {
+  flex: 1;
+  min-width: 0;
+  background: var(--panel);
+  border-radius: var(--radius-card);
+  box-shadow: var(--card-shadow);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+}
+.shell-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.shell-toolbar h2 { margin: 0; font-size: 20px; }
+.shell-stage { position: relative; flex: 1; min-height: 480px; }
+.shell-chart { position: absolute; inset: 0; }
+.shell-detail { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--grid); }
+
+@media (max-width: 900px) {
+  .shell { flex-direction: column; min-height: 0; }
+  .shell-rail { flex: none; }
+  .shell-ranking { max-height: 280px; }
+}
+
+/* ============================================================
+   Story-scroll / immersive -- full-bleed single chart + bottom drawer
+   ============================================================ */
+.story-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  margin: 0 auto 16px;
+  background: var(--panel-raised);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--card-shadow);
+  padding: 6px;
+}
+.story-nav button[data-view] {
+  border: none;
+  background: transparent;
+  color: var(--secondary);
+  font: 600 13.5px var(--f-body);
+  padding: 9px 16px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+.story-nav button[data-view].active { background: var(--accent); color: #fff; }
+.story-nav-sep { width: 1px; height: 20px; background: var(--grid); margin: 0 4px; }
+
+.story-stage {
+  position: relative;
+  height: min(70vh, 700px);
+  min-height: 440px;
+}
+.story-chart { position: absolute; inset: 0; }
+.story-stage-controls {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  background: var(--panel-raised);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--card-shadow);
+  padding: 8px;
+}
+
+.story-drawer-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 14px;
+  border: none;
+  background: var(--panel);
+  box-shadow: var(--card-shadow);
+  color: var(--secondary);
+  font: 600 13px var(--f-body);
+  padding: 14px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+.story-drawer-chevron { font-size: 10px; transition: transform 0.2s ease; display: inline-block; }
+.story-drawer-handle.open .story-drawer-chevron { transform: rotate(180deg); }
+
+.story-drawer {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.25s ease;
+}
+.story-drawer.open { max-height: 640px; overflow: auto; }
+.story-drawer-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 20px;
+  background: var(--panel);
+  border-radius: var(--radius-card);
+  box-shadow: var(--card-shadow);
+  padding: 24px;
+  margin-top: 10px;
+}
+.story-drawer-grid h2 { margin: 0 0 12px; font-size: 16px; }
+@media (max-width: 760px) {
+  .story-drawer-grid { grid-template-columns: 1fr; }
+}
