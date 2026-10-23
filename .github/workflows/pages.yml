@@ -2,7 +2,7 @@ name: Deploy PyConnectedness Explorer to GitHub Pages
 
 on:
   push:
-    branches: [main, claude/pensive-pascal-sz4532]
+    branches: [main, claude/pensive-pascal-sz4532, claude/serene-shannon-v6pfgc]
     paths:
       - "pyconnectedness-explorer/app/**"
       - ".github/workflows/pages.yml"
