@@ -6,24 +6,25 @@
  * a dark gradient caption card overlaid directly on the image (not a separate text block above
  * or below it), and masonry grids of varied-size thumbnails for browsing a collection.
  *
- * Translated to data that has no photography: each chart IS the "artwork" -- full-bleed on a
- * dark gallery-wall stage, with the title/description as a bottom scrim caption sitting on top
- * of the chart the way a museum caption sits on an AR tour photo, and view-switching/controls
- * as floating circular buttons over the image instead of a toolbar beside it. The ranking list
+ * Translated to data that has no photography: each chart IS the "artwork" -- full-bleed on the
+ * gallery-wall stage, with the title/description as a bottom scrim caption sitting on top of
+ * the chart the way a museum caption sits on an AR tour photo, and view-switching/controls as
+ * floating circular buttons over the image instead of a toolbar beside it. The ranking list
  * becomes a magnitude-sized gallery grid (bigger |net| -> bigger tile), the same "varied-size
  * thumbnail wall" pattern as Google Arts & Culture's collection grids.
+ *
+ * The stage, scrims and controls all use the app's own theme-aware tokens (same f.tok every
+ * other layout renders with) -- an earlier version forced a permanently-dark stage "like a real
+ * gallery wall" regardless of the light/dark toggle, which read as a different product bolted
+ * onto Bento/Shell instead of one system in a third arrangement. Immersive and full-bleed is a
+ * layout choice; it isn't a license to fork the colour system.
  */
 import { NetworkChart } from "../charts/network";
 import { TimelineChart } from "../charts/timeline";
 import { HeatmapChart } from "../charts/heatmap";
 import { renderDetail } from "../charts/detail";
-import { REDESIGN_DARK } from "../encoding";
 import type { World } from "../world";
 import type { LayoutController } from "./types";
-
-// The stage is always a dark gallery wall (see layouts/story.ts header) -- charts on it use the
-// dark token set regardless of the app's own light/dark toggle, so they never clash with it.
-const STAGE_TOK = REDESIGN_DARK;
 
 type View = "network" | "timeline" | "heatmap";
 const VIEWS: { id: View; label: string; eyebrow: string }[] = [
@@ -216,7 +217,7 @@ export class StoryLayout implements LayoutController {
         title: "",
         weekLabel: "",
         style: f.s.chartStyle,
-        tokens: STAGE_TOK,
+        tokens: f.tok,
         onSelectMarket: world.onSelectMarket,
         onSelectPair: world.onSelectPair,
         selectedMarket: f.s.selection.market,
@@ -237,7 +238,7 @@ export class StoryLayout implements LayoutController {
         selectedIndex: f.t,
         showXAxis: true,
         style: f.s.chartStyle,
-        tokens: STAGE_TOK,
+        tokens: f.tok,
         measureLabel: f.measure === "returns" ? "return" : "volatility",
         onScrub: (idx) => world.store.set({ t: idx }),
       });
@@ -249,7 +250,7 @@ export class StoryLayout implements LayoutController {
         matrix: f.heatmapMatrix,
         title: "",
         style: f.s.chartStyle,
-        tokens: STAGE_TOK,
+        tokens: f.tok,
         selectedPair: f.s.selection.pair,
         onSelectCell: world.onSelectCell,
       });

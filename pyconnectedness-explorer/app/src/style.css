@@ -562,9 +562,12 @@ svg text { font-family: inherit; }
 
 /* ============================================================
    Story / gallery viewer -- reskinned off a Google Arts & Culture scan: full-bleed "artwork"
-   (the chart) on a dark gallery wall, floating circular icon buttons sitting ON the image
-   instead of a toolbar beside it, and a dark gradient caption card overlaid directly on the
-   image the way a museum caption sits on an AR tour photo. See layouts/story.ts's header.
+   (the chart) on the gallery wall, floating circular icon buttons sitting ON the image instead
+   of a toolbar beside it, and a gradient caption card overlaid directly on the image the way a
+   museum caption sits on an AR tour photo. See layouts/story.ts's header.
+   Every colour here is a token or a color-mix() of one, same as Bento/Shell -- the stage is the
+   same --panel surface the other two layouts build their cards from, just full-bleed instead of
+   inset, so this reads as one design system in a third arrangement, not a separate skin.
    ============================================================ */
 .story-stage {
   position: relative;
@@ -572,8 +575,7 @@ svg text { font-family: inherit; }
   min-height: 460px;
   border-radius: var(--radius-card);
   overflow: hidden;
-  background: #0a0a0a; /* a gallery wall, not the page's own light/dark surface -- the chart is
-    the "artwork" and reads the same way regardless of the app's own theme toggle */
+  background: var(--panel);
   box-shadow: var(--card-shadow);
 }
 /* bottom inset reserves room for the caption scrim so chart content (e.g. the heatmap's last
@@ -593,9 +595,13 @@ svg text { font-family: inherit; }
   pointer-events: none; /* only the controls inside should catch clicks, not the gradient itself */
 }
 .story-scrim > * { pointer-events: auto; }
+/* Both scrims are built from --panel, not a hardcoded black -- in dark mode that's still a
+   near-black fade (--panel is #1a1a19); in light mode it fades from the same cream surface
+   every other card uses instead of punching a black vignette into a light theme. Legibility
+   for the floating controls comes from their own panel-raised chips below, not this gradient. */
 .story-scrim-top {
   top: 0;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.55), rgba(0,0,0,0));
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--panel) 70%, transparent), transparent);
 }
 .story-scrim-bottom {
   bottom: 0;
@@ -603,16 +609,16 @@ svg text { font-family: inherit; }
   align-items: stretch;
   gap: 14px;
   padding-top: 56px;
-  background: linear-gradient(to top, rgba(0,0,0,0.72), rgba(0,0,0,0));
+  background: linear-gradient(to top, color-mix(in srgb, var(--panel) 82%, transparent), transparent);
 }
 
 .story-dots { display: flex; gap: 8px; }
 .story-dot {
   width: 30px; height: 30px;
   border-radius: 50%;
-  border: 1.5px solid rgba(255,255,255,0.35);
-  background: rgba(0,0,0,0.25);
-  color: rgba(255,255,255,0.85);
+  border: 1.5px solid var(--line);
+  background: color-mix(in srgb, var(--panel-raised) 78%, transparent);
+  color: var(--secondary);
   font: 700 12px var(--f-body);
   cursor: pointer;
   backdrop-filter: blur(6px);
@@ -622,8 +628,8 @@ svg text { font-family: inherit; }
 .story-fab-group { display: flex; gap: 6px; }
 .story-fab-pill {
   border: none;
-  background: rgba(0,0,0,0.3);
-  color: rgba(255,255,255,0.85);
+  background: color-mix(in srgb, var(--panel-raised) 78%, transparent);
+  color: var(--secondary);
   font: 600 12.5px var(--f-body);
   padding: 7px 13px;
   border-radius: var(--radius-pill);
@@ -634,8 +640,8 @@ svg text { font-family: inherit; }
 
 .story-fab {
   border: none;
-  background: rgba(0,0,0,0.35);
-  color: #fff;
+  background: color-mix(in srgb, var(--panel-raised) 78%, transparent);
+  color: var(--fg);
   width: 44px; height: 44px;
   border-radius: 50%;
   font-size: 18px;
@@ -646,7 +652,7 @@ svg text { font-family: inherit; }
   backdrop-filter: blur(6px);
   transition: background 0.15s ease;
 }
-.story-fab:hover { background: rgba(0,0,0,0.55); }
+.story-fab:hover { background: var(--panel-raised); }
 .story-fab-sm { width: 36px; height: 36px; font-size: 14px; }
 .story-fab-prev, .story-fab-next {
   position: absolute;
@@ -666,9 +672,9 @@ svg text { font-family: inherit; }
   gap: 8px;
 }
 .story-float select {
-  background: rgba(0,0,0,0.35);
-  color: #fff;
-  border: none;
+  background: color-mix(in srgb, var(--panel-raised) 78%, transparent);
+  color: var(--fg);
+  border: 1px solid var(--line);
   backdrop-filter: blur(6px);
   box-shadow: none;
 }
@@ -678,11 +684,11 @@ svg text { font-family: inherit; }
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: rgba(255,255,255,0.65);
+  color: var(--accent);
   margin-bottom: 4px;
 }
-.story-caption h2 { margin: 0 0 4px; font-size: 22px; color: #fff; letter-spacing: -0.01em; }
-.story-caption p { margin: 0; font-size: 13px; color: rgba(255,255,255,0.75); }
+.story-caption h2 { margin: 0 0 4px; font-size: 22px; color: var(--fg); letter-spacing: -0.01em; }
+.story-caption p { margin: 0; font-size: 13px; color: var(--secondary); }
 .story-transport { display: flex; gap: 8px; align-self: flex-end; }
 
 /* market gallery -- the same varied-size masonry wall as Google Arts & Culture's collection
