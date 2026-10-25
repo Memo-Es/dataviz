@@ -6,3 +6,4 @@ app/dist/
 app/tsconfig.tsbuildinfo
 .DS_Store
 styleguide/fonts/
+__pycache__/
