@@ -186,3 +186,10 @@ clearer, with a possible consumer app to discuss later. The one hard rule: the n
 PyConnectedness's own code, exactly as on GitHub. So the short vs long term split was added
 through the export cell (the library's `frequency_connectedness`, on the notebook's own series),
 not reimplemented, and not a new notebook cell. `LIBRARY_NOTES.md` is a full read of the library.
+
+Oct 25 (later): Memo shared Klüppelberg & Krali, "Causal analysis of extreme risk in a network of
+industry portfolios" (arXiv:2504.00523). It's the method behind the roadmap's extreme-risk module
+and the questionnaire's "layered network". It's summarised, with design notes, in the second half
+of `LIBRARY_NOTES.md`. The library has no code for it yet (`causality/` is empty), so under the
+"exact same code" rule it can't feed the explorer until that module, or the authors' R package,
+exists.

@@ -188,3 +188,132 @@ The ordering check in `replicate_dy2009` shows why the generalized method matter
 - **Animations** (the client's top-ranked feature) don't exist in the library yet. The explorer's
   play button is the only version so far, and it already uses fixed scales across frames, which
   the library's plots don't.
+
+---
+
+# The extreme-risk paper: Klüppelberg & Krali, "Causal analysis of extreme risk in a network of industry portfolios"
+
+arXiv:2504.00523v2 [q-fin.RM], 26 Sep 2025, 24 pages. Claudia Klüppelberg (TU Munich) and
+Mario Krali (EPFL). Read in full from the PDF Memo shared (not committed here; it's on arXiv).
+
+**Why it matters here.** This is the method behind two items in the client's questionnaire
+(`CONTEXT.md`): the "extreme risk module with causal max-linear models (Klüppelberg)" on the
+roadmap, and the "Layered network for extreme risk, as in Klüppelberg and Krali (2025) (in
+progress)" graph. The library's `causality/` module, which should hold it, is still an **empty
+file** at the pinned commit. The paper's own code is an R package the authors say "will soon be
+available" at https://github.com/mariokrali.
+
+## The question it answers, versus what PyConnectedness does today
+
+| | Diebold-Yilmaz (in the library today) | Klüppelberg-Krali (this paper) |
+|---|---|---|
+| Which events | All weeks, ordinary moves | **Only extremes** (the largest losses) |
+| Model | Linear VAR, variance decomposition | **Max-linear** structural equations: only the largest shock gets through |
+| Result | Net and pairwise spillovers, which can run both ways and loop | A **DAG** (directed acyclic graph): a causal order with no loops |
+| Picture | Circular network, heatmap | **Layered network**: sources on top, then each "generation" below |
+| Time | Rolling windows, so it changes over time | One window, so it doesn't change over time |
+
+## The method in plain terms
+
+1. **The model** (recursive max-linear model, RMLM). Each node's value is the **maximum**, not the
+   sum, of its parents' values times edge weights, or its own shock. In formulas:
+   `X_i = max_k∈pa(i) c_ik·X_k ∨ c_ii·Z_i`. The solution is `X = A ×max Z`, where each entry `a_ij`
+   is the weight of the heaviest path from j to i. This is the "winner takes all" idea: only the
+   largest shocks travel and dominate the nodes downstream.
+2. **Identifiability.** The edge weights `C` can't be recovered from data, but the path matrix `A`
+   can. The **minimum max-linear DAG** `D^A` keeps only the edges that sit on a heaviest path.
+   That's the graph the paper estimates.
+3. **The extreme-value setup** (Assumptions A).
+   - Innovations are heavy-tailed: regularly varying with index α=2, independent, standardised.
+   - The norm is Euclidean, and every node has unit scale (σᵢ = 1).
+   - The dependence structure lives in the "angular measure", the directions of the largest
+     observations, which has a point mass at each normalised column of `A`.
+4. **Algorithm 1, causal order.**
+   - It compares the scalings of max-projections such as `M_{i,aj} = X_i ∨ aX_j`, for an a > 1.
+   - Theorem 5: a node is a **source** exactly when a certain difference equals a² − 1, and for
+     non-sources the difference is smaller.
+   - It finds the sources first, then each later generation.
+   - The tolerance ε lets it order several nearly tied nodes in one step.
+   - Consistency: Theorem 8.
+5. **Algorithm 2, estimating A.**
+   - A recursion over scalings (Proposition 2), equivalent to a linear map `A² = T·S_M`
+     (Theorem 10).
+   - It's asymptotically normal (Theorem 12).
+6. **The statistics programme.**
+   - Transform each margin to Fréchet(α=2) with the empirical integral transform (eq. 29).
+   - Keep the k observations with the largest radius.
+   - Estimate the scalings as averages of ω² over those (eq. 30).
+7. **New in this paper: a sparse DAG.**
+   - **Hard thresholding** with δ ≥ 0 drops weak entries of `Â` that would otherwise become
+     spurious edges.
+   - To pick the number of extremes k and the threshold δ, it fits DAGs for k ∈ {50, …, 90},
+     each with 5 nearby values r ∈ {k, k+2, …, k+8}, and δ ∈ {0, 0.025, 0.05, 0.1}.
+   - It then takes the **centroid**: the DAG with the smallest total normalised structural
+     Hamming distance (nSHD) to the other four.
+   - A **stability score** counts how many of the 5 DAGs contain each edge.
+
+## The application
+
+- **Data:**
+  - 30 Kenneth-French industry portfolios, daily, **1 Jun 1989 to 15 Jun 1998**, n = 2285.
+    Chosen as a window that is approximately stationary.
+  - Only losses: `X = max(−returns, 0)`.
+  - The dataset is public:
+    https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html
+- **Settings:**
+  - Causal order: a = 1.3, ε = 0.1, k = 250 extremes.
+  - Final DAG: δ = 0.1, r = 92 (the minimiser).
+- **Causal order found:** {Whlsl, Hshld, Food, Txtls, Smoke, BusEq, Hlth, Carry, Beer, Servs,
+  Util, Cnstr, Rtail, Clths, Telcm, Paper, Chems, Elcq, Meals, Other, Games, Fin, Fabr, Steel,
+  Trans, Books, Autos, Oil, Mines, Coal}. The paper lists it with sources last.
+- **The estimated DAG (Figure 4), top to bottom:**
+  - **Sources:** Coal and Mines.
+  - **First generation:** Oil, Autos, Transportation, and Books (Books appears in the figure but
+    not the prose).
+  - **Second generation:** Steel, FabPr, Fin, Games, Other, Meals, ElcEq, Chems, Paper, Telcm,
+    Clths, Rtail, Cnstr.
+  - **Then:** Util, Servs, Beer, Carry, Hlth.
+  - **Then:** BusEq, Smoke, Txtls, Food, Hshld.
+  - **At the bottom:** Whlsl.
+- **Stability:**
+  - The edge count per pair varies from 0 to 5 across the five DAGs.
+  - Edges out of Coal, Mines, Oil, Autos, Books and Transportation appear in **all five**.
+  - Some edges appear only once, e.g. Coal → Services and Transportation → Construction.
+- **The authors' reading:** Coal (48–53% of US electricity then) and metals mining are where
+  extreme losses start, then oil (the Gulf War), the Big Three automakers, and transport.
+
+## Design notes on the paper's own figures (input for the explorations)
+
+- **Figure 4, the layered DAG, is the "layered network" the client wants, but it's a hairball.**
+  - Over 150 edges with no hierarchy.
+  - Arrowheads pile up on the nodes.
+  - Labels are tiny inside circles.
+  - Layer meaning ("generation") isn't labelled, and neither is direction ("risk flows down").
+- **Figure 5 encodes stability (1 to 5) with five unrelated categorical colours.** Stability is
+  ordered, so it needs a single sequential ramp, or weight and opacity. It also draws every
+  edge at once, which buries the stable core.
+- **Figure 3 can't be read:** the axis labels are too small to see, and there are no values.
+  **Figures 6 and 7 are thumbnail grids** too small to see anything in.
+- **Opportunities:**
+  - Label the generations as rows.
+  - Draw only the stable core by default, with weaker edges on demand.
+  - Highlight one node's paths upstream and downstream, the same focus-and-dim pattern the
+    explorer's network already uses.
+  - Encode stability by line weight.
+  - Use plain titles ("Where extreme losses start, and where they end up").
+
+## What this means for the explorer (decision needed)
+
+- **The rule is "exact same code as the PyConnectedness GitHub".** That code doesn't exist yet for
+  this method (`causality/` is empty), so **nothing in this paper can be computed in the explorer
+  today** without breaking the rule.
+- **Options:**
+  1. **Wait** for the library's module, or the authors' R package, then run it the same way as
+     the Demo.
+  2. **Run a design-only study** of the layered network on the paper's published DAG. That needs
+     the edge list from the authors. Reading 150+ edges off Figure 4 by eye would be unreliable,
+     and it would have to be labelled clearly as the paper's result, not PyConnectedness output.
+- **Terminology to keep apart:**
+  - In Diebold-Yilmaz a **"net sender"** is a net position that can change week to week.
+  - Here a **"source node"** is causal and fixed for the window.
+  - The same colours (red = sender) shouldn't mean both without saying so.
