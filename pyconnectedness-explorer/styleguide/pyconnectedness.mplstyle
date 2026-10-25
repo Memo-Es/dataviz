@@ -2,15 +2,15 @@
 #
 # Drop-in rcParams for the library's existing plotting functions. Covers what's validated and
 # portable: colour, type, line weight, grid. Does NOT change layout (circular network, matrix
-# heatmap) -- see STYLE_GUIDE.md for why the web prototype's grid-network and capsule-heatmap
-# ideas aren't in here.
+# heatmap) -- see STYLE_GUIDE.md "What's not here, on purpose".
 #
 # Usage:
 #   import matplotlib.pyplot as plt
 #   plt.style.use("pyconnectedness.mplstyle")
 #
 # Typography needs the fonts registered first (they aren't matplotlib built-ins) -- see
-# STYLE_GUIDE.md "Registering the fonts".
+# STYLE_GUIDE.md "Registering the fonts". Words are Plus Jakarta Sans, as in the web explorer;
+# numbers are B612 Mono via pcstyle.mono_numbers(ax), since no rcParam targets tick labels alone.
 
 figure.facecolor: fcfcfb
 axes.facecolor: fcfcfb
@@ -31,7 +31,7 @@ xtick.labelsize: 10
 ytick.labelsize: 10
 
 font.family: sans-serif
-font.sans-serif: IBM Plex Sans, DejaVu Sans, sans-serif
+font.sans-serif: Plus Jakarta Sans, DejaVu Sans, sans-serif
 axes.titlesize: 13
 axes.titleweight: 600
 axes.titlelocation: left

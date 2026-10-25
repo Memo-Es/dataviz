@@ -33,14 +33,17 @@ OUT.mkdir(parents=True, exist_ok=True)
 SEND = "#e34948"
 RECV = "#2a78d6"
 EDGE = "#52514e"
-CRISIS = "#d03b3b"
+SECONDARY = "#52514e"  # crises are marked in neutral ink: red means "net sender" only
 PRIMARY = "#0b0b0b"
 MUTED = "#898781"
 GRID = "#e1e0d9"
 SURFACE = "#fcfcfb"
 
-for font_file in (STYLEGUIDE / "fonts").glob("*.ttf") if (STYLEGUIDE / "fonts").exists() else []:
-    fm.fontManager.addfont(str(font_file))
+sys.path.insert(0, str(STYLEGUIDE))
+from pcstyle import mono_number, mono_numbers, register_fonts  # noqa: E402
+
+if not register_fonts():
+    print("fonts missing: run `python styleguide/get_fonts.py` first (falling back to DejaVu Sans)")
 plt.style.use(str(STYLEGUIDE / "pyconnectedness.mplstyle"))
 
 # ---- the notebook's own cell 6, on the raw download run_demo.py saved ----
@@ -112,15 +115,19 @@ plt.close(fig)
 
 # ---- 2. heatmap: cell 18 (returns panel only), recoloured + legend ----
 fig, ax = plt.subplots(figsize=(7.5, 7))
-spillover_heatmap(ret_conn.pairwise_net, ax=ax, cmap="RdBu_r", annotate=False)
+spillover_heatmap(ret_conn.pairwise_net, ax=ax, cmap="RdBu_r", annotate=False, colorbar=False)
+ax.grid(False)  # the style sheet's grid would draw over the cells
 im = ax.images[0]
 maxabs = float(np.abs(ret_conn.pairwise_net.to_numpy()).max())
 im.set_clim(-maxabs, maxabs)
 cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-cbar.set_label("sender →                         → receiver", fontsize=9, color=MUTED)
+# pairwise_net[i, j] > 0 means row i sends to column j, so the library's default labels
+# ("affected variable" rows, "shock source" columns -- right for fevd) read backwards here
+cbar.set_label("row receives  ←  0  →  row sends (pp)", fontsize=9, color=MUTED)
 ax.set_title("Every pair, net return connectedness", loc="left", fontsize=15, fontweight="bold")
-ax.set_xlabel("shock source →", fontsize=9.5, color=MUTED)
-ax.set_ylabel("← affected variable", fontsize=9.5, color=MUTED)
+ax.set_xlabel("to this market (column)", fontsize=9.5, color=MUTED)
+ax.set_ylabel("from this market (row)", fontsize=9.5, color=MUTED)
+mono_numbers(colorbars=[cbar])
 fig.savefig(OUT / "heatmap_restyled.png", dpi=150, bbox_inches="tight", facecolor=SURFACE)
 plt.close(fig)
 
@@ -132,7 +139,7 @@ ax.margins(y=0.12)
 _, ytop = ax.get_ylim()
 for iso, label in episodes.items():
     ts = ret_dyn.total.index[ret_dyn.total.index.searchsorted(iso)]
-    ax.axvline(ts, color=CRISIS, alpha=0.25, lw=6)
+    ax.axvline(ts, color=SECONDARY, alpha=0.5, lw=1, ls=(0, (2, 3)))
     ax.text(ts + pd.Timedelta(weeks=1), ytop - 0.3, label, fontsize=8.5, color=MUTED,
             rotation=90, va="top", ha="left", zorder=5)
 fig.suptitle("When markets became fragile", x=0.02, y=0.98, ha="left", fontsize=16, fontweight="bold")
@@ -141,8 +148,11 @@ ax.set_title("Rolling total return spillover, 200-week window, VAR(2), H=10",
 fig.subplots_adjust(top=0.86)
 ax.set_ylabel("Total spillover, %")
 last = ret_dyn.total.iloc[-1]
-ax.annotate(f"{last:.1f}%", (ret_dyn.total.index[-1], last), xytext=(8, 0), textcoords="offset points",
-            fontsize=13, fontweight="bold", color=SEND if last >= ret_conn.total else RECV, va="center")
+mono_number(ax, (ret_dyn.total.index[-1], last), f"{last:.1f}%", xytext=(8, 0), fontsize=13,
+            fontweight="bold", color=PRIMARY, va="center")
+ax.text(ret_dyn.total.index[0], ret_conn.total, f" full sample {ret_conn.total:.1f}%", fontsize=8.5,
+        color=MUTED, va="bottom")
+mono_numbers(ax)
 fig.savefig(OUT / "timeline_restyled.png", dpi=150, facecolor=SURFACE)
 plt.close(fig)
 

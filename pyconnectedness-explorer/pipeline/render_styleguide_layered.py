@@ -9,6 +9,7 @@ library's output once the module exists; the drawing code shouldn't need to chan
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import matplotlib
@@ -21,6 +22,11 @@ from matplotlib.patches import FancyArrowPatch
 
 ROOT = Path(__file__).resolve().parents[1]
 STYLEGUIDE = ROOT / "styleguide"
+sys.path.insert(0, str(STYLEGUIDE))
+from pcstyle import register_fonts  # noqa: E402
+
+if not register_fonts():
+    print("fonts missing: run `python styleguide/get_fonts.py` first (falling back to DejaVu Sans)")
 plt.style.use(str(STYLEGUIDE / "pyconnectedness.mplstyle"))
 
 INK = "#0b0b0b"

@@ -58,7 +58,7 @@ unrelated pair). One pair, used identically in both charts, fixes that directly.
 | Net sender (`send`) | `#e34948` | `#e66767` |
 | Net receiver (`recv`) | `#2a78d6` | `#3987e5` |
 | Diverging midpoint | `#f0efec` | `#383835` |
-| Crisis emphasis (distinct from `send`) | `#d03b3b` | `#d03b3b` |
+| Critical alert, not for chart data (see rule below) | `#d03b3b` | `#d03b3b` |
 | Primary ink | `#0b0b0b` | `#f0efec` |
 | Secondary ink | `#52514e` | `#c3c2b7` |
 | Muted (axis/labels) | `#898781` | `#898781` |
@@ -75,9 +75,9 @@ been through the validator yet; run it before they ship in a library release.
 
 **Colour has one meaning per channel, across all four graphics.**
 - **Red/blue means net sender/receiver**, a signed Diebold-Yilmaz position. Use it nowhere else.
-  That includes crises: the crisis red above sits too close to the sender red. The explorer marks
-  crisis dates with dashed neutral ink and labels instead, and the crisis recipe below should
-  move to the same treatment (secondary ink, `alpha≈0.5`) next time the examples are rendered.
+  That includes crises: the crisis red above sits too close to the sender red, so crisis dates
+  are dashed neutral ink with a label, in the explorer and in the recipe below. The crisis red
+  stays in the table only for a future "critical alert" state, not for chart data.
 - **The accent means "what you selected"**: a hovered node, a traced path. It never means data.
 - **Ink, in weight and opacity, carries magnitude or confidence** when there's no sign.
 
@@ -92,29 +92,46 @@ node scripts/validate_palette.js "#3987e5,#e66767" --mode dark
 
 ## Typography
 
-From the typefaces the client already gathered (`../CONTEXT.md`, "References gathered"), split
-by job the same way the client's own list already splits them ("for numbers and data" vs.
-"academic tone"):
+The same two families as the web explorer, so library plots, docs and the website match:
 
-- **Titles** -- Source Serif 4. Reads academic, not corporate; not used for numbers (a serif
-  hero figure looks like decoration, per the `dataviz` skill's mark spec).
-- **Labels, ticks, axis text** -- IBM Plex Sans.
-- **Numbers, tick values** -- B612 Mono (the client's own first pick, from Airbus/ENAC --
-  monospace figures keep a column of numbers aligned).
+- **Words** (titles, labels, legends, annotations): **Plus Jakarta Sans**, 400–700. It's the
+  closest free match to Aeonik, the face in the client's Figma file. Titles use 600–700 and
+  state the finding.
+- **Numbers** (tick values, colour-bar ticks, callouts, tables): **B612 Mono**, 400/700. It's
+  the client's own first pick, from Airbus/ENAC. Monospace keeps columns of figures aligned.
+- **Page headlines on the web only**: the explorer sets its one headline sentence in Source
+  Serif 4. Charts don't use a serif.
+
+**B612 Mono's decimal point takes a full-width cell, so "71.7" renders as "71. 7".** The
+explorer tightens it in CSS; for plots, use `pcstyle.mono_number()` for any callout with a
+decimal (below). Tick values are usually whole numbers, so they don't need it.
 
 ### Registering the fonts
 
-matplotlib doesn't ship these. Download the `.ttf` files (all on Google Fonts) into
-`styleguide/fonts/`, then:
+They aren't matplotlib built-ins. Both are SIL Open Font License, from Google Fonts. Fetch them
+once per machine into `styleguide/fonts/` (gitignored):
 
-```python
-import matplotlib.font_manager as fm
-for f in Path("styleguide/fonts").glob("*.ttf"):
-    fm.fontManager.addfont(str(f))
+```bash
+python styleguide/get_fonts.py
 ```
 
-`pyconnectedness.mplstyle` already sets `font.sans-serif: IBM Plex Sans, ...` with a
-`DejaVu Sans` fallback so plots still render reasonably if the fonts aren't installed.
+Then, in a script or notebook:
+
+```python
+import sys; sys.path.insert(0, "styleguide")
+from pcstyle import register_fonts, mono_numbers, mono_number
+
+register_fonts()                                   # adds styleguide/fonts/*.ttf
+plt.style.use("styleguide/pyconnectedness.mplstyle")  # words in Plus Jakarta Sans
+...plot...
+mono_numbers(ax, colorbars=[cbar])                 # tick values in B612 Mono
+mono_number(ax, (x, y), "71.7%", xytext=(8, 0), fontsize=13, fontweight="bold")  # callout
+```
+
+`pyconnectedness.mplstyle` sets `font.sans-serif: Plus Jakarta Sans, DejaVu Sans, ...`, so plots
+still render, in DejaVu Sans, if the fonts aren't installed. matplotlib has no rcParam for tick
+labels alone, which is why `mono_numbers` exists. It uses `tick_params(labelfontfamily=...)` on
+matplotlib 3.8+, so date ticks regenerated at save time keep the font.
 
 ## Using the style sheet
 
@@ -167,8 +184,17 @@ im = ax.images[0]
 maxabs = float(np.abs(result.pairwise_net.to_numpy()).max())
 im.set_clim(-maxabs, maxabs)          # centre the colourmap on zero
 cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-cbar.set_label("sender →          → receiver", fontsize=9)
+cbar.set_label("row receives  ←  0  →  row sends (pp)", fontsize=9)
+ax.set_xlabel("to this market (column)")
+ax.set_ylabel("from this market (row)")
+ax.grid(False)                        # the style sheet's grid would draw over the cells
+mono_numbers(colorbars=[cbar])
 ```
+
+Call `spillover_heatmap(..., colorbar=False)` when you add your own colour bar, or you get two.
+**Always relabel the axes for `pairwise_net`.** The library's defaults ("affected variable" for
+rows, "shock source" for columns) are right for `fevd`. On `pairwise_net`, a positive cell means
+the *row* sends to the *column*, so the defaults read backwards.
 
 `RdBu_r` itself is already a reasonable diverging map and doesn't need replacing -- the fix here
 is centring it explicitly and adding the label, not swapping the colormap.
@@ -182,14 +208,15 @@ call to recolour:
 ```python
 for iso, label in episodes.items():
     ts = dyn.total.index[dyn.total.index.searchsorted(iso)]
-    ax.axvline(ts, color="#d03b3b", alpha=0.25, lw=6)   # a soft band, not a hard line
+    ax.axvline(ts, color="#52514e", alpha=0.5, lw=1, ls=(0, (2, 3)))  # neutral: red = sender
     ax.text(ts + pd.Timedelta(weeks=1), ax.get_ylim()[1] - 0.3, label,
             fontsize=8.5, color="#898781", rotation=90, va="top", ha="left")
 ```
 
-Pair with a callout of the current value (`ax.annotate` at the series' last point) so the
-headline number isn't only ever in notebook output, which the style analysis also names
-directly.
+Pair with a callout of the current value, `mono_number(ax, (last_date, last), f"{last:.1f}%")`
+in primary ink, so the headline number isn't only ever in notebook output, which the style
+analysis also names directly. Keep the callout ink, not red/blue: above or below the average
+isn't "sender" or "receiver".
 
 ## The layered network (extreme risk)
 
