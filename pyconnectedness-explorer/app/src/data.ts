@@ -24,6 +24,27 @@ export interface DynamicBlock {
   method: string;
 }
 
+/** frequency_connectedness() for one window (export_cell.py freq_block). Bands add up to
+ * static_total, a static run at the same 100-week horizon -- not the H=10 StaticBlock total. */
+export interface FrequencyBand {
+  label: "<=5" | "5-20" | ">20";
+  share: number;
+  total: number;
+  within_total: number;
+  to: number[];
+  from: number[];
+  net: number[];
+  pairwise_net: number[][];
+}
+
+export interface FrequencyBlock {
+  horizon: number;
+  periods: number[];
+  static_total: number;
+  static_net: number[];
+  bands: FrequencyBand[];
+}
+
 export interface ConnectednessMeta {
   names: string[];
   tickers: Record<string, string>;
@@ -39,6 +60,10 @@ export interface ConnectednessMeta {
   dynamic: {
     returns: DynamicBlock;
     volatility: DynamicBlock;
+  };
+  frequency: {
+    returns: Record<"full" | "last200" | "p1" | "p2" | "p3" | "p4", FrequencyBlock>;
+    volatility: Record<"full" | "p1" | "p2" | "p3" | "p4", FrequencyBlock>;
   };
 }
 

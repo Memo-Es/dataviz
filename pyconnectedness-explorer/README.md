@@ -24,6 +24,12 @@ runner (which can reach Yahoo Finance):
 4. commits `app/public/data/` (including the notebook's own matplotlib figures, shown in the
    app's last section) only if every check passes.
 
+One addition the notebook doesn't make: the short vs long term split. The export cell calls the
+library's own `frequency_connectedness` (Baruník-Křehlík) on the notebook's own `returns` and
+`log_vola`, with the notebook's VAR settings and the library's default bands (≤5, 5–20, >20
+weeks, 100-week horizon). `validate.py` checks that the bands add up, the same identity the
+library's tests check.
+
 It runs on every push that touches the pipeline, or by hand from the Actions tab. The app
 never computes a statistic itself: the one derived value is the strongest-10% cut-off, which
 applies the notebook's own rule (cells 19/21) to whichever matrix is on screen.
@@ -56,7 +62,8 @@ npm run build   # static build, deployed by .github/workflows/pages.yml
 
 One page, top to bottom: a headline finding for the selected window, the rolling spillover
 timeline (click/drag or press play to move through the weeks, click a period to compare), the
-network grouped by region, net senders and receivers, the full pair matrix, a detail panel for
+network grouped by region, net senders and receivers, how fast shocks travel (the frequency
+split), the full pair matrix, a detail panel for
 the selected market, and the notebook's own figures for comparison. Returns/volatility and
 light/dark sit in the top bar. `styleguide/` has the matplotlib-portable version of the same
 colour system.

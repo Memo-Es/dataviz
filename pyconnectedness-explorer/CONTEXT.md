@@ -180,3 +180,9 @@ Oct 23: two changes, at Memo's request.
    in the app's last section, which is more faithful than any replica. The network went back
    to a circle (grouped by region, edges tapering toward the receiver) because the grid
    layout's right-angle edges ran through other nodes and hid direction.
+
+Oct 25: framing from Memo. This is a series of design explorations to make the library's output
+clearer, with a possible consumer app to discuss later. The one hard rule: the numbers come from
+PyConnectedness's own code, exactly as on GitHub. So the short vs long term split was added
+through the export cell (the library's `frequency_connectedness`, on the notebook's own series),
+not reimplemented, and not a new notebook cell. `LIBRARY_NOTES.md` is a full read of the library.

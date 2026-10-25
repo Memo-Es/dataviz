@@ -7,6 +7,7 @@ import { TimelineChart, type PeriodBand } from "./charts/timeline";
 import { RankingChart } from "./charts/ranking";
 import { HeatmapChart } from "./charts/heatmap";
 import { sparkline } from "./charts/sparkline";
+import { type FrequencyRow, dominantBand, renderFrequency } from "./charts/frequency";
 
 const FIGURES = [
   { file: "01_rolling_spillover_index.png", cell: 14, title: "Rolling spillover index" },
@@ -85,6 +86,25 @@ app.innerHTML = `
       </div>
       <div id="ranking" class="chart-host"></div>
     </section>
+  </div>
+
+  <section class="card span-12">
+    <div class="card-head">
+      <div>
+        <h2>How fast shocks travel</h2>
+        <p class="sub" id="freq-finding"></p>
+      </div>
+    </div>
+    <div id="frequency" class="freq"></div>
+    <div class="legend">
+      <span><i class="key fast"></i>Plays out within 5 weeks</span>
+      <span><i class="key mid"></i>5 to 20 weeks</span>
+      <span><i class="key slow"></i>Over 20 weeks</span>
+    </div>
+    <p class="note">Baruník–Křehlík split from the library's own <code>frequency_connectedness</code>, on a 100-week horizon, so totals can differ slightly from the 10-week figures above.</p>
+  </section>
+
+  <div class="grid">
 
     <section class="card span-7">
       <div class="card-head">
@@ -252,8 +272,25 @@ async function main() {
     $("heatmap-sub").textContent = `${frame.label} · row → column, in percentage points. Hover a cell for the value.`;
     heatmap.render(frame, p, model.maxPair[m], focus);
     renderDetail(s, frame, p);
+    renderSpeed(s);
     tightenDecimals(document, ".num");
   };
+
+  function renderSpeed(s: State) {
+    const fblocks = meta.frequency[s.measure] as Record<string, FrequencyRow["block"]>;
+    const rows: FrequencyRow[] = windowOptions(data, s.measure)
+      .filter((o) => o.key !== "t" && fblocks[o.key])
+      .map((o) => ({ key: o.key, label: o.label, block: fblocks[o.key] }));
+    const selKey = s.window !== "t" && fblocks[s.window] ? s.window : "full";
+    const sel = rows.find((r) => r.key === selKey)!;
+    const d = dominantBand(sel.block);
+    const word = s.measure === "returns" ? "return" : "volatility";
+    const where = selKey === "full" ? "Over the full sample" : `In ${sel.label}`;
+    $("freq-finding").innerHTML = `${where}, <b class="num">${d.pct.toFixed(0)}%</b> of ${word} spillover plays out <b>${d.copy.phrase}</b>.${
+      s.window === "t" ? " The split is computed per period, not per week, so this shows the full sample; pick a bar to compare." : " Pick a bar to compare periods."
+    }`;
+    renderFrequency($("frequency"), rows, selKey, names, (key) => store.set({ window: key as WindowKey, playing: false }));
+  }
 
   function renderDetail(s: State, frame: ReturnType<Model["frame"]>, p: ReturnType<typeof readPalette>) {
     const el = $("detail");
