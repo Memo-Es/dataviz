@@ -91,3 +91,34 @@ export function percentile(values: ArrayLike<number>, q: number): number {
   const hi = Math.ceil(pos);
   return a[lo] + (a[hi] - a[lo]) * (pos - lo);
 }
+
+/** B612 Mono gives "." a full monospace cell, so 71.7 reads as "71. 7". Wrap each decimal point
+ * in a tightened span (HTML) or tspan (SVG). Idempotent: already-wrapped points are skipped. */
+export function tightenDecimals(root: ParentNode, selector: string) {
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  root.querySelectorAll(selector).forEach((el) => {
+    const svg = el instanceof SVGElement;
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    const nodes: Text[] = [];
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const parent = (n as Text).parentElement;
+      if (parent?.classList.contains("dp")) continue;
+      if (/\d\.\d/.test((n as Text).data)) nodes.push(n as Text);
+    }
+    for (const node of nodes) {
+      const parts = node.data.split(/(?<=\d)\.(?=\d)/);
+      const frag = document.createDocumentFragment();
+      parts.forEach((part, i) => {
+        if (i > 0) {
+          const dp = svg ? document.createElementNS(SVG_NS, "tspan") : document.createElement("span");
+          dp.setAttribute("class", "dp");
+          if (svg) dp.setAttribute("dx", "-0.05em");
+          dp.textContent = ".";
+          frag.appendChild(dp);
+        }
+        frag.appendChild(document.createTextNode(part));
+      });
+      node.replaceWith(frag);
+    }
+  });
+}

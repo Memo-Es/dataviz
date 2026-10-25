@@ -22,6 +22,7 @@
   --radius: 20px;
   --f-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
   --f-serif: "Source Serif 4", Georgia, serif;
+  --f-num: "B612 Mono", ui-monospace, SFMono-Regular, monospace; /* every number on the page */
   color-scheme: light;
 }
 
@@ -85,6 +86,42 @@ button {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 6px;
+}
+
+/* Numbers: B612 Mono (Airbus/ENAC cockpit face, on the client's reference list), paired with
+   Plus Jakarta Sans for words. Monospace already aligns digits, so no negative tracking. */
+.num,
+.axis-label,
+.row-value,
+.cursor-label,
+.ref-label,
+.band-label {
+  font-family: var(--f-num);
+  letter-spacing: 0;
+  font-variant-numeric: normal;
+}
+
+.num {
+  font-weight: 700;
+}
+
+/* tightened decimal point, see encoding.ts tightenDecimals */
+.dp {
+  margin: 0 -0.3em 0 -0.05em; /* B612 Mono sits the dot left of its cell, so the extra space is after it */
+}
+
+svg .dp {
+  margin: 0;
+  letter-spacing: -0.3em;
+}
+
+.hl.num {
+  font-size: 0.86em; /* mono runs wide and tall next to the serif headline */
+}
+
+.kpi .v.num,
+.trio .v.num {
+  letter-spacing: -0.01em;
 }
 
 /* ---- top bar ---- */

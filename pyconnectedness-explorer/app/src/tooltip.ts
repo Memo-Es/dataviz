@@ -1,3 +1,4 @@
+import { tightenDecimals } from "./encoding";
 /**
  * One shared hover tooltip for redesign-mode charts (dataviz skill's interaction.md: an HTML
  * chart is interactive by default, tooltips enhance but never gate -- every value here is also
@@ -66,11 +67,12 @@ export function showTooltip(x: number, y: number, title: string, rows: TooltipRo
     label.textContent = r.label;
     row.appendChild(label);
     const value = document.createElement("span");
-    value.style.fontWeight = "700";
+    value.className = "num";
     value.style.fontWeight = "600";
     value.style.marginLeft = "auto";
     value.textContent = r.value;
     row.appendChild(value);
+    tightenDecimals(row, ".num");
     node.appendChild(row);
   }
 

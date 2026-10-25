@@ -5,7 +5,7 @@
  */
 import * as d3 from "d3";
 import type { DynamicBlock, StaticBlock } from "../data";
-import { EPISODE_LABELS, type Palette, fmtDate, parseDate } from "../encoding";
+import { tightenDecimals, EPISODE_LABELS, type Palette, fmtDate, parseDate } from "../encoding";
 
 const H = 300;
 const M = { top: 46, right: 18, bottom: 54, left: 44 };
@@ -246,7 +246,7 @@ export class TimelineChart {
         .attr("stroke-width", 1.5);
       svg.append("circle").attr("cx", cx).attr("cy", cy).attr("r", 5.5).attr("fill", p.accent).attr("stroke", p.panel).attr("stroke-width", 2);
       const label = `${dyn.total[t].toFixed(1)}% · ${fmtDate(this.dates[t])}`;
-      const lw = label.length * 7 + 16;
+      const lw = label.length * 7.8 + 18; // B612 Mono: ~0.65em per glyph at 12px bold
       const lx = Math.min(Math.max(cx - lw / 2, M.left), W - M.right - lw);
       const ly = cy - 34 < M.top ? cy + 12 : cy - 34;
       svg.append("rect").attr("x", lx).attr("y", ly).attr("width", lw).attr("height", 22).attr("rx", 11).attr("fill", p.accent);
@@ -260,5 +260,6 @@ export class TimelineChart {
         .attr("fill", "#fff")
         .text(label);
     }
+    tightenDecimals(this.svg.node()!, ".axis-label, .row-value, .cursor-label, .band-label, .ref-label");
   }
 }

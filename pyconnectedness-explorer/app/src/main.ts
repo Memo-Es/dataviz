@@ -1,7 +1,7 @@
 import "./style.css";
 import { type Measure, loadExplorerData, staticBlock } from "./data";
 import { Model, type State, Store, type WindowKey, windowOptions } from "./model";
-import { REGION_OF, fmtDate, fmtSigned, parseDate, readPalette } from "./encoding";
+import { REGION_OF, fmtDate, fmtSigned, parseDate, readPalette, tightenDecimals } from "./encoding";
 import { NetworkChart } from "./charts/network";
 import { TimelineChart, type PeriodBand } from "./charts/timeline";
 import { RankingChart } from "./charts/ranking";
@@ -224,13 +224,13 @@ async function main() {
     frame.matrix.forEach((row, i) => row.forEach((v, j) => v > link.v && (link = { s: i, r: j, v })));
     const diff = frame.total - full.total;
     const when = s.window === "t" ? `In the 200 weeks to ${fmtDate(parseDate(dyn.dates[s.t])!)}` : `Over ${frame.short.toLowerCase() === "full sample" ? "the full sample" : frame.short}`;
-    $("headline").innerHTML = `${when}, <span class="hl">${frame.total.toFixed(1)}%</span> of ${word} moves came from shocks in other markets. <span class="hl-send">${top.n}</span> sent the most.`;
+    $("headline").innerHTML = `${when}, <span class="hl num">${frame.total.toFixed(1)}%</span> of ${word} moves came from shocks in other markets. <span class="hl-send">${top.n}</span> sent the most.`;
     $("kpis").innerHTML = `
-      <div class="kpi"><span class="k">Total ${word} spillover</span><span class="v">${frame.total.toFixed(1)}<small>%</small></span>
-        <span class="d ${diff >= 0 ? "up" : "down"}">${s.window === "full" ? "the long-run level" : `${fmtSigned(diff)} pp vs full sample`}</span></div>
-      <div class="kpi"><span class="k">Biggest sender</span><span class="v send">${top.n}</span><span class="d">net ${fmtSigned(top.v)} pp</span></div>
-      <div class="kpi"><span class="k">Biggest receiver</span><span class="v recv">${bottom.n}</span><span class="d">net ${fmtSigned(bottom.v)} pp</span></div>
-      <div class="kpi"><span class="k">Strongest single link</span><span class="v small">${names[link.s]} → ${names[link.r]}</span><span class="d">${link.v.toFixed(2)} pp</span></div>`;
+      <div class="kpi"><span class="k">Total ${word} spillover</span><span class="v num">${frame.total.toFixed(1)}<small>%</small></span>
+        <span class="d ${diff >= 0 ? "up" : "down"}">${s.window === "full" ? "the long-run level" : `<span class="num">${fmtSigned(diff)}</span> pp vs full sample`}</span></div>
+      <div class="kpi"><span class="k">Biggest sender</span><span class="v send">${top.n}</span><span class="d">net <span class="num">${fmtSigned(top.v)}</span> pp</span></div>
+      <div class="kpi"><span class="k">Biggest receiver</span><span class="v recv">${bottom.n}</span><span class="d">net <span class="num">${fmtSigned(bottom.v)}</span> pp</span></div>
+      <div class="kpi"><span class="k">Strongest single link</span><span class="v small">${names[link.s]} → ${names[link.r]}</span><span class="d"><span class="num">${link.v.toFixed(2)}</span> pp</span></div>`;
 
     // charts
     const periods: PeriodBand[] = (["p1", "p2", "p3", "p4"] as const).map((k) => {
@@ -252,6 +252,7 @@ async function main() {
     $("heatmap-sub").textContent = `${frame.label} · row → column, in percentage points. Hover a cell for the value.`;
     heatmap.render(frame, p, model.maxPair[m], focus);
     renderDetail(s, frame, p);
+    tightenDecimals(document, ".num");
   };
 
   function renderDetail(s: State, frame: ReturnType<Model["frame"]>, p: ReturnType<typeof readPalette>) {
@@ -272,7 +273,7 @@ async function main() {
     const gets = names.map((n, j) => ({ n, v: -frame.matrix[i][j] })).filter((d) => d.v > 0).sort((a, b) => b.v - a.v).slice(0, 4);
     const list = (rows: { n: string; v: number }[], cls: string) =>
       rows.length
-        ? rows.map((r) => `<li><span>${r.n}</span><b class="${cls}">${r.v.toFixed(2)}</b></li>`).join("")
+        ? rows.map((r) => `<li><span>${r.n}</span><b class="num ${cls}">${r.v.toFixed(2)}</b></li>`).join("")
         : `<li class="muted">none</li>`;
     const net = frame.net[i];
     el.innerHTML = `
@@ -281,9 +282,9 @@ async function main() {
         ${s.selected ? `<button class="icon-btn" id="clear" aria-label="Clear selection">✕</button>` : ""}
       </div>
       <div class="trio">
-        <div><span class="k">Gives to others</span><span class="v">${frame.to[i].toFixed(1)}</span></div>
-        <div><span class="k">Takes from others</span><span class="v">${frame.from[i].toFixed(1)}</span></div>
-        <div><span class="k">Net</span><span class="v ${net >= 0 ? "send" : "recv"}">${fmtSigned(net)}</span></div>
+        <div><span class="k">Gives to others</span><span class="v num">${frame.to[i].toFixed(1)}</span></div>
+        <div><span class="k">Takes from others</span><span class="v num">${frame.from[i].toFixed(1)}</span></div>
+        <div><span class="k">Net</span><span class="v num ${net >= 0 ? "send" : "recv"}">${fmtSigned(net)}</span></div>
       </div>
       <p class="k spark-k">Net spillover, every week</p>
       <div id="spark"></div>

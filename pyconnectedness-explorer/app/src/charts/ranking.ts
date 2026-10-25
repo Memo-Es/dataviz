@@ -4,7 +4,7 @@
  */
 import * as d3 from "d3";
 import type { Frame } from "../model";
-import { type Palette, fmtSigned } from "../encoding";
+import { tightenDecimals, type Palette, fmtSigned } from "../encoding";
 
 const ROW = 26;
 
@@ -96,5 +96,6 @@ export class RankingChart {
       .attr("dy", "0.35em")
       .attr("text-anchor", "end")
       .text((d) => fmtSigned(d.v));
+    tightenDecimals(this.svg.node()!, ".axis-label, .row-value, .cursor-label, .band-label, .ref-label");
   }
 }
