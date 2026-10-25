@@ -5,6 +5,15 @@ import json
 import os
 from pathlib import Path
 
+# The notebook never calls the library's frequency split, so this cell does, using the library's
+# own function on the notebook's own series and VAR settings (generalized, VAR(2)). horizon and
+# periods are the library defaults: on weekly data, cycles of up to 5 weeks, 5 to 20 weeks, and
+# longer than 20 weeks. The split needs a long horizon to resolve cycle lengths, so its bands add
+# up to a static run at horizon=100 (exported as static_total), not to the notebook's H=10 totals.
+from pyconnectedness import frequency_connectedness
+
+FREQ = {"horizon": 100, "periods": (5, 20), "method": "generalized", "lags": 2}
+
 OUT = Path(os.environ["EXPLORER_DATA_DIR"])
 OUT.mkdir(parents=True, exist_ok=True)
 names = list(returns.columns)
@@ -26,6 +35,30 @@ def static_block(res, label, start, end):
         "pairwise_net": r2(res.pairwise_net.loc[names, names].to_numpy()),
         "fevd": r2(res.fevd.loc[names, names].to_numpy()),
         "threshold_p90": float(np.percentile(np.abs(res.pairwise_net.to_numpy()), 90)),
+    }
+
+
+def freq_block(series):
+    res = frequency_connectedness(series, **FREQ)
+    ref = static_connectedness(series, FREQ["horizon"], method=FREQ["method"], lags=FREQ["lags"])
+    return {
+        "horizon": res.horizon,
+        "static_total": float(ref.total),
+        "static_net": r2(ref.net.reindex(names)),
+        "periods": list(FREQ["periods"]),
+        "bands": [
+            {
+                "label": label,
+                "share": float(res.share[label]),
+                "total": float(res.total[label]),
+                "within_total": float(res.within[label].total),
+                "to": r2(band.directional_to.reindex(names)),
+                "from": r2(band.directional_from.reindex(names)),
+                "net": r2(band.net.reindex(names)),
+                "pairwise_net": r2(band.pairwise_net.loc[names, names].to_numpy()),
+            }
+            for label, band in res.bands.items()
+        ],
     }
 
 
@@ -75,6 +108,24 @@ meta = {
         },
     },
     "dynamic": {"returns": dyn_block(ret_dyn), "volatility": dyn_block(vol_dyn)},
+    # same windows as the static blocks above, split by cycle length
+    "frequency": {
+        "returns": {
+            "full": freq_block(returns),
+            "last200": freq_block(returns.iloc[-200:]),
+            "p1": freq_block(returns.loc["1997":"2006"]),
+            "p2": freq_block(returns.loc["2007":"2012"]),
+            "p3": freq_block(returns.loc["2013":"2019"]),
+            "p4": freq_block(returns.loc["2020":"2026"]),
+        },
+        "volatility": {
+            "full": freq_block(log_vola),
+            "p1": freq_block(log_vola.loc["1997":"2006"]),
+            "p2": freq_block(log_vola.loc["2007":"2012"]),
+            "p3": freq_block(log_vola.loc["2013":"2019"]),
+            "p4": freq_block(log_vola.loc["2020":"2026"]),
+        },
+    },
 }
 (OUT / "connectedness.json").write_text(json.dumps(meta, separators=(",", ":")))
 

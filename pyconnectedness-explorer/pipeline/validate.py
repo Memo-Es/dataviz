@@ -120,6 +120,22 @@ def _(m):
         assert close(v, w, 0.1), (key, v, w)
 
 
+@check("frequency bands add up to the static results")
+def _(m):
+    # the library's own identity (tests/test_frequency.py): bands sum to a static run at the same
+    # horizon (100), which the export cell computes alongside -- not to the H=10 totals above
+    for measure, blocks in m["frequency"].items():
+        for key, fb in blocks.items():
+            assert fb["horizon"] == 100, fb["horizon"]
+            total = sum(b["total"] for b in fb["bands"])
+            assert close(total, fb["static_total"], 0.01), (measure, key, total, fb["static_total"])
+            share = sum(b["share"] for b in fb["bands"])
+            assert close(share, 100.0, 0.01), (measure, key, share)
+            for i in range(len(m["names"])):
+                net = sum(b["net"][i] for b in fb["bands"])
+                assert close(net, fb["static_net"][i], 0.01), (measure, key, i, net, fb["static_net"][i])
+
+
 def main():
     if not DATA.exists():
         raise SystemExit(f"{DATA} not found; run pipeline/run_demo.py first")
