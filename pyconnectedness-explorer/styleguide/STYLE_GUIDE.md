@@ -9,21 +9,43 @@ designer, in the tools they already use (matplotlib, with Plotly next).
 
 ## What's not here, on purpose
 
-The web explorer (`../app/`) goes further: a grid-snapped network layout with angular
-connectors instead of a circle, and heatmap cells drawn as height-coded capsules instead of
-flat squares. Those came from references the client sent mid-project for the prototype's own
-look. They're not in this guide, because:
+The web explorer (`../app/`) goes further in a few places the matplotlib recipes don't follow:
+network nodes grouped by region on the circle, edges drawn as tapered shapes that narrow toward
+the receiver instead of arrowheads, and fixed scales shared across every week of an animation.
+They're not in this guide, because:
 
-- They need real routing/collision logic (which node goes where, which edges avoid which
-  nodes) that's an engineering project, not a style change -- the explorer's version is already
-  a simplification, not something to also maintain in matplotlib by hand.
+- Tapered edges and shared animation scales mean drawing the shapes by hand rather than
+  recolouring what `plot_connectedness_graph` already draws. That's an engineering change,
+  not a style change.
 - "Maintainable without a designer" is a named success criterion. Recolouring an existing plot
   call is maintainable. Reimplementing graph layout in matplotlib on every release is not.
 
 Everything below -- colour, type, legends, crisis context -- is the part that's actually
 low-risk to keep using.
 
+## The four graphic types
+
+PyConnectedness has four kinds of graphic. Each encoding means something specific in each one,
+and the same channel must not mean two different things across them.
+
+| | Heatmap | Circular network | Time series | Layered network (extreme risk) |
+|---|---|---|---|---|
+| Library source | `spillover_heatmap` | `plot_connectedness_graph` | plain `.plot()` (cells 14, 17) | none yet (`causality/` is empty); method from Klüppelberg & Krali (2025) |
+| Question | How much does each pair send, net? | Who sends risk to whom, and who's central? | When did the system become fragile? | Where do *extreme* losses start, and where do they end up? |
+| Position | Row and column = the two variables | Little: a ring (the explorer groups it by region) | Time on x, value on y | **Everything**: the row is the causal generation, with sources on top |
+| Colour | Diverging: sender red, receiver blue | Node: red/blue for net sign | Ink line; crisis bands | **Neutral ink only.** The graph has no signed quantity (see below) |
+| Size / width | n/a | Node area ∝ \|net\|; edge width ∝ net flow | Line weight fixed | Edge weight ∝ **stability** (how many estimates contain the edge) |
+| Direction | Sign of the cell | One arrow per pair, sender → receiver | n/a | Always downward; no loops |
+| Uncertainty | Not shown | Not shown | Not shown | **Central**: stability is part of the result |
+| Time | One window per heatmap | One window; animates week to week | Time *is* the axis | One fixed structure per data window; doesn't animate |
+| Main interaction | Hover a cell | Hover a node, scrub the weeks | Scrub, pick a crisis | **Trace a path**: "what does a crash in X reach?" |
+
+The explorer adds a fifth view, not from a library plot: **speed bars** for the frequency split
+(`frequency_connectedness`). They use an ordinal one-hue ramp, darker = faster, which is also
+kept away from red/blue (see Palette).
+
 ## Palette
+
 
 Diverging pair, validated with the `dataviz` skill's checker (`validate_palette.js`): CVD
 Delta E 21.6 (protan) / 34.5 (tritan) on light, 19.2 / 31.4 on dark -- both comfortably past the
@@ -43,6 +65,21 @@ unrelated pair). One pair, used identically in both charts, fixes that directly.
 | Gridline | `#e1e0d9` | `#2c2c2a` |
 | Axis/baseline | `#c3c2b7` | `#383835` |
 | Chart surface | `#fcfcfb` | `#1a1a19` |
+| Selection / traced path (`accent`) | `#e9580b` | `#ff7a33` |
+| Speed band ≤5 weeks (ordinal, darkest) | `#2f2a78` | `#cbc6ff` |
+| Speed band 5–20 weeks | `#6f67c9` | `#8b83e3` |
+| Speed band >20 weeks (lightest) | `#bdb8ee` | `#4a4494` |
+
+The accent and speed-band rows come from the explorer (`../app/src/style.css`). They haven't
+been through the validator yet; run it before they ship in a library release.
+
+**Colour has one meaning per channel, across all four graphics.**
+- **Red/blue means net sender/receiver**, a signed Diebold-Yilmaz position. Use it nowhere else.
+  That includes crises: the crisis red above sits too close to the sender red. The explorer marks
+  crisis dates with dashed neutral ink and labels instead, and the crisis recipe below should
+  move to the same treatment (secondary ink, `alpha≈0.5`) next time the examples are rendered.
+- **The accent means "what you selected"**: a hovered node, a traced path. It never means data.
+- **Ink, in weight and opacity, carries magnitude or confidence** when there's no sign.
 
 Dark isn't a flip of light -- it's its own validated step (see `../app/src/encoding.ts`'s
 `REDESIGN_LIGHT`/`REDESIGN_DARK`, which this table mirrors). Re-run the validator if you ever
@@ -154,6 +191,77 @@ Pair with a callout of the current value (`ax.annotate` at the series' last poin
 headline number isn't only ever in notebook output, which the style analysis also names
 directly.
 
+## The layered network (extreme risk)
+
+This is the graph the questionnaire calls "layered network for extreme risk, as in Klüppelberg
+and Krali (2025)". It's the minimum max-linear DAG `D^A` from a recursive max-linear model: an
+edge j → i means extreme losses in j reach i along a heaviest path. See `../LIBRARY_NOTES.md`,
+second half, for the method. The paper's own Figure 4 shows what goes wrong by default: over 150
+crossing edges, unlabelled layers, arrowheads piled on nodes, and five unrelated colours for an
+ordered score.
+
+**Layout: position is the encoding.**
+- One row per causal generation, from `nx.topological_generations`. Sources go in the top row;
+  arrows always point down.
+- **Label the rows** in words ("Where it starts", "Generation 1", …). Readers shouldn't need a
+  caption to learn that up means cause.
+- Within a row, order nodes to reduce crossings: by the mean position of their parents, or by
+  sector group. Never order them alphabetically, because that implies nothing and crosses
+  everything.
+- Labels sit **beside** nodes, not inside tiny circles.
+
+**Colour: neutral, because nothing here is signed.**
+- Don't reuse red/blue. A source node isn't a "net sender". It's first in a causal order that
+  is fixed for the window, while a Diebold-Yilmaz sender is a net position that changes weekly.
+  If both views sit side by side, say so in the caption.
+- **Nodes:** source nodes filled in ink; every other node hollow, with an ink outline.
+- **Edges:** secondary ink.
+
+**Stability (the uncertainty) is ordinal, so it's line weight and opacity, not hue.**
+- 1 of 5 estimates: hairline, faint. 5 of 5: heavy, near-opaque. The recipe uses
+  `width = 0.6 + 0.45·(s−1)` pt and `alpha = 0.18 + 0.18·(s−1)`.
+- **By default, show only the stable core** (edges in, say, 4–5 of 5 estimates), and reveal
+  weaker edges on demand. The paper's Figure 5 draws every edge at once and buries the core.
+- The legend states it in words: "in 1 / 3 / 5 of 5 estimates".
+
+**Interaction: trace, don't scrub.**
+- Picking a node draws all its downstream paths (`nx.descendants`) in the accent colour and
+  dims everything else. That answers "what does a crash in Coal reach?", the question this
+  graph exists for.
+- It's the same focus-and-dim pattern the explorer's network uses on hover.
+
+**Titles say the finding**, e.g. "Where extreme losses start, and where they end up", with one
+plain sub-line ("Each arrow is a path extreme losses can travel. Risk flows downward.").
+
+### Recipe: the layered network
+
+There's no library plot to recolour yet, so this draws it directly with networkx (already a
+library dependency). It's a full working version in `pipeline/render_styleguide_layered.py`,
+which rendered `examples/layered_network_sketch.png` on the paper's 4-node Example 6.
+
+```python
+import networkx as nx
+
+def layered_positions(g):
+    """Rows = causal generations (sources on top), nodes centred in each row."""
+    gens = [sorted(gen) for gen in nx.topological_generations(g)]
+    pos = {n: (i - (len(row) - 1) / 2, -r) for r, row in enumerate(gens) for i, n in enumerate(row)}
+    return pos, gens
+
+width = lambda s: 0.6 + 0.45 * (s - 1)      # stability 1..5 -> line weight
+alpha = lambda s: 0.18 + 0.18 * (s - 1)     # ... and opacity, never hue
+
+pos, gens = layered_positions(g)            # g: DiGraph, edge attribute "stability"
+downstream = nx.descendants(g, picked)      # the traced node's reach
+# edges: FancyArrowPatch(pos[u], pos[v], lw=width(s), alpha=alpha(s), color="#52514e"),
+#        or accent "#e9580b" at alpha 0.95 if u == picked or both ends are in `downstream`
+# nodes: sources (row 0) filled "#0b0b0b", others hollow with an ink outline
+# rows:  ax.axhline(-r) in gridline colour, labelled "Where it starts", "Generation 1", ...
+```
+
+Once `causality/` ships, replace the toy graph with the library's estimated DAG and stability
+counts. The drawing shouldn't need to change.
+
 ## Texture fallback (CVD / print / grayscale)
 
 matplotlib's native `hatch=` is a direct fit for the `dataviz` skill's texture channel (45°
@@ -175,3 +283,6 @@ Rendered by `pipeline/render_styleguide_examples.py` from the real Yahoo Finance
 - `examples/network_restyled.png`
 - `examples/heatmap_restyled.png`
 - `examples/timeline_restyled.png`
+- `examples/layered_network_sketch.png`: rendered by `pipeline/render_styleguide_layered.py`
+  on a toy DAG (the paper's Example 6), with illustrative stability counts, because the library
+  can't estimate one yet.
