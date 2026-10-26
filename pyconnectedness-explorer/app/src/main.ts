@@ -62,33 +62,32 @@ app.innerHTML = `
     <div class="windows" id="windows" role="group" aria-label="Window shown on every chart"></div>
   </section>
 
-  <div class="grid">
-    <section class="card span-7">
-      <div class="card-head">
-        <div>
-          <h2>Who sends risk to whom</h2>
-          <p class="sub" id="network-sub"></p>
+  <!-- graph 2: the network, with its own readout and its node values (net) beside it -->
+  <section class="card span-12 graph2">
+    <div class="card-head">
+      <div>
+        <h2 id="network-title"></h2>
+        <p class="sub" id="network-sub"></p>
+      </div>
+    </div>
+    <div class="readout" id="net-readout" aria-live="polite"></div>
+    <div class="graph2-body">
+      <div class="graph2-net">
+        <div id="network" class="chart-host network-host"></div>
+        <div class="legend">
+          <span><i class="dot send"></i>Net transmitter</span>
+          <span><i class="dot recv"></i>Net receiver</span>
+          <span><i class="taper"></i>Arrow narrows toward the receiver; width = size of the flow</span>
+          <span><i class="sizes"><b></b><b></b><b></b></i>Circle size = |net|</span>
         </div>
       </div>
-      <div id="network" class="chart-host network-host"></div>
-      <div class="legend">
-        <span><i class="dot send"></i>Net transmitter</span>
-        <span><i class="dot recv"></i>Net receiver</span>
-        <span><i class="taper"></i>Arrow narrows toward the receiver; width = size of the flow</span>
-        <span><i class="sizes"><b></b><b></b><b></b></i>Circle size = net spillover</span>
+      <div class="graph2-side">
+        <p class="side-title">Net by market <code>net</code></p>
+        <p class="side-sub">TO minus FROM, in percentage points: the circle sizes, as bars. Hover or click a market.</p>
+        <div id="ranking" class="chart-host"></div>
       </div>
-    </section>
-
-    <section class="card span-5">
-      <div class="card-head">
-        <div>
-          <h2>Net transmitters and receivers</h2>
-          <p class="sub">Shocks given minus shocks received, in percentage points</p>
-        </div>
-      </div>
-      <div id="ranking" class="chart-host"></div>
-    </section>
-  </div>
+    </div>
+  </section>
 
   <section class="card span-12">
     <div class="card-head">
@@ -268,7 +267,11 @@ async function main() {
     // charts
     renderTimeline(s, p);
 
-    $("network-sub").textContent = `${frame.label} · ${frame.edgeCount} strongest links (top 10%, above ${frame.threshold.toFixed(2)} pp)`;
+    $("network-title").textContent = `Net pairwise ${word} connectedness, strongest 10% of links`;
+    $("network-sub").innerHTML = `The library's <code>connectedness_graph</code>: one arrow per pair, from net transmitter to net
+      receiver, keeping links above the notebook's cut-off, the 90th percentile of |<code>pairwise_net</code>|.
+      Markets are grouped by region; sizes use one scale across all weeks.`;
+    renderNetReadout(s, frame);
     network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion, s.pair);
     ranking.render(frame, p, model.maxNet[m], focus, s.selected, motion);
     $("heatmap-sub").textContent = `${frame.label} · row → column, in percentage points. Click a cell to follow that pair over time.`;
@@ -329,6 +332,40 @@ async function main() {
       s.hoverT
     );
     renderReadout(s);
+  }
+
+  /** Graph 2's readout: what the network on screen is drawn from, or one market's TO / FROM /
+   * NET (the library's directional_to, directional_from, net) when one is hovered or picked. */
+  function renderNetReadout(s: State, f: ReturnType<Model["frame"]>) {
+    const el = $("net-readout");
+    const name = s.hovered ?? s.selected;
+    const stat = (label: string, field: string, value: string, sub: string, cls = "") =>
+      `<div class="ro-stat"><span class="ro-label">${label}${field ? ` <code>${field}</code>` : ""}</span>
+        <span class="ro-value ${cls}">${value}</span><span class="ro-sub">${sub}</span></div>`;
+    if (name) {
+      const i = names.indexOf(name);
+      const links = f.matrix[i].filter((v) => Math.abs(v) > f.threshold);
+      const out = f.matrix[i].filter((v) => v > f.threshold).length;
+      el.innerHTML = `
+        <p class="ro-when">${s.hovered && s.hovered !== s.selected ? `<span class="ro-tag">Hover</span>` : ""}${name} <span class="ro-hint">· ${REGION_OF[name]} · ${f.label}</span></p>
+        <div class="ro-stats">
+          ${stat("Gives to others", "directional_to", `<span class="num">${f.to[i].toFixed(1)}</span>`, "pp of others' variance")}
+          ${stat("Takes from others", "directional_from", `<span class="num">${f.from[i].toFixed(1)}</span>`, "pp of its own variance")}
+          ${stat("Net position", "net", `<span class="num">${fmtSigned(f.net[i])}</span>`, f.net[i] >= 0 ? "a net transmitter" : "a net receiver", f.net[i] >= 0 ? "send" : "recv")}
+          ${stat("Links drawn", "", `<span class="num">${links.length}</span>`, `${out} out, ${links.length - out} in`)}
+        </div>`;
+    } else {
+      const connected = names.filter((_, i) => f.matrix[i].some((v) => Math.abs(v) > f.threshold)).length;
+      el.innerHTML = `
+        <p class="ro-when">${f.label} <span class="ro-hint">· hover a market for its TO, FROM and NET</span></p>
+        <div class="ro-stats">
+          ${stat("Links drawn", "", `<span class="num">${f.edgeCount}</span>`, `of ${(names.length * (names.length - 1)) / 2} pairs`)}
+          ${stat("Cut-off", "pairwise_net", `<span class="num">${f.threshold.toFixed(2)}</span> pp`, "90th percentile of all cells")}
+          ${stat("Markets with a link", "", `<span class="num">${connected}</span> of ${names.length}`, `${names.length - connected} have none this window`)}
+        </div>`;
+    }
+    el.classList.toggle("preview", !!s.hovered && s.hovered !== s.selected);
+    tightenDecimals(el, ".num");
   }
 
   /** The graph's readout: the library's own measures for the picked week or period, or for the

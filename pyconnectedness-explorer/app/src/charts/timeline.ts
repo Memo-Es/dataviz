@@ -7,8 +7,8 @@ import * as d3 from "d3";
 import type { DynamicBlock, StaticBlock } from "../data";
 import { tightenDecimals, EPISODE_LABELS, type Palette, fmtDate, parseDate } from "../encoding";
 
-const H = 300;
-const M = { top: 46, right: 18, bottom: 54, left: 44 };
+const H = 276;
+const M = { top: 46, right: 18, bottom: 28, left: 44 };
 
 export interface PeriodBand {
   key: string;
@@ -108,51 +108,14 @@ export class TimelineChart {
     const svg = this.svg;
     svg.selectAll("*").remove();
 
-    // sub-period bands, a strip under the axis that doubles as a picker
-    const bandY = H - M.bottom + 22;
-    const bands = svg.append("g");
+    // the picked period (from the chips under the chart) is shaded on the chart itself; the
+    // chips are the only period control, so there's no second picker strip here
     for (const b of periods) {
+      if (b.key !== activePeriod) continue;
       const x0 = Math.max(M.left, x(b.start));
       const x1 = Math.min(W - this.right, x(b.end));
-      if (x1 <= x0) continue;
-      const active = b.key === activePeriod;
-      if (active) {
-        bands
-          .append("rect")
-          .attr("x", x0)
-          .attr("width", x1 - x0)
-          .attr("y", M.top)
-          .attr("height", H - M.bottom - M.top)
-          .attr("fill", p.band);
-      }
-      const g = bands
-        .append("g")
-        .attr("class", "band-hit")
-        .attr("role", "button")
-        .attr("tabindex", 0)
-        .attr("aria-label", `Show ${b.label} on every chart`)
-        .on("click", () => this.onPickPeriod(b.key))
-        .on("keydown", (ev: KeyboardEvent) => {
-          if (ev.key === "Enter" || ev.key === " ") {
-            ev.preventDefault();
-            this.onPickPeriod(b.key);
-          }
-        });
-      g.append("rect")
-        .attr("x", x0 + 1)
-        .attr("width", x1 - x0 - 2)
-        .attr("y", bandY)
-        .attr("height", 24)
-        .attr("rx", 6)
-        .attr("fill", active ? p.fg : p.band);
-      g.append("text")
-        .attr("x", (x0 + x1) / 2)
-        .attr("y", bandY + 12)
-        .attr("dy", "0.35em")
-        .attr("text-anchor", "middle")
-        .attr("class", "band-label")
-        .attr("fill", active ? p.panel : p.secondary)
-        .text(x1 - x0 > 150 ? `${b.label} · ${b.total.toFixed(1)}%` : x1 - x0 > 70 ? b.label : "");
+      if (x1 > x0)
+        svg.append("rect").attr("x", x0).attr("width", x1 - x0).attr("y", M.top).attr("height", H - M.bottom - M.top).attr("fill", p.band);
     }
 
     // grid + axes

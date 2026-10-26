@@ -271,8 +271,10 @@ main {
 
 .ro-when {
   display: flex;
+  flex-wrap: wrap; /* on a phone the hint drops to its own line instead of splitting the date */
   align-items: center;
-  gap: 8px;
+  column-gap: 8px;
+  row-gap: 2px;
   margin: 0 0 10px;
   font-size: 13px;
   font-weight: 600;
@@ -657,6 +659,56 @@ svg {
 .network-host {
   max-width: 680px;
   margin: 0 auto;
+}
+
+/* graph 2: the network and its node values in one card */
+.graph2 {
+  margin: 20px 0;
+}
+
+.graph2-body {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 4fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.graph2-side {
+  padding-left: 24px;
+  border-left: 1px solid var(--line);
+}
+
+.side-title {
+  margin: 4px 0 2px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.side-title code {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  padding: 0;
+}
+
+.side-sub {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  color: var(--secondary);
+}
+
+@media (max-width: 960px) {
+  .graph2-body {
+    grid-template-columns: 1fr;
+  }
+
+  .graph2-side {
+    padding-left: 0;
+    border-left: 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
 }
 
 .network .node {

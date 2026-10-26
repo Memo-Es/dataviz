@@ -13,7 +13,7 @@ import {
   matrixAt,
   staticBlock,
 } from "./data";
-import { percentile } from "./encoding";
+import { fmtDate, parseDate, percentile } from "./encoding";
 
 export type WindowKey = StaticWindow; // "t" = the rolling week picked on the timeline
 
@@ -105,7 +105,7 @@ export class Model {
       const dyn = this.data.meta.dynamic[measure];
       f = {
         key: "t",
-        label: `200 weeks to ${dyn.dates[s.t]}`,
+        label: `200 weeks to ${fmtDate(parseDate(dyn.dates[s.t])!)}`,
         short: dyn.dates[s.t],
         total: dyn.total[s.t],
         matrix: matrixAt(this.data, measure, s.t),
