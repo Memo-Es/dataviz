@@ -7,8 +7,8 @@
  *     picked, its items. A bead's height on the string is how much of its moves came from shocks
  *     elsewhere (`directional_from`, the same % as the index: the index is its average over every
  *     item); its width, how much it passes to the others (`directional_to`).
- * So each region rises and falls along the strings, overlaid on the others and told apart by
- * colour. Beads are painted on a canvas; the cursor, labels and axis are SVG on top, so a hover
+ * The strings are solid up to the index, so they draw its rise and fall, the point of the graph;
+ * the regions sit around it, smaller, told apart by colour. Beads are painted on a canvas; the cursor, labels and axis are SVG on top, so a hover
  * redraws only the overlay.
  */
 import * as d3 from "d3";
@@ -29,7 +29,8 @@ export function readBeadColors(): BeadColors {
 
 const H = 360;
 const M = { top: 40, bottom: 28, left: 44 };
-const BEAD_H = 9; // a bead's length along its string
+const BEAD_H = 12; // the index bead's length along its string
+const SIDE_H = 6; // a region's or item's
 
 interface Series {
   label: string;
@@ -226,7 +227,8 @@ export class BeadsChart {
     // width: what the series passes on, from its lowest to its highest over the series on show
     const tos = this.series.flatMap((s) => d3.range(this.T).map((ti) => this.value(s, dyn.to, ti)));
     const [toLo, toHi] = d3.extent(tos) as [number, number];
-    const wTo = (v: number) => 3 + (maxW - 3) * ((v - toLo) / Math.max(1e-9, toHi - toLo));
+    const sideW = pitch * 0.62; // the series' beads stay smaller than the index's
+    const wTo = (v: number) => 2.5 + (sideW - 2.5) * ((v - toLo) / Math.max(1e-9, toHi - toLo));
     const active = periods.find((b) => b.key === activePeriod) ?? null;
     const dates = dyn.dates.map((d) => parseDate(d)!);
     const y = this.y;
@@ -234,23 +236,29 @@ export class BeadsChart {
     cols.forEach((ti) => {
       const x = this.xOf(ti);
       const inside = !active || (dates[ti] >= active.start && dates[ti] <= active.end);
-      ctx.globalAlpha = inside ? 1 : 0.16;
-      // the string
+      const alpha = inside ? 1 : 0.16;
+      const top = y(dyn.total[ti]);
+      // the string: faint all the way up, solid from the floor to the index, so the strings
+      // themselves draw the index rising and falling
       ctx.fillStyle = c.ink;
-      ctx.fillRect(x - 0.6, M.top, 1.2, H - M.bottom - M.top);
-      // the series: a colour bead with a sliver of the next hue offset beside it, like a misprint
+      ctx.globalAlpha = alpha * 0.16;
+      ctx.fillRect(x - 0.5, M.top, 1, H - M.bottom - M.top);
+      ctx.globalAlpha = alpha;
+      ctx.fillRect(x - 1, top, 2, H - M.bottom - top);
+      // the series: a small colour bead with a sliver of the next hue offset beside it, like a misprint
+      ctx.globalAlpha = alpha * 0.92;
       for (const s of this.series) {
         const cy = y(this.value(s, dyn.from, ti));
         const w = wTo(this.value(s, dyn.to, ti));
         ctx.fillStyle = s.fringe;
-        ctx.fillRect(x - w / 2 + 1.5, cy - BEAD_H / 2, w, BEAD_H);
+        ctx.fillRect(x - w / 2 + 1.2, cy - SIDE_H / 2, w, SIDE_H);
         ctx.fillStyle = s.hue;
-        ctx.fillRect(x - w / 2, cy - BEAD_H / 2, w, BEAD_H);
+        ctx.fillRect(x - w / 2, cy - SIDE_H / 2, w, SIDE_H);
       }
-      // the index, on top: a dark bead
-      const cy = y(dyn.total[ti]);
+      // the index, on top: the big dark bead
+      ctx.globalAlpha = alpha;
       ctx.fillStyle = c.ink;
-      ctx.fillRect(x - maxW * 0.28, cy - BEAD_H / 2, maxW * 0.56, BEAD_H);
+      ctx.fillRect(x - maxW / 2, top - BEAD_H / 2, maxW, BEAD_H);
     });
     ctx.globalAlpha = 1;
   }
