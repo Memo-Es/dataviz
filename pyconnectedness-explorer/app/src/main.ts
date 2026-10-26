@@ -307,15 +307,11 @@ async function main() {
     $("beads").hidden = !asBeads;
     $("beads-legend").hidden = !asBeads;
     if (asBeads) {
-      const Items = ds.items.charAt(0).toUpperCase() + ds.items.slice(1);
-      $("timeline-sub").innerHTML = `${mName(m)}: the share of each ${ds.item}'s ups and downs caused by shocks at other
-        ${ds.items}, each ${ds.step} measured over the ${dyn.window} ${ds.steps} before it. Each string is a ${ds.step}.
-        <b>Hover to preview a ${ds.step}; click or drag to pick it.</b>`;
-      $("beads-legend").innerHTML = `<span><i class="bk-index"></i>Top row: the spillover index <code>total</code></span>
-        <span><i class="bk-to"></i>Colour: what ${/^[aeiou]/i.test(ds.item) ? "an" : "a"} ${ds.item} passes to the others <code>directional_to</code></span>
-        <span><i class="bk-from"></i>Dark core: what it takes from them <code>directional_from</code></span>
-        <span>Each bead starts at its measure's usual level (the median) and is widest at its highest, so bare string = a quiet ${ds.step}.
-        ${Items} in rows${REGION_ORDER.length > 1 ? `, by ${REGION_ORDER.join(" · ")}` : ""}${events ? "; ▲ notable events" : ""}.</span>`;
+      $("timeline-sub").textContent = `How much of each ${ds.item}'s moves came from shocks elsewhere, over rolling ${dyn.window}-${ds.step} windows.`;
+      $("beads-legend").innerHTML = `<span title="PyConnectedness: total"><i class="bk-index"></i>Spillover index</span>
+        <span title="PyConnectedness: directional_to"><i class="bk-to"></i>Passes on</span>
+        <span title="PyConnectedness: directional_from"><i class="bk-from"></i>Takes in</span>
+        <span class="muted" title="Each bead starts at its measure's median and is widest at its highest.">Bare string = calmer than usual${events ? " · ▲ events" : ""}</span>`;
       beads.render(
         dyn,
         periods,
@@ -513,11 +509,9 @@ async function main() {
       })
       .join("");
     return `<div class="ro-speed">
-      <p class="ro-speed-head"><b>Short vs long term</b> <code>frequency_connectedness</code> <span class="ro-hint">· ${context}</span></p>
+      <p class="ro-speed-head" title="PyConnectedness: frequency_connectedness (Baruník–Křehlík). How long shocks take to play out, on a ${fb.horizon}-${ds.step} horizon, so the three add up to ${fb.static_total.toFixed(1)}% rather than exactly the index."><b>Short vs long term</b> <span class="ro-hint">· ${context}</span></p>
       <div class="speed-bar">${segs}</div>
-      <div class="speed-words">${words}</div>
-      <span class="ro-note">How long shocks take to play out (Baruník–Křehlík), on a ${fb.horizon}-${ds.step} horizon, so the
-        three add up to <span class="num">${fb.static_total.toFixed(1)}%</span> rather than exactly the index.</span></div>`;
+      <div class="speed-words">${words}</div></div>`;
   }
 
   /** The graph's readout: the library's own measures for the picked week or period, or for the
@@ -541,7 +535,7 @@ async function main() {
         ? `${week(s.t)} <span class="ro-hint">· the ${dyn.window} ${ds.steps} up to it</span>`
         : f.label;
     const stat = (label: string, field: string, value: string, sub: string, cls = "") =>
-      `<div class="ro-stat"><span class="ro-label">${label} <code>${field}</code></span>
+      `<div class="ro-stat"><span class="ro-label" title="PyConnectedness: ${field}">${label}</span>
         <span class="ro-value ${cls}">${value}</span><span class="ro-sub">${sub}</span></div>`;
     const el = $("readout");
     el.classList.toggle("preview", preview);
