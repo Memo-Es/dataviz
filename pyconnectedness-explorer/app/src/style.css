@@ -103,10 +103,10 @@ button {
 /* Numbers: B612 Mono (Airbus/ENAC cockpit face, on the client's reference list), paired with
    Plus Jakarta Sans for words. Monospace already aligns digits, so no negative tracking. */
 .num,
+.mono,
 .axis-label,
 .row-value,
 .cursor-label,
-.ref-label,
 .band-label {
   font-family: var(--f-num);
   letter-spacing: 0;
@@ -426,6 +426,28 @@ svg {
   font-size: 11.5px;
   font-weight: 600;
   pointer-events: none;
+}
+
+.end-name {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.end-label:not(.on) {
+  cursor: pointer;
+}
+
+.end-label:not(.on):hover .end-name {
+  text-decoration: underline;
+}
+
+.end-label:focus-visible {
+  outline: none;
+}
+
+.end-label:focus-visible .end-name {
+  text-decoration: underline;
+  fill: var(--accent);
 }
 
 .band-hit {

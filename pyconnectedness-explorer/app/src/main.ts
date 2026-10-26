@@ -169,6 +169,12 @@ async function main() {
   });
 
   const hover = (n: string | null) => store.set({ hovered: n });
+  // shared by the top bar's toggle and the timeline's end labels
+  const setMeasure = (measure: Measure) => {
+    const w = store.get().window;
+    // volatility has no "last 200 weeks" static block in the notebook
+    store.set({ measure, window: measure === "volatility" && w === "last200" ? "full" : w });
+  };
   const select = (n: string | null) =>
     store.set({ selected: n === store.get().selected ? null : n, pair: null });
   // a pair and a market are alternative views of the detail panel: picking one clears the other
@@ -184,7 +190,8 @@ async function main() {
   const timeline = new TimelineChart(
     $("timeline"),
     (t) => store.set({ t, window: "t" }),
-    (key) => store.set({ window: store.get().window === key ? "t" : (key as WindowKey) })
+    (key) => store.set({ window: store.get().window === key ? "t" : (key as WindowKey) }),
+    (measure) => setMeasure(measure)
   );
 
   // notebook figures
@@ -279,8 +286,21 @@ async function main() {
         total: b.total,
       };
     });
-    $("timeline-sub").textContent = `Total ${word} spillover, each week measured over the 200 weeks before it. Dashed lines mark the notebook's six crisis dates. Click or drag to pick a week; click a period below to compare.`;
-    timeline.render(dyn, full, meta.episodes, periods, s.window === "t" ? s.t : null, s.window.startsWith("p") ? s.window : null, p);
+    $("timeline-sub").textContent = `Total ${word} spillover (dark line), with ${
+      m === "returns" ? "volatility" : "return"
+    } spillover behind it (grey) to compare. Each week is measured over the 200 weeks before it; dashed lines mark the notebook's six crisis dates. Click or drag to pick a week, or click a period below.`;
+    const otherMeasure: Measure = m === "returns" ? "volatility" : "returns";
+    timeline.render(
+      dyn,
+      full,
+      meta.episodes,
+      periods,
+      s.window === "t" ? s.t : null,
+      s.window.startsWith("p") ? s.window : null,
+      p,
+      { measure: otherMeasure, dyn: meta.dynamic[otherMeasure] },
+      m
+    );
 
     $("network-sub").textContent = `${frame.label} · ${frame.edgeCount} strongest links (top 10%, above ${frame.threshold.toFixed(2)} pp)`;
     network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion, s.pair);
@@ -409,9 +429,7 @@ async function main() {
   $("measure").addEventListener("click", (ev) => {
     const b = (ev.target as HTMLElement).closest("button");
     if (!b) return;
-    const measure = b.dataset.measure as Measure;
-    const w = store.get().window;
-    store.set({ measure, window: measure === "volatility" && w === "last200" ? "full" : w });
+    setMeasure(b.dataset.measure as Measure);
   });
   $("theme").addEventListener("click", () => {
     const theme = store.get().theme === "dark" ? "light" : "dark";

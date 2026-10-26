@@ -27,7 +27,8 @@ export class TimelineChart {
   constructor(
     private host: HTMLElement,
     private onPick: (t: number) => void,
-    private onPickPeriod: (key: string) => void
+    private onPickPeriod: (key: string) => void,
+    private onPickMeasure: (measure: "returns" | "volatility") => void
   ) {
     this.svg = d3.select(host).append("svg").attr("class", "timeline").attr("height", H);
     new ResizeObserver(() => {
@@ -57,13 +58,19 @@ export class TimelineChart {
       .on("pointerup pointercancel", () => (dragging = false));
   }
 
+  /** room on the right for the two series' end labels */
+  private get right() {
+    return this.width < 600 ? 74 : 112;
+  }
+
   private x() {
     return d3
       .scaleUtc()
       .domain(d3.extent(this.dates) as [Date, Date])
-      .range([M.left, this.width - M.right]);
+      .range([M.left, this.width - this.right]);
   }
 
+  /** `dyn` is the measure on show; `other` is drawn behind it, lighter, for comparison. */
   render(
     dyn: DynamicBlock,
     full: StaticBlock,
@@ -71,15 +78,20 @@ export class TimelineChart {
     periods: PeriodBand[],
     t: number | null,
     activePeriod: string | null,
-    p: Palette
+    p: Palette,
+    other: { measure: "returns" | "volatility"; dyn: DynamicBlock } | null = null,
+    measure: "returns" | "volatility" = "returns"
   ) {
-    this.last = [dyn, full, episodes, periods, t, activePeriod, p];
+    this.last = [dyn, full, episodes, periods, t, activePeriod, p, other, measure];
+    // both measures come from the same balanced panel, so their windows line up week for week
+    const cmp = other && other.dyn.total.length === dyn.total.length ? other : null;
     this.dates = dyn.dates.map((d) => parseDate(d)!);
     const W = this.width;
     this.svg.attr("width", W).attr("viewBox", `0 0 ${W} ${H}`);
     const x = this.x();
-    const lo = Math.min(d3.min(dyn.total)!, full.total);
-    const hi = Math.max(d3.max(dyn.total)!, full.total);
+    const all = cmp ? dyn.total.concat(cmp.dyn.total) : dyn.total;
+    const lo = Math.min(d3.min(all)!, full.total);
+    const hi = Math.max(d3.max(all)!, full.total);
     const y = d3
       .scaleLinear()
       .domain([Math.floor((lo - 2) / 5) * 5, Math.ceil((hi + 1) / 5) * 5])
@@ -92,7 +104,7 @@ export class TimelineChart {
     const bands = svg.append("g");
     for (const b of periods) {
       const x0 = Math.max(M.left, x(b.start));
-      const x1 = Math.min(W - M.right, x(b.end));
+      const x1 = Math.min(W - this.right, x(b.end));
       if (x1 <= x0) continue;
       const active = b.key === activePeriod;
       if (active) {
@@ -142,7 +154,7 @@ export class TimelineChart {
       .data(yTicks)
       .join("line")
       .attr("x1", M.left)
-      .attr("x2", W - M.right)
+      .attr("x2", W - this.right)
       .attr("y1", (d) => y(d))
       .attr("y2", (d) => y(d))
       .attr("stroke", p.grid);
@@ -205,7 +217,7 @@ export class TimelineChart {
     svg
       .append("line")
       .attr("x1", M.left)
-      .attr("x2", W - M.right)
+      .attr("x2", W - this.right)
       .attr("y1", y(full.total))
       .attr("y2", y(full.total))
       .attr("stroke", p.muted)
@@ -216,7 +228,24 @@ export class TimelineChart {
       .attr("x", M.left + 6)
       .attr("y", y(full.total) - 6)
       .attr("fill", p.muted)
-      .text(`Full sample ${full.total.toFixed(1)}%`);
+      .text("Full sample ")
+      .append("tspan")
+      .attr("class", "mono")
+      .text(`${full.total.toFixed(1)}%`);
+
+    // the other measure: behind, thinner, neutral ink (red/blue would read as sender/receiver)
+    if (cmp) {
+      const opts = cmp.dyn.total.map((v, i) => [x(this.dates[i]), y(v)] as [number, number]);
+      svg
+        .append("path")
+        .attr("class", "other-line")
+        .attr("d", d3.line<[number, number]>()(opts)!)
+        .attr("fill", "none")
+        .attr("stroke", p.muted)
+        .attr("stroke-width", 1.1)
+        .attr("stroke-opacity", 0.75)
+        .attr("stroke-linejoin", "round");
+    }
 
     const pts = dyn.total.map((v, i) => [x(this.dates[i]), y(v)] as [number, number]);
     svg
@@ -232,6 +261,39 @@ export class TimelineChart {
       .attr("stroke-width", 1.6)
       .attr("stroke-linejoin", "round");
 
+    // direct labels at the right end instead of a legend; clicking one switches the page to it
+    const NAME = { returns: "Returns", volatility: "Volatility" } as const;
+    const ends = [{ m: measure, v: dyn.total[dyn.total.length - 1], on: true }];
+    if (cmp) ends.push({ m: cmp.measure, v: cmp.dyn.total[cmp.dyn.total.length - 1], on: false });
+    const endY = ends.map((e) => y(e.v));
+    if (endY.length === 2 && Math.abs(endY[0] - endY[1]) < 30) {
+      const mid = (endY[0] + endY[1]) / 2;
+      const up = endY[0] <= endY[1] ? 0 : 1;
+      endY[up] = mid - 15;
+      endY[1 - up] = mid + 15;
+    }
+    const lastX = x(this.dates[this.dates.length - 1]);
+    ends.forEach((e, i) => {
+      const g = svg
+        .append("g")
+        .attr("class", `end-label${e.on ? " on" : ""}`)
+        .attr("transform", `translate(${lastX + 8},${endY[i]})`);
+      if (!e.on) {
+        g.attr("role", "button")
+          .attr("tabindex", 0)
+          .attr("aria-label", `Show ${NAME[e.m].toLowerCase()} on every chart`)
+          .on("click", () => this.onPickMeasure(e.m))
+          .on("keydown", (ev: KeyboardEvent) => {
+            if (ev.key === "Enter" || ev.key === " ") {
+              ev.preventDefault();
+              this.onPickMeasure(e.m);
+            }
+          });
+      }
+      g.append("text").attr("class", "end-name").attr("y", -2).attr("fill", e.on ? p.fg : p.muted).text(NAME[e.m]);
+      g.append("text").attr("class", "end-value axis-label").attr("y", 12).attr("fill", e.on ? p.fg : p.muted).text(`${e.v.toFixed(1)}%`);
+    });
+
     // the selected week
     if (t !== null) {
       const cx = x(this.dates[t]);
@@ -244,10 +306,25 @@ export class TimelineChart {
         .attr("y2", H - M.bottom)
         .attr("stroke", p.accent)
         .attr("stroke-width", 1.5);
+      if (cmp) {
+        const oy = y(cmp.dyn.total[t]);
+        // near the right edge the end label already shows this value, so skip the duplicate
+        const nearEnd = cx > lastX - 70;
+        svg.append("circle").attr("cx", cx).attr("cy", oy).attr("r", 4).attr("fill", p.panel).attr("stroke", p.muted).attr("stroke-width", 1.5);
+        if (!nearEnd) svg
+          .append("text")
+          .attr("class", "other-value axis-label")
+          .attr("x", cx + (cx > W - this.right - 60 ? -8 : 8))
+          .attr("y", oy)
+          .attr("dy", "0.35em")
+          .attr("text-anchor", cx > W - this.right - 60 ? "end" : "start")
+          .attr("fill", p.secondary)
+          .text(`${cmp.dyn.total[t].toFixed(1)}%`);
+      }
       svg.append("circle").attr("cx", cx).attr("cy", cy).attr("r", 5.5).attr("fill", p.accent).attr("stroke", p.panel).attr("stroke-width", 2);
       const label = `${dyn.total[t].toFixed(1)}% · ${fmtDate(this.dates[t])}`;
       const lw = label.length * 7.8 + 18; // B612 Mono: ~0.65em per glyph at 12px bold
-      const lx = Math.min(Math.max(cx - lw / 2, M.left), W - M.right - lw);
+      const lx = Math.min(Math.max(cx - lw / 2, M.left), W - this.right - lw);
       const ly = cy - 34 < M.top ? cy + 12 : cy - 34;
       svg.append("rect").attr("x", lx).attr("y", ly).attr("width", lw).attr("height", 22).attr("rx", 11).attr("fill", p.accent);
       svg
@@ -260,6 +337,6 @@ export class TimelineChart {
         .attr("fill", "#fff")
         .text(label);
     }
-    tightenDecimals(this.svg.node()!, ".axis-label, .row-value, .cursor-label, .band-label, .ref-label");
+    tightenDecimals(this.svg.node()!, ".axis-label, .row-value, .cursor-label, .band-label, .mono");
   }
 }
