@@ -43,8 +43,13 @@ def get(url: str, *, tries: int = 5, timeout: int = 60) -> bytes:
     raise RuntimeError(f"GET {url} failed: {last}")
 
 
+def complete(weekly: pd.DataFrame, daily: pd.DataFrame) -> pd.DataFrame:
+    """Drop the week still under way: its Friday label would be a date that hasn't come yet."""
+    return weekly.loc[: daily.index.max()]
+
+
 def weekly_last(df: pd.DataFrame) -> pd.DataFrame:
-    return df.resample("W-FRI").last().ffill()
+    return complete(df.resample("W-FRI").last().ffill(), df)
 
 
 def log_changes(levels: pd.DataFrame) -> pd.DataFrame:
@@ -206,7 +211,7 @@ def fetch_industries() -> pd.DataFrame:
 
 def prepare_industries(daily_pct: pd.DataFrame) -> pd.DataFrame:
     r = daily_pct.loc["1990":] / 100
-    weekly = (1 + r).resample("W-FRI").prod().sub(1).mul(100)  # compounded weekly return, %
+    weekly = complete((1 + r).resample("W-FRI").prod(), r).sub(1).mul(100)  # compounded weekly return, %
     return weekly.dropna()
 
 
@@ -246,7 +251,7 @@ def fetch_rivers() -> pd.DataFrame:
 
 
 def prepare_rivers(daily: pd.DataFrame) -> pd.DataFrame:
-    weekly = np.log(daily.resample("W-FRI").mean())
+    weekly = np.log(complete(daily.resample("W-FRI").mean(), daily))
     # drop gauges that miss more than a tenth of the weeks, then keep weeks where all report
     weekly = weekly.loc[:, weekly.notna().mean() >= 0.9]
     return seasonal_anomaly(weekly.dropna())  # log-flow anomaly: wetter or drier than usual for the week
@@ -280,7 +285,7 @@ def fetch_climate() -> pd.DataFrame:
 
 
 def prepare_climate(daily: pd.DataFrame) -> pd.DataFrame:
-    return seasonal_anomaly(daily.resample("W-FRI").mean())  # °C above or below normal for the week
+    return seasonal_anomaly(complete(daily.resample("W-FRI").mean(), daily))  # °C above or below normal for the week
 
 
 # ---------------------------------------------------------------------------------------------
