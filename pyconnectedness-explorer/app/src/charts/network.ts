@@ -115,7 +115,23 @@ export class NetworkChart {
     }
   }
 
-  render(frame: Frame, p: Palette, maxNet: number, maxPair: number, focus: string | null, selected: string | null) {
+  /** `duration` > 0 animates a change of week/window (play, scrub); 0 for hover, selection or
+   * theme changes, which should feel instant. Scales stay fixed either way. */
+  render(
+    frame: Frame,
+    p: Palette,
+    maxNet: number,
+    maxPair: number,
+    focus: string | null,
+    selected: string | null,
+    duration = 0
+  ) {
+    // apply attributes now, or through a linear transition of `duration` ms (frames arrive at a
+    // steady rate while playing, so linear reads as continuous motion, not a series of eases)
+    const tr = <S extends d3.Selection<any, any, any, any>>(sel: S): S =>
+      // an instant update (hover, selection) must cancel a running frame transition, or the
+      // transition's end values would overwrite it a few ms later
+      (duration > 0 ? sel.transition().duration(duration).ease(d3.easeLinear) : sel.interrupt()) as unknown as S;
     const k = this.names.length;
     const nodeR = d3.scaleSqrt().domain([0, maxNet]).range([NODE_MIN, NODE_MAX]).clamp(true);
     const width = d3.scaleLinear().domain([0, maxPair]).range([1, EDGE_MAX]).clamp(true);
@@ -133,13 +149,21 @@ export class NetworkChart {
       return { fill: p.secondary, op: 0.07 };
     };
 
-    this.gEdges
-      .selectAll<SVGPathElement, Edge>("path")
-      .data(edges, (e) => `${e.s}-${e.r}`)
-      .join("path")
-      .attr("d", (e) => this.taper(e, nodeR(Math.abs(frame.net[e.s])), nodeR(Math.abs(frame.net[e.r])), width(e.v)))
-      .attr("fill", (e) => edgeStyle(e).fill)
-      .attr("fill-opacity", (e) => edgeStyle(e).op)
+    const shape = (e: Edge) =>
+      this.taper(e, nodeR(Math.abs(frame.net[e.s])), nodeR(Math.abs(frame.net[e.r])), width(e.v));
+    const joined = this.gEdges
+      .selectAll<SVGPathElement, Edge>("path:not(.exiting)")
+      .data(edges, (e) => `${e.s}-${e.r}`);
+    // links that drop out of the strongest 10% fade out rather than vanish
+    const leaving = joined.exit().classed("exiting", true).on("mousemove", null);
+    if (duration > 0) leaving.transition().duration(duration).ease(d3.easeLinear).attr("fill-opacity", 0).remove();
+    else leaving.remove();
+    // links that join start where they'll be, transparent, and fade in
+    const entering = joined.enter().append("path").attr("d", shape).attr("fill-opacity", 0);
+    const edgeSel = entering.merge(joined);
+    edgeSel.attr("fill", (e) => edgeStyle(e).fill);
+    tr(edgeSel).attr("d", shape).attr("fill-opacity", (e: Edge) => edgeStyle(e).op);
+    edgeSel
       .on("mousemove", (ev: MouseEvent, e) => {
         showTooltip(ev.clientX, ev.clientY, `${this.names[e.s]} → ${this.names[e.r]}`, [
           { label: "Net flow", value: `${e.v.toFixed(2)} pp` },
@@ -192,12 +216,14 @@ export class NetworkChart {
       .attr("cy", (d) => d.y)
       .attr("r", NODE_MAX + 4)
       .attr("fill", "transparent");
-    nodes
+    const dots = nodes
       .select<SVGCircleElement>("circle.dot")
       .attr("cx", (d) => d.x)
-      .attr("cy", (d) => d.y)
-      .attr("r", (d) => nodeR(Math.abs(frame.net[d.idx])))
-      .attr("fill", (d) => (frame.net[d.idx] >= 0 ? p.send : p.recv))
+      .attr("cy", (d) => d.y);
+    tr(dots)
+      .attr("r", (d: Pos) => nodeR(Math.abs(frame.net[d.idx])))
+      .attr("fill", (d: Pos) => (frame.net[d.idx] >= 0 ? p.send : p.recv));
+    dots
       .attr("stroke", (d) => (d.name === selected ? p.fg : p.panel))
       .attr("stroke-width", (d) => (d.name === selected ? 2.5 : 1.5));
     nodes

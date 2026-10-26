@@ -29,8 +29,12 @@ export class RankingChart {
     }).observe(host);
   }
 
-  render(frame: Frame, p: Palette, maxNet: number, focus: string | null, selected: string | null) {
-    this.last = [frame, p, maxNet, focus, selected];
+  render(frame: Frame, p: Palette, maxNet: number, focus: string | null, selected: string | null, duration = 0) {
+    this.last = [frame, p, maxNet, focus, selected, 0];
+    const tr = <S extends d3.Selection<any, any, any, any>>(sel: S): S =>
+      // an instant update (hover, selection) must cancel a running frame transition, or the
+      // transition's end values would overwrite it a few ms later
+      (duration > 0 ? sel.transition().duration(duration).ease(d3.easeLinear) : sel.interrupt()) as unknown as S;
     const W = this.width;
     const labelW = 96;
     const valueW = 52;
@@ -68,8 +72,9 @@ export class RankingChart {
         return r;
       });
 
-    g.attr("transform", (_d, i) => `translate(0,${4 + i * ROW})`)
-      .attr("aria-label", (d) => `${d.name}: net ${fmtSigned(d.v)} percentage points`)
+    // rows slide to their new rank instead of jumping
+    tr(g).attr("transform", (_d: unknown, i: number) => `translate(0,${4 + i * ROW})`);
+    g.attr("aria-label", (d) => `${d.name}: net ${fmtSigned(d.v)} percentage points`)
       .style("opacity", (d) => (focus && focus !== d.name ? 0.45 : 1));
     g.select("rect.row-bg")
       .attr("x", 0)
@@ -83,13 +88,11 @@ export class RankingChart {
       .attr("dy", "0.35em")
       .attr("font-weight", (d) => (d.name === selected ? 700 : 500))
       .text((d) => d.name);
-    g.select("rect.bar")
-      .attr("x", (d) => Math.min(x(0), x(d.v)))
-      .attr("width", (d) => Math.max(1, Math.abs(x(d.v) - x(0))))
-      .attr("y", 5)
-      .attr("height", ROW - 12)
-      .attr("rx", 3)
-      .attr("fill", (d) => (d.v >= 0 ? p.send : p.recv));
+    const bars = g.select<SVGRectElement>("rect.bar").attr("y", 5).attr("height", ROW - 12).attr("rx", 3);
+    tr(bars)
+      .attr("x", (d: { v: number }) => Math.min(x(0), x(d.v)))
+      .attr("width", (d: { v: number }) => Math.max(1, Math.abs(x(d.v) - x(0))))
+      .attr("fill", (d: { v: number }) => (d.v >= 0 ? p.send : p.recv));
     g.select("text.row-value")
       .attr("x", W - 6)
       .attr("y", ROW / 2 - 1)

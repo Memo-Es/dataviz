@@ -212,7 +212,15 @@ async function main() {
     ${meta.dynamic.returns.window}-week rolling window. Each week's value describes the ${meta.dynamic.returns.window} weeks ending that week.</p>
     <p class="muted">A design prototype for the coaching, not the stage 2 browser interface.</p>`;
 
+  // a change of week/window/measure animates; hover, selection and theme changes don't
+  const PLAY_MS = 90;
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let lastFrameKey = "";
+
   const render = (s: State) => {
+    const frameKey = `${s.measure}|${s.window}|${s.t}`;
+    const motion = reduceMotion || !lastFrameKey || frameKey === lastFrameKey ? 0 : s.playing ? PLAY_MS : 180;
+    lastFrameKey = frameKey;
     const p = readPalette();
     const m = s.measure;
     const dyn = meta.dynamic[m];
@@ -267,8 +275,8 @@ async function main() {
     timeline.render(dyn, full, meta.episodes, periods, s.window === "t" ? s.t : null, s.window.startsWith("p") ? s.window : null, p);
 
     $("network-sub").textContent = `${frame.label} · ${frame.edgeCount} strongest links (top 10%, above ${frame.threshold.toFixed(2)} pp)`;
-    network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected);
-    ranking.render(frame, p, model.maxNet[m], focus, s.selected);
+    network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion);
+    ranking.render(frame, p, model.maxNet[m], focus, s.selected, motion);
     $("heatmap-sub").textContent = `${frame.label} · row → column, in percentage points. Hover a cell for the value.`;
     heatmap.render(frame, p, model.maxPair[m], focus);
     renderDetail(s, frame, p);
@@ -384,7 +392,7 @@ async function main() {
         return;
       }
       store.set({ t: Math.min(last, cur.t + 2) });
-    }, 45);
+    }, PLAY_MS);
   });
 
   window.addEventListener("keydown", (ev) => {
