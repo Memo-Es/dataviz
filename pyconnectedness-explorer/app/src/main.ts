@@ -27,8 +27,10 @@ app.innerHTML = `
 </header>
 
 <main>
+  <!-- the dataset comes first: every graph below is computed from this one table -->
+  <section class="dataset" id="dataset" aria-labelledby="dataset-title"></section>
+
   <section class="hero">
-    <p class="eyebrow">20 stock markets · weekly, 1997–2026 · from the PyConnectedness Demo notebook</p>
     <h1>How shocks travel between the world's stock markets</h1>
     <p class="lede">Spillover is the share of a market's weekly moves that is explained by shocks
       that started in <em>other</em> markets. The higher it is, the faster trouble in one place
@@ -173,6 +175,8 @@ async function main() {
     }
   );
 
+  renderDataset();
+
   $("footer").innerHTML = `
     <p><b>Where the numbers come from.</b> Every value on this page was produced by running
     PyConnectedness's own <a href="https://github.com/zstoi/PyConnectedness/blob/main/examples/Demo.ipynb">examples/Demo.ipynb</a>
@@ -297,6 +301,44 @@ async function main() {
     }
     el.classList.toggle("preview", !!s.hovered && s.hovered !== s.selected);
     tightenDecimals(el, ".num");
+  }
+
+  /** The table every graph is computed from: what the authors' demo downloads and builds. */
+  function renderDataset() {
+    // the index behind each Yahoo Finance ticker the demo downloads (Demo.ipynb, cell 4)
+    const INDEX: Record<string, string> = {
+      "^AORD": "All Ordinaries", "^N225": "Nikkei 225", "^HSI": "Hang Seng", "^GDAXI": "DAX",
+      "^FCHI": "CAC 40", "^FTSE": "FTSE 100", "^GSPTSE": "S&P/TSX Composite", "^GSPC": "S&P 500",
+      "^SSMI": "SMI", "^STI": "Straits Times", "^JKSE": "Jakarta Composite", "^MXX": "IPC",
+      "^BVSP": "Bovespa", "^IBEX": "IBEX 35", "^KLSE": "FTSE Bursa Malaysia KLCI", "^MERV": "MERVAL",
+      "^KS11": "KOSPI", "XU100.IS": "BIST 100", "000001.SS": "SSE Composite", "^TWII": "TAIEX",
+    };
+    const [from, to] = meta.sample.map((d) => fmtDate(parseDate(d)!));
+    const groups = (["Americas", "Europe", "Asia Pacific"] as const)
+      .map((r) => {
+        const chips = names
+          .filter((n) => REGION_OF[n] === r)
+          .map((n) => {
+            const t = meta.tickers[n];
+            return `<li title="Yahoo Finance ticker ${t}"><b>${n}</b> ${INDEX[t] ?? t}</li>`;
+          })
+          .join("");
+        return `<div class="ds-region"><p class="ds-k">${r}</p><ul>${chips}</ul></div>`;
+      })
+      .join("");
+    $("dataset").innerHTML = `
+      <p class="q">Dataset</p>
+      <h2 id="dataset-title">${names.length} national stock market indices <span class="ds-src">· Yahoo Finance</span></h2>
+      <dl class="ds-facts">
+        <div><dt>Period</dt><dd>${from} to ${to}</dd></div>
+        <div><dt>Rows</dt><dd><span class="num">${meta.weeks}</span> weeks, Friday to Friday, only weeks where all ${names.length} markets traded</dd></div>
+        <div><dt>Columns</dt><dd>one per market, for two series: <b>returns</b>, the weekly % change, and <b>volatility</b>, the weekly high-low swing</dd></div>
+        <div><dt>Built by</dt><dd>the authors' demo, <code>examples/Demo.ipynb</code>, from daily closing, high and low prices</dd></div>
+      </dl>
+      <div class="ds-regions">${groups}</div>
+      <p class="ds-any">PyConnectedness works on any table like this, one column per variable and one row per time
+        step: river levels, energy prices, banks. The three graphs below would come out of any of them.</p>`;
+    tightenDecimals($("dataset"), ".num");
   }
 
   /** "Short vs long term": the library's frequency_connectedness (export_cell.py), which exists per
