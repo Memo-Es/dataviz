@@ -1505,3 +1505,27 @@ svg {
 .beads-floor {
   font-weight: 700;
 }
+
+/* graph 3 as a dot matrix */
+.legend .hm-dot,
+.legend .hm-ring {
+  display: inline-block;
+  flex: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+
+.legend .hm-dot {
+  background: var(--bead-1);
+}
+
+.legend .hm-ring {
+  background: var(--bead-3);
+  box-shadow: 0 0 0 1.5px var(--panel), 0 0 0 3px var(--fg);
+}
+
+.heatmap .cell .dot,
+.heatmap .cell .ring {
+  transition: r 0.18s ease;
+}

@@ -1,16 +1,28 @@
 /**
- * Net pairwise matrix (spillover_heatmap, notebook cells 18/21/28), rows = sender, columns =
- * receiver, grouped by region. Cells above the strongest-link cut-off get an outline, so the
- * matrix and the network visibly describe the same links.
+ * Net pairwise matrix (spillover_heatmap, notebook cells 18/21/28) as a dot matrix: a pale circle
+ * in every cell, and each pair drawn once, in its sender's row. pairwise_net is antisymmetric
+ * (row→column is minus column→row), so the other half adds nothing.
+ *   - a dot at (row, column): the row passes more to the column than it gets back;
+ *   - its area: how much more (pairwise_net, pp), on one scale across every step;
+ *   - its colour: the sender's region, the same colours as graph 1;
+ *   - a dark ring: above the strongest-link cut-off, so the matrix and the network visibly
+ *     describe the same links.
  */
 import * as d3 from "d3";
 import type { Frame } from "../model";
-import { type Palette, REGION_OF, diverging, regionOrder } from "../encoding";
+import { type Palette, REGION_OF, regionOrder } from "../encoding";
 import { hideTooltip, showTooltip } from "../tooltip";
 
 const CELL = 22;
 const LEFT = 92;
 const TOP = 92;
+const R = CELL / 2 - 1.5; // the pale circle, and the largest dot
+
+interface Cell {
+  r: number;
+  c: number;
+  v: number;
+}
 
 export class HeatmapChart {
   private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
@@ -32,39 +44,48 @@ export class HeatmapChart {
       .attr("class", "heatmap")
       .attr("viewBox", `0 0 ${S} ${TOP + n * CELL + 8}`)
       .attr("role", "img")
-      .attr("aria-label", "Matrix of net pairwise spillovers, sender rows by receiver columns");
+      .attr("aria-label", "Dot matrix of net pairwise spillovers: a dot where the row passes more to the column than it gets back");
   }
 
-  render(frame: Frame, p: Palette, maxPair: number, focus: string | null, pair: [string, string] | null = null) {
+  /** `hueOf`: the colour of an item's region (graph 1's palette); `base`: the pale cell circle */
+  render(
+    frame: Frame,
+    p: Palette,
+    maxPair: number,
+    focus: string | null,
+    pair: [string, string] | null = null,
+    hueOf: (name: string) => string = () => p.send,
+    base = p.band
+  ) {
     const n = this.order.length;
-    const color = diverging(maxPair, p);
     const idx = this.order.map((name) => this.names.indexOf(name));
-    const cells: { r: number; c: number; v: number }[] = [];
+    const cells: Cell[] = [];
     for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) cells.push({ r, c, v: frame.matrix[idx[r]][idx[c]] });
+    // area proportional to the flow; one scale across every step (the global max)
+    const rad = d3.scaleSqrt().domain([0, maxPair]).range([0, R]).clamp(true);
     const focusPos = focus ? this.order.indexOf(focus) : -1;
     const pr = pair ? this.order.indexOf(pair[0]) : -1;
     const pc = pair ? this.order.indexOf(pair[1]) : -1;
-    const picked = (d: { r: number; c: number }) => (d.r === pr && d.c === pc) || (d.r === pc && d.c === pr);
+    const picked = (d: Cell) => (d.r === pr && d.c === pc) || (d.r === pc && d.c === pr);
+    const opacity = (d: Cell) =>
+      focusPos >= 0
+        ? d.r === focusPos || d.c === focusPos ? 1 : 0.25
+        : pr >= 0 ? (d.r === pr || d.c === pr || d.r === pc || d.c === pc ? 1 : 0.3) : 1;
+    const cx = (d: Cell) => LEFT + d.c * CELL + CELL / 2;
+    const cy = (d: Cell) => TOP + d.r * CELL + CELL / 2;
 
-    this.svg
-      .selectAll<SVGRectElement, (typeof cells)[number]>("rect.cell")
+    const g = this.svg
+      .selectAll<SVGGElement, Cell>("g.cell")
       .data(cells)
-      .join("rect")
-      .attr("class", "cell")
-      .attr("x", (d) => LEFT + d.c * CELL)
-      .attr("y", (d) => TOP + d.r * CELL)
-      .attr("width", CELL - 2)
-      .attr("height", CELL - 2)
-      .attr("rx", 3)
-      .attr("fill", (d) => (d.r === d.c ? "transparent" : color(d.v)))
-      .attr("stroke", (d) => (picked(d) ? p.accent : d.v > frame.threshold ? p.fg : "none"))
-      .attr("stroke-width", (d) => (picked(d) ? 2.6 : 1.4))
+      .join((e) => {
+        const gg = e.append("g").attr("class", "cell");
+        gg.append("circle").attr("class", "base");
+        gg.append("circle").attr("class", "ring");
+        gg.append("circle").attr("class", "dot");
+        return gg;
+      })
+      .attr("opacity", opacity)
       .style("cursor", (d) => (d.r === d.c ? "default" : "pointer"))
-      .style("opacity", (d) =>
-        focusPos >= 0
-          ? d.r === focusPos || d.c === focusPos ? 1 : 0.3
-          : pr >= 0 ? (d.r === pr || d.c === pr || d.r === pc || d.c === pc ? 1 : 0.35) : 1
-      )
       .on("click", (_ev, d) => {
         if (d.r !== d.c) this.onPair(this.order[d.r], this.order[d.c]);
       })
@@ -75,10 +96,32 @@ export class HeatmapChart {
         const title = d.v >= 0 ? `${s} → ${rcv}` : `${rcv} → ${s}`;
         showTooltip(ev.clientX, ev.clientY, title, [
           { label: "Net flow", value: `${Math.abs(d.v).toFixed(2)} pp` },
-          { label: d.v > frame.threshold ? "Among the strongest 10%" : "Below the cut-off", value: "" },
+          { label: Math.abs(d.v) > frame.threshold ? "Among the strongest 10%" : "Below the cut-off", value: "" },
         ]);
       })
       .on("mouseleave", hideTooltip);
+
+    // the pale circle every cell has (none on the diagonal: a market with itself)
+    g.select<SVGCircleElement>("circle.base")
+      .attr("cx", cx)
+      .attr("cy", cy)
+      .attr("r", R)
+      .attr("fill", (d) => (d.r === d.c ? "transparent" : base));
+    // a ring: the pair is one of the strongest, or the one picked
+    g.select<SVGCircleElement>("circle.ring")
+      .attr("cx", cx)
+      .attr("cy", cy)
+      .attr("r", (d) => (d.v > 0 ? rad(d.v) + 2.2 : 0))
+      .attr("fill", "none")
+      .attr("stroke", (d) => (picked(d) && d.v > 0 ? p.accent : p.fg))
+      .attr("stroke-width", (d) => (picked(d) ? 2.2 : 1.4))
+      .attr("visibility", (d) => (d.v > 0 && (d.v > frame.threshold || picked(d)) ? "visible" : "hidden"));
+    // the dot, in the sender's row only
+    g.select<SVGCircleElement>("circle.dot")
+      .attr("cx", cx)
+      .attr("cy", cy)
+      .attr("r", (d) => (d.r !== d.c && d.v > 0 ? rad(d.v) : 0))
+      .attr("fill", (d) => hueOf(this.order[d.r]));
 
     const label = (cls: string, horizontal: boolean) =>
       this.svg
@@ -106,28 +149,21 @@ export class HeatmapChart {
     label("row-label", true);
     label("col-label", false);
 
-    // region separators
+    // region separators: a little air between the groups, no lines
     const breaks: number[] = [];
     for (let i = 1; i < n; i++) if (REGION_OF[this.order[i]] !== REGION_OF[this.order[i - 1]]) breaks.push(i);
-    this.svg
-      .selectAll("line.sep-v")
-      .data(breaks)
-      .join("line")
-      .attr("class", "sep-v")
-      .attr("x1", (b) => LEFT + b * CELL - 1)
-      .attr("x2", (b) => LEFT + b * CELL - 1)
-      .attr("y1", TOP)
-      .attr("y2", TOP + n * CELL)
-      .attr("stroke", p.axis);
-    this.svg
-      .selectAll("line.sep-h")
-      .data(breaks)
-      .join("line")
-      .attr("class", "sep-h")
-      .attr("y1", (b) => TOP + b * CELL - 1)
-      .attr("y2", (b) => TOP + b * CELL - 1)
-      .attr("x1", LEFT)
-      .attr("x2", LEFT + n * CELL)
-      .attr("stroke", p.axis);
+    this.svg.selectAll("line.sep-v, line.sep-h").remove();
+    const swatch = this.svg
+      .selectAll<SVGRectElement, number>("rect.region-mark")
+      .data([0, ...breaks]);
+    swatch
+      .join("rect")
+      .attr("class", "region-mark")
+      .attr("x", LEFT - 4)
+      .attr("y", (b) => TOP + b * CELL + 3)
+      .attr("width", 2.5)
+      .attr("height", (b, i) => ((breaks[i] ?? n) - b) * CELL - 6) // runs to the next break
+      .attr("rx", 1)
+      .attr("fill", (b) => hueOf(this.order[b]));
   }
 }

@@ -95,10 +95,7 @@ app.innerHTML = `
         </div>
       </div>
       <div id="heatmap" class="chart-host"></div>
-      <div class="legend">
-        <span class="ramp"><i></i>Row receives ← 0 → row sends</span>
-        <span><i class="outlined"></i>Outlined = drawn in the network</span>
-      </div>
+      <div class="legend" id="heatmap-legend"></div>
     </section>
 
     <section class="card span-5 detail" id="detail"></section>
@@ -207,6 +204,18 @@ async function main() {
     renderTimeline(store.get(), readPalette());
   });
 
+  // graph 1's colours: one per region (or per item, when there's only one region)
+  const presentRegions = REGION_ORDER.filter((g) => names.some((n) => REGION_OF[n] === g));
+  const hueOf = (n: string) => {
+    const hues = readBeadColors().hues;
+    const i = presentRegions.length > 1 ? presentRegions.indexOf(REGION_OF[n]) : names.indexOf(n);
+    return hues[i % hues.length];
+  };
+  $("heatmap-legend").innerHTML = `
+    <span title="PyConnectedness: pairwise_net"><i class="hm-dot"></i>Dot: the row passes more to the column than it gets back · bigger = more</span>
+    <span><i class="hm-ring"></i>Ring: among the strongest 10%, drawn in the network</span>
+    ${presentRegions.length > 1 ? `<span>Colour: the sender's region, as in graph 1</span>` : ""}`;
+
   const network = new NetworkChart($("network"), names, { onHover: hover, onSelect: select, onPair: pickPair });
   const ranking = new RankingChart($("ranking"), names, hover, (n) => select(n));
   const heatmap = new HeatmapChart($("heatmap"), names, hover, (n) => select(n), pickPair);
@@ -290,8 +299,8 @@ async function main() {
     renderNetReadout(s, frame);
     network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion, s.pair);
     ranking.render(frame, p, model.maxNet[m], focus, s.selected, motion);
-    $("heatmap-sub").innerHTML = `Net pairwise connectedness (<code>pairwise_net</code>) for every pair, ${frame.label.toLowerCase().startsWith("full") ? "over the " : "in the "}${frame.label.replace(/^Full/, "full")}: red, the row passes risk to the column; blue, the reverse. Click a cell to follow that pair over time.`;
-    heatmap.render(frame, p, model.maxPair[m], focus, s.pair);
+    $("heatmap-sub").textContent = `Each pair once, in the row of the ${ds.item} that passes more to the other, ${frame.label.toLowerCase().startsWith("full") ? "over the " : "in the "}${frame.label.replace(/^Full/, "full")}.`;
+    heatmap.render(frame, p, model.maxPair[m], focus, s.pair, hueOf, p.band);
     renderDetail(s, frame, p);
     tightenDecimals(document, ".num");
   };
