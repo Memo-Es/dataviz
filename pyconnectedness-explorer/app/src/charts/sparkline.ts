@@ -8,10 +8,11 @@ export function sparkline(
   values: number[],
   t: number | null,
   maxAbs: number,
-  p: Palette
+  p: Palette,
+  opts: { above?: string; below?: string; height?: number } = {}
 ) {
   const W = Math.max(200, host.clientWidth || 320);
-  const H = 84;
+  const H = opts.height ?? 84;
   const m = { l: 4, r: 4, t: 6, b: 16 };
   const x = d3
     .scaleUtc()
@@ -25,15 +26,21 @@ export function sparkline(
   svg.append("line").attr("x1", m.l).attr("x2", W - m.r).attr("y1", y(0)).attr("y2", y(0)).attr("stroke", p.axis);
   const clipUp = `clip-up-${Math.random().toString(36).slice(2)}`;
   const defs = svg.append("defs");
+  const clipDown = `${clipUp}-down`;
   defs.append("clipPath").attr("id", clipUp).append("rect").attr("x", 0).attr("y", 0).attr("width", W).attr("height", y(0));
+  defs.append("clipPath").attr("id", clipDown).append("rect").attr("x", 0).attr("y", y(0)).attr("width", W).attr("height", H - y(0));
   const area = d3.area<[number, number]>().x((d) => d[0]).y0(y(0)).y1((d) => d[1]);
-  svg.append("path").attr("d", area(pts)!).attr("fill", p.recv).attr("fill-opacity", 0.25);
+  // each fill only on its own side of zero, or the two overlap into a third colour
+  svg.append("path").attr("d", area(pts)!).attr("fill", p.recv).attr("fill-opacity", 0.3).attr("clip-path", `url(#${clipDown})`);
   svg.append("path").attr("d", area(pts)!).attr("fill", p.send).attr("fill-opacity", 0.3).attr("clip-path", `url(#${clipUp})`);
   svg.append("path").attr("d", d3.line()(pts)!).attr("fill", "none").attr("stroke", p.fg).attr("stroke-width", 1);
   for (const yr of [2005, 2010, 2015, 2020, 2025]) {
     const d = new Date(Date.UTC(yr, 0, 1));
     svg.append("text").attr("class", "axis-label").attr("x", x(d)).attr("y", H - 3).attr("text-anchor", "middle").text(yr);
   }
+  // say what each side of zero means, in words, where a y axis would otherwise be needed
+  if (opts.above) svg.append("text").attr("class", "spark-side").attr("x", m.l + 2).attr("y", m.t + 9).attr("fill", p.send).text(opts.above);
+  if (opts.below) svg.append("text").attr("class", "spark-side").attr("x", m.l + 2).attr("y", H - m.b - 4).attr("fill", p.recv).text(opts.below);
   if (t !== null) {
     svg.append("line").attr("x1", pts[t][0]).attr("x2", pts[t][0]).attr("y1", m.t).attr("y2", H - m.b).attr("stroke", p.accent);
     svg.append("circle").attr("cx", pts[t][0]).attr("cy", pts[t][1]).attr("r", 3.5).attr("fill", p.accent);

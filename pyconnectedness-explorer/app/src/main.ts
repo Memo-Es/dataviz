@@ -1,5 +1,5 @@
 import "./style.css";
-import { type Measure, loadExplorerData, staticBlock } from "./data";
+import { type Measure, loadExplorerData, pairSeriesAt, staticBlock } from "./data";
 import { Model, type State, Store, type WindowKey, windowOptions } from "./model";
 import { REGION_OF, fmtDate, fmtSigned, parseDate, readPalette, tightenDecimals } from "./encoding";
 import { NetworkChart } from "./charts/network";
@@ -162,17 +162,25 @@ async function main() {
     t: last,
     window: "t",
     selected: null,
+    pair: null,
     hovered: null,
     playing: false,
     theme,
   });
 
   const hover = (n: string | null) => store.set({ hovered: n });
-  const select = (n: string | null) => store.set({ selected: n === store.get().selected ? null : n });
+  const select = (n: string | null) =>
+    store.set({ selected: n === store.get().selected ? null : n, pair: null });
+  // a pair and a market are alternative views of the detail panel: picking one clears the other
+  const pickPair = (row: string, col: string) => {
+    const cur = store.get().pair;
+    const same = cur && ((cur[0] === row && cur[1] === col) || (cur[0] === col && cur[1] === row));
+    store.set({ pair: same ? null : [row, col], selected: null, hovered: null });
+  };
 
-  const network = new NetworkChart($("network"), names, { onHover: hover, onSelect: select });
+  const network = new NetworkChart($("network"), names, { onHover: hover, onSelect: select, onPair: pickPair });
   const ranking = new RankingChart($("ranking"), names, hover, (n) => select(n));
-  const heatmap = new HeatmapChart($("heatmap"), names, hover, (n) => select(n));
+  const heatmap = new HeatmapChart($("heatmap"), names, hover, (n) => select(n), pickPair);
   const timeline = new TimelineChart(
     $("timeline"),
     (t) => store.set({ t, window: "t" }),
@@ -275,10 +283,10 @@ async function main() {
     timeline.render(dyn, full, meta.episodes, periods, s.window === "t" ? s.t : null, s.window.startsWith("p") ? s.window : null, p);
 
     $("network-sub").textContent = `${frame.label} · ${frame.edgeCount} strongest links (top 10%, above ${frame.threshold.toFixed(2)} pp)`;
-    network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion);
+    network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion, s.pair);
     ranking.render(frame, p, model.maxNet[m], focus, s.selected, motion);
-    $("heatmap-sub").textContent = `${frame.label} · row → column, in percentage points. Hover a cell for the value.`;
-    heatmap.render(frame, p, model.maxPair[m], focus);
+    $("heatmap-sub").textContent = `${frame.label} · row → column, in percentage points. Click a cell to follow that pair over time.`;
+    heatmap.render(frame, p, model.maxPair[m], focus, s.pair);
     renderDetail(s, frame, p);
     renderSpeed(s);
     tightenDecimals(document, ".num");
@@ -300,7 +308,55 @@ async function main() {
     renderFrequency($("frequency"), rows, selKey, names, (key) => store.set({ window: key as WindowKey, playing: false }));
   }
 
+  function renderPair(s: State, frame: ReturnType<Model["frame"]>, p: ReturnType<typeof readPalette>) {
+    const el = $("detail");
+    const [a, b] = s.pair!;
+    const i = names.indexOf(a);
+    const j = names.indexOf(b);
+    const v = frame.matrix[i][j]; // > 0: a sends to b, net (the library's pairwise_net)
+    const [from, to] = v >= 0 ? [a, b] : [b, a];
+    const statement =
+      Math.abs(v) < 0.005
+        ? `<b>${a}</b> and <b>${b}</b> are balanced: neither sends more to the other.`
+        : `<b>${from}</b> sends <b class="num">${Math.abs(v).toFixed(2)}</b> pp more to <b>${to}</b> than it receives back.`;
+    const strong = v > frame.threshold || -v > frame.threshold;
+    const series = pairSeriesAt(data, s.measure, i, j);
+    const scale = Math.max(...series.map(Math.abs), 0.5) * 1.1;
+    const windows = windowOptions(data, s.measure)
+      .filter((o) => o.key !== "t")
+      .map((o) => {
+        const pv = staticBlock(data, s.measure, o.key as Exclude<WindowKey, "t">).pairwise_net[i][j];
+        const [f, t] = pv >= 0 ? [a, b] : [b, a];
+        return `<li class="${o.key === s.window ? "current" : ""}"><span>${o.label}</span><span class="dir">${f} → ${t}</span><b class="num ${pv >= 0 ? "send" : "recv"}">${Math.abs(pv).toFixed(2)}</b></li>`;
+      })
+      .join("");
+    el.innerHTML = `
+      <div class="card-head">
+        <div><p class="eyebrow">One pair</p><h2>${a} ↔ ${b}</h2><p class="sub">${frame.label}</p></div>
+        <button class="icon-btn" id="clear" aria-label="Clear pair">✕</button>
+      </div>
+      <p class="pair-statement">${statement}</p>
+      <p class="pair-note">${
+        strong
+          ? `One of the ${frame.edgeCount} strongest links in this window, so it's drawn in the network.`
+          : `Below the strongest-10% cut-off (<span class="num">${frame.threshold.toFixed(2)}</span> pp), so the network doesn't draw it.`
+      }</p>
+      <p class="k spark-k">Net flow between them, every week (scale fits this pair)</p>
+      <div id="spark"></div>
+      <p class="k spark-k">By period</p>
+      <ul class="pair-windows">${windows}</ul>`;
+    sparkline($("spark"), dyn(s).dates, series, s.window === "t" ? s.t : null, scale, p, {
+      above: `${a} sends ↑`,
+      below: `${b} sends ↓`,
+      height: 120,
+    });
+    el.querySelector<HTMLButtonElement>("#clear")?.addEventListener("click", () => store.set({ pair: null }));
+  }
+
+  const dyn = (s: State) => meta.dynamic[s.measure];
+
   function renderDetail(s: State, frame: ReturnType<Model["frame"]>, p: ReturnType<typeof readPalette>) {
+    if (s.pair) return renderPair(s, frame, p); // stays put while the mouse crosses markets
     const el = $("detail");
     const name = s.selected ?? s.hovered;
     if (!name) {
@@ -399,7 +455,7 @@ async function main() {
     if ((ev.target as HTMLElement).closest("input,select,textarea")) return;
     if (ev.key === "ArrowRight") step(ev.shiftKey ? 52 : 1);
     else if (ev.key === "ArrowLeft") step(ev.shiftKey ? -52 : -1);
-    else if (ev.key === "Escape") store.set({ selected: null });
+    else if (ev.key === "Escape") store.set({ selected: null, pair: null });
   });
 }
 

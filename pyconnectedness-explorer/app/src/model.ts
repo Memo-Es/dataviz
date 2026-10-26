@@ -22,6 +22,8 @@ export interface State {
   t: number;
   window: WindowKey;
   selected: string | null;
+  /** [row, column] of the pair picked on the matrix or network; row → column when positive */
+  pair: [string, string] | null;
   hovered: string | null;
   playing: boolean;
   theme: "light" | "dark";

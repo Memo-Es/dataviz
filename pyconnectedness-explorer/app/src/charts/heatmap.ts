@@ -20,7 +20,8 @@ export class HeatmapChart {
     host: HTMLElement,
     private names: string[],
     private onHover: (n: string | null) => void,
-    private onSelect: (n: string) => void
+    private onSelect: (n: string) => void,
+    private onPair: (row: string, col: string) => void
   ) {
     this.order = regionOrder(names);
     const n = names.length;
@@ -34,13 +35,16 @@ export class HeatmapChart {
       .attr("aria-label", "Matrix of net pairwise spillovers, sender rows by receiver columns");
   }
 
-  render(frame: Frame, p: Palette, maxPair: number, focus: string | null) {
+  render(frame: Frame, p: Palette, maxPair: number, focus: string | null, pair: [string, string] | null = null) {
     const n = this.order.length;
     const color = diverging(maxPair, p);
     const idx = this.order.map((name) => this.names.indexOf(name));
     const cells: { r: number; c: number; v: number }[] = [];
     for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) cells.push({ r, c, v: frame.matrix[idx[r]][idx[c]] });
     const focusPos = focus ? this.order.indexOf(focus) : -1;
+    const pr = pair ? this.order.indexOf(pair[0]) : -1;
+    const pc = pair ? this.order.indexOf(pair[1]) : -1;
+    const picked = (d: { r: number; c: number }) => (d.r === pr && d.c === pc) || (d.r === pc && d.c === pr);
 
     this.svg
       .selectAll<SVGRectElement, (typeof cells)[number]>("rect.cell")
@@ -53,9 +57,17 @@ export class HeatmapChart {
       .attr("height", CELL - 2)
       .attr("rx", 3)
       .attr("fill", (d) => (d.r === d.c ? "transparent" : color(d.v)))
-      .attr("stroke", (d) => (d.v > frame.threshold ? p.fg : "none"))
-      .attr("stroke-width", 1.4)
-      .style("opacity", (d) => (focusPos < 0 || d.r === focusPos || d.c === focusPos ? 1 : 0.3))
+      .attr("stroke", (d) => (picked(d) ? p.accent : d.v > frame.threshold ? p.fg : "none"))
+      .attr("stroke-width", (d) => (picked(d) ? 2.6 : 1.4))
+      .style("cursor", (d) => (d.r === d.c ? "default" : "pointer"))
+      .style("opacity", (d) =>
+        focusPos >= 0
+          ? d.r === focusPos || d.c === focusPos ? 1 : 0.3
+          : pr >= 0 ? (d.r === pr || d.c === pr || d.r === pc || d.c === pc ? 1 : 0.35) : 1
+      )
+      .on("click", (_ev, d) => {
+        if (d.r !== d.c) this.onPair(this.order[d.r], this.order[d.c]);
+      })
       .on("mousemove", (ev: MouseEvent, d) => {
         if (d.r === d.c) return;
         const s = this.order[d.r];

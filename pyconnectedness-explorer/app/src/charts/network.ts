@@ -39,6 +39,7 @@ interface Edge {
 export interface NetworkCallbacks {
   onHover(name: string | null): void;
   onSelect(name: string | null): void;
+  onPair(sender: string, receiver: string): void;
 }
 
 export class NetworkChart {
@@ -124,7 +125,8 @@ export class NetworkChart {
     maxPair: number,
     focus: string | null,
     selected: string | null,
-    duration = 0
+    duration = 0,
+    pair: [string, string] | null = null
   ) {
     // apply attributes now, or through a linear transition of `duration` ms (frames arrive at a
     // steady rate while playing, so linear reads as continuous motion, not a series of eases)
@@ -136,6 +138,10 @@ export class NetworkChart {
     const nodeR = d3.scaleSqrt().domain([0, maxNet]).range([NODE_MIN, NODE_MAX]).clamp(true);
     const width = d3.scaleLinear().domain([0, maxPair]).range([1, EDGE_MAX]).clamp(true);
     const focusIdx = focus ? this.names.indexOf(focus) : -1;
+    // a picked pair spotlights its one link (either direction) unless a market is hovered
+    const pairIdx = pair && focusIdx < 0 ? pair.map((n) => this.names.indexOf(n)) : null;
+    const isPair = (e: Edge) =>
+      !!pairIdx && ((e.s === pairIdx[0] && e.r === pairIdx[1]) || (e.s === pairIdx[1] && e.r === pairIdx[0]));
 
     const edges: Edge[] = [];
     for (let s = 0; s < k; s++)
@@ -143,6 +149,7 @@ export class NetworkChart {
     edges.sort((a, b) => a.v - b.v); // strongest on top
 
     const edgeStyle = (e: Edge) => {
+      if (pairIdx) return isPair(e) ? { fill: p.accent, op: 0.95 } : { fill: p.secondary, op: 0.07 };
       if (focusIdx < 0) return { fill: p.secondary, op: 0.42 };
       if (e.s === focusIdx) return { fill: p.send, op: 0.85 };
       if (e.r === focusIdx) return { fill: p.recv, op: 0.85 };
@@ -171,9 +178,13 @@ export class NetworkChart {
         ]);
       })
       .on("mouseleave", hideTooltip)
+      .on("click", (ev: MouseEvent, e) => {
+        ev.stopPropagation();
+        this.cb.onPair(this.names[e.s], this.names[e.r]);
+      })
       .order();
 
-    const linked = new Set<number>();
+    const linked = new Set<number>(pairIdx ?? []);
     if (focusIdx >= 0) {
       linked.add(focusIdx);
       for (const e of edges) {
@@ -209,7 +220,7 @@ export class NetworkChart {
       });
 
     nodes.attr("aria-label", (d) => `${d.name}, net ${fmtSigned(frame.net[d.idx])} percentage points`);
-    nodes.style("opacity", (d) => (focusIdx < 0 || linked.has(d.idx) ? 1 : 0.28));
+    nodes.style("opacity", (d) => ((focusIdx < 0 && !pairIdx) || linked.has(d.idx) ? 1 : 0.28));
     nodes
       .select<SVGCircleElement>("circle.hit")
       .attr("cx", (d) => d.x)
