@@ -51,7 +51,7 @@ questionnaire, and the names from the library:
 
 | | Question | Name | Library |
 |---|---|---|---|
-| Graph 1 | When did markets become fragile? | **Spillover index** | `dynamic_connectedness(…).total` |
+| Graph 1 | When did markets become fragile? | **Rolling spillover index** | `dynamic_connectedness(…).total` |
 | inside graph 1 | How long do shocks last? | **Short vs long term** (bands: short, medium, long term) | `frequency_connectedness` |
 | Graph 2 | Who passes risk to whom? | **Connectedness network** | `connectedness_graph` |
 | Graph 3 | How much does each pair pass on? | **Spillover heatmap** | `spillover_heatmap` |

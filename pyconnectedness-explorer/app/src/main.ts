@@ -34,7 +34,7 @@ app.innerHTML = `
       that started in <em>other</em> markets. The higher it is, the faster trouble in one place
       becomes trouble everywhere.</p>
     <ol class="questions" aria-label="Three questions, three graphs">
-      <li><a href="#g1"><span class="qn">1</span>When did markets become fragile?<em>Spillover index</em></a></li>
+      <li><a href="#g1"><span class="qn">1</span>When did markets become fragile?<em>Rolling spillover index</em></a></li>
       <li><a href="#g2"><span class="qn">2</span>Who passes risk to whom?<em>Connectedness network</em></a></li>
       <li><a href="#g3"><span class="qn">3</span>How much does each pair pass on?<em>Spillover heatmap</em></a></li>
     </ol>
@@ -44,7 +44,7 @@ app.innerHTML = `
     <div class="card-head">
       <div>
         <p class="q">1 · When did markets become fragile?</p>
-        <h2>Spillover index <code class="tag">dynamic_connectedness(…).total</code></h2>
+        <h2>Rolling spillover index <code class="tag">dynamic_connectedness(…).total</code></h2>
         <p class="sub" id="timeline-sub"></p>
       </div>
       <div class="player">
@@ -248,8 +248,7 @@ async function main() {
     });
     const dyn = meta.dynamic[m];
     $("timeline-sub").innerHTML = `${m === "returns" ? "Returns" : "Volatility"}: the share of each market's moves
-      caused by shocks elsewhere, each week measured over the ${dyn.window} weeks before it (the notebook's
-      "rolling ${word} spillover index"). Grey: ${other === "returns" ? "returns" : "volatility"}, to compare. Dashed:
+      caused by shocks elsewhere, each week measured over the ${dyn.window} weeks before it. Grey: ${other === "returns" ? "returns" : "volatility"}, to compare. Dashed:
       the notebook's crisis dates. <b>Hover to preview a week; click or drag to pick it.</b>`;
     timeline.render(
       dyn,
