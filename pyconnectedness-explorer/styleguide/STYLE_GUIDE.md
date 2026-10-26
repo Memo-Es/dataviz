@@ -44,16 +44,32 @@ The explorer adds a fifth view, not from a library plot: **speed bars** for the 
 (`frequency_connectedness`). They use an ordinal one-hue ramp, darker = faster, which is also
 kept away from red/blue (see Palette).
 
-## Naming: use the library's words
+## Naming and narrative
 
-Graph titles and labels follow the PyConnectedness code and notebook, with a plain explanation
-next to them:
-- "Rolling return spillover index" (notebook cell 14), the `total` of `dynamic_connectedness`.
-- "Net transmitter" and "net receiver" (`viz/network.py`'s docstring), not "sender".
-- "Net pairwise" for `pairwise_net`.
+The page answers three questions, in order, one graph each. The questions come from the client's
+questionnaire, and the names from the library:
 
-Where it helps the team map a number back to code, show the field name small, in the number
-font (e.g. `total`, `net`, `pairwise_net`).
+| | Question | Name | Library |
+|---|---|---|---|
+| Graph 1 | When did markets become fragile? | **Spillover index** | `dynamic_connectedness(…).total` |
+| inside graph 1 | How long do shocks last? | **Short vs long term** (bands: short, medium, long term) | `frequency_connectedness` |
+| Graph 2 | Who passes risk to whom? | **Connectedness network** | `connectedness_graph` |
+| Graph 3 | How much does each pair pass on? | **Spillover heatmap** | `spillover_heatmap` |
+| Side panel | (detail for graphs 2 and 3) | **Detail · market / pair** | `directional_to`, `directional_from`, `net`, `pairwise_net` |
+
+**Every graph uses the same three-level header:**
+1. The question, small, uppercase, in the accent colour, numbered ("1 · When did markets become
+   fragile?").
+2. The name as the title, with the library call beside it in small muted mono.
+3. One plain sentence: what it shows for the current selection, then how to interact.
+
+The intro repeats the three questions as links to their graphs, so the narrative is visible
+before scrolling. Other terms keep the library's words: "net transmitter" and "net receiver"
+(`viz/network.py`), not "sender"; "net pairwise" for `pairwise_net`.
+
+**Readouts never change height.** Every slot is always drawn with the same structure, so hovering
+can't move the chart under the pointer. "Short vs long term" is always shown: for a picked period
+it's that period, and for a single week it's the period the week falls in, labelled as such.
 
 ## Layout rule: controls above what they control
 

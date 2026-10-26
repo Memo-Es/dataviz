@@ -270,6 +270,7 @@ main {
 }
 
 .ro-when {
+  min-height: 22px; /* the Preview tag is taller than plain text: reserve it either way */
   display: flex;
   flex-wrap: wrap; /* on a phone the hint drops to its own line instead of splitting the date */
   align-items: center;
@@ -342,7 +343,19 @@ main {
 
 .ro-sub {
   font-size: 12.5px;
+  line-height: 18px; /* fixed, so the ▲/▼ marker can't make one state taller than another */
+  height: 18px;
+  white-space: nowrap;
   color: var(--secondary);
+}
+
+/* B612 Mono's line box is taller than Plus Jakarta's: inside a readout line it must not stretch
+   the line, or a line with a number would be taller than one without and the chart would move */
+.ro-sub .num,
+.ro-value .num,
+.ro-when .num,
+.speed-words .num {
+  line-height: 1;
 }
 
 .ro-value.up + .ro-sub::before {
@@ -1003,11 +1016,89 @@ svg {
   border-top: 1px solid var(--line);
 }
 
-.ro-speed.empty {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: 10px;
+.ro-speed-head {
+  margin: 0;
+  font-size: 13px;
+}
+
+.ro-speed-head code,
+.tag {
+  padding: 0;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  vertical-align: middle;
+}
+
+.speed-words em {
+  font-style: normal;
+  color: var(--muted);
+}
+
+/* one header system for every graph: question, then the library's name, then what it shows */
+.q {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.card h2 .tag {
+  margin-left: 6px;
+  font-size: 11px;
+}
+
+/* the three questions in the intro, as links to their graphs */
+.questions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.questions a {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  height: 100%;
+  padding: 14px 16px 14px 48px;
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.questions a:hover {
+  border-color: var(--axis);
+}
+
+.questions em {
+  font-style: normal;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.qn {
+  position: absolute;
+  left: 16px;
+  top: 14px;
+  font: 700 15px var(--f-num);
+  color: var(--accent);
+}
+
+@media (max-width: 760px) {
+  .questions {
+    grid-template-columns: 1fr;
+  }
 }
 
 .speed-bar {

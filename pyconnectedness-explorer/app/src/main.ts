@@ -32,14 +32,19 @@ app.innerHTML = `
     <h1>How shocks travel between the world's stock markets</h1>
     <p class="lede">Spillover is the share of a market's weekly moves that is explained by shocks
       that started in <em>other</em> markets. The higher it is, the faster trouble in one place
-      becomes trouble everywhere. Pick a week or a period on the timeline; everything below it
-      follows.</p>
+      becomes trouble everywhere.</p>
+    <ol class="questions" aria-label="Three questions, three graphs">
+      <li><a href="#g1"><span class="qn">1</span>When did markets become fragile?<em>Spillover index</em></a></li>
+      <li><a href="#g2"><span class="qn">2</span>Who passes risk to whom?<em>Connectedness network</em></a></li>
+      <li><a href="#g3"><span class="qn">3</span>How much does each pair pass on?<em>Spillover heatmap</em></a></li>
+    </ol>
   </section>
 
-  <section class="card span-12">
+  <section class="card span-12" id="g1">
     <div class="card-head">
       <div>
-        <h2 id="timeline-title"></h2>
+        <p class="q">1 · When did markets become fragile?</p>
+        <h2>Spillover index <code class="tag">dynamic_connectedness(…).total</code></h2>
         <p class="sub" id="timeline-sub"></p>
       </div>
       <div class="player">
@@ -55,10 +60,11 @@ app.innerHTML = `
   </section>
 
   <!-- graph 2: the network, with its own readout and its node values (net) beside it -->
-  <section class="card span-12 graph2">
+  <section class="card span-12 graph2" id="g2">
     <div class="card-head">
       <div>
-        <h2 id="network-title"></h2>
+        <p class="q">2 · Who passes risk to whom?</p>
+        <h2>Connectedness network <code class="tag">connectedness_graph</code></h2>
         <p class="sub" id="network-sub"></p>
       </div>
     </div>
@@ -74,8 +80,8 @@ app.innerHTML = `
         </div>
       </div>
       <div class="graph2-side">
-        <p class="side-title">Net by market <code>net</code></p>
-        <p class="side-sub">TO minus FROM, in percentage points: the circle sizes, as bars. Hover or click a market.</p>
+        <p class="side-title">Net connectedness by market <code>net</code></p>
+        <p class="side-sub">What each market gives minus what it takes, in pp: the network's circle sizes, as bars.</p>
         <div id="ranking" class="chart-host"></div>
       </div>
     </div>
@@ -84,10 +90,11 @@ app.innerHTML = `
 
   <div class="grid">
 
-    <section class="card span-7">
+    <section class="card span-7" id="g3">
       <div class="card-head">
         <div>
-          <h2>Every pair, both ways</h2>
+          <p class="q">3 · How much does each pair pass on?</p>
+          <h2>Spillover heatmap <code class="tag">spillover_heatmap</code></h2>
           <p class="sub" id="heatmap-sub"></p>
         </div>
       </div>
@@ -211,14 +218,13 @@ async function main() {
     // charts
     renderTimeline(s, p);
 
-    $("network-title").textContent = `Net pairwise ${word} connectedness, strongest 10% of links`;
-    $("network-sub").innerHTML = `The library's <code>connectedness_graph</code>: one arrow per pair, from net transmitter to net
-      receiver, keeping links above the notebook's cut-off, the 90th percentile of |<code>pairwise_net</code>|.
-      Markets are grouped by region; sizes use one scale across all weeks.`;
+    $("network-sub").innerHTML = `${m === "returns" ? "Returns" : "Volatility"}, ${frame.label.replace(/^Full/, "full")}: an arrow from
+      each net transmitter to each net receiver, for the strongest 10% of pairs (the notebook's "net pairwise
+      ${word} connectedness"). Markets are grouped by region; sizes use one scale across all weeks.`;
     renderNetReadout(s, frame);
     network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion, s.pair);
     ranking.render(frame, p, model.maxNet[m], focus, s.selected, motion);
-    $("heatmap-sub").textContent = `${frame.label} · row → column, in percentage points. Click a cell to follow that pair over time.`;
+    $("heatmap-sub").innerHTML = `Net pairwise connectedness (<code>pairwise_net</code>) for every pair, ${frame.label.toLowerCase().startsWith("full") ? "over the " : "in the "}${frame.label.replace(/^Full/, "full")}: red, the row passes risk to the column; blue, the reverse. Click a cell to follow that pair over time.`;
     heatmap.render(frame, p, model.maxPair[m], focus, s.pair);
     renderDetail(s, frame, p);
     tightenDecimals(document, ".num");
@@ -241,11 +247,10 @@ async function main() {
       };
     });
     const dyn = meta.dynamic[m];
-    $("timeline-title").textContent = `Rolling ${word} spillover index`;
-    $("timeline-sub").innerHTML = `The total connectedness index (<code>dynamic_connectedness(…).total</code>): each week is
-      measured over the ${dyn.window} weeks before it, VAR(${dyn.lags}), ${dyn.horizon}-week horizon. Grey: the ${
-        other === "returns" ? "return" : "volatility"
-      } index, to compare. Dashed lines: the notebook's six crisis dates. <b>Hover to preview a week; click or drag to pick it.</b>`;
+    $("timeline-sub").innerHTML = `${m === "returns" ? "Returns" : "Volatility"}: the share of each market's moves
+      caused by shocks elsewhere, each week measured over the ${dyn.window} weeks before it (the notebook's
+      "rolling ${word} spillover index"). Grey: ${other === "returns" ? "returns" : "volatility"}, to compare. Dashed:
+      the notebook's crisis dates. <b>Hover to preview a week; click or drag to pick it.</b>`;
     timeline.render(
       dyn,
       staticBlock(data, m, "full"),
@@ -295,31 +300,39 @@ async function main() {
     tightenDecimals(el, ".num");
   }
 
-  /** The spillover index split by how fast shocks play out: the library's frequency_connectedness
-   * (export_cell.py), which exists per period, not per week. */
+  /** "Short vs long term": the library's frequency_connectedness (export_cell.py), which exists per
+   * period, not per week. Always drawn with the same structure, so the readout never changes
+   * height (it sits above the chart, so a height change moves the chart under the pointer). */
   function speedLine(s: State, preview: boolean) {
-    const blocks = meta.frequency[s.measure] as Record<string, (typeof meta.frequency.returns)["full"]>;
-    const fb = !preview && s.window !== "t" ? blocks[s.window] : undefined;
-    const label = `<span class="ro-label">How fast it plays out <code>frequency_connectedness</code></span>`;
-    if (!fb) {
-      return `<div class="ro-speed empty">${label}<span class="ro-sub">Pick a period below to see it: the library
-        computes this split per period, not per week.</span></div>`;
-    }
+    const m = s.measure;
+    const blocks = meta.frequency[m] as Record<string, (typeof meta.frequency.returns)["full"]>;
+    const week = preview ? s.hoverT! : s.t;
+    const yr = +meta.dynamic[m].dates[week].slice(0, 4);
+    const periodOfWeek = yr <= 2006 ? "p1" : yr <= 2012 ? "p2" : yr <= 2019 ? "p3" : "p4";
+    const fromChip = !preview && s.window !== "t" && blocks[s.window];
+    const key = fromChip ? s.window : periodOfWeek;
+    const fb = blocks[key];
+    const option = windowOptions(data, m).find((o) => o.key === key)!;
+    const context = fromChip ? option.label : `${option.label}, the period this week falls in`;
     const sum = fb.bands.reduce((a, b) => a + b.total, 0);
     const segs = fb.bands
       .map((b) => {
         const c = BAND_COPY[b.label];
-        return `<span class="seg ${c.cls}" style="flex:${b.total}" title="${c.short}: ${b.total.toFixed(1)} pp"><b class="num">${b.total.toFixed(1)}</b></span>`;
+        return `<span class="seg ${c.cls}" style="flex:${b.total}" title="${c.name}, ${c.phrase}: ${b.total.toFixed(1)} pp"><b class="num">${b.total.toFixed(1)}</b></span>`;
       })
       .join("");
     const words = fb.bands
-      .map((b) => `<span><i class="key ${BAND_COPY[b.label].cls}"></i><b class="num">${((b.total / sum) * 100).toFixed(0)}%</b> ${BAND_COPY[b.label].phrase}</span>`)
+      .map((b) => {
+        const c = BAND_COPY[b.label];
+        return `<span><i class="key ${c.cls}"></i>${c.name} <b class="num">${((b.total / sum) * 100).toFixed(0)}%</b> <em>${c.phrase}</em></span>`;
+      })
       .join("");
-    return `<div class="ro-speed">${label}
+    return `<div class="ro-speed">
+      <p class="ro-speed-head"><b>Short vs long term</b> <code>frequency_connectedness</code> <span class="ro-hint">· ${context}</span></p>
       <div class="speed-bar">${segs}</div>
       <div class="speed-words">${words}</div>
-      <span class="ro-note">Baruník–Křehlík bands on a ${fb.horizon}-week horizon, so they add up to
-        <span class="num">${fb.static_total.toFixed(1)}%</span> rather than exactly the index above.</span></div>`;
+      <span class="ro-note">How long shocks take to play out (Baruník–Křehlík), on a ${fb.horizon}-week horizon, so the
+        three add up to <span class="num">${fb.static_total.toFixed(1)}%</span> rather than exactly the index.</span></div>`;
   }
 
   /** The graph's readout: the library's own measures for the picked week or period, or for the
@@ -389,7 +402,7 @@ async function main() {
       .join("");
     el.innerHTML = `
       <div class="card-head">
-        <div><p class="eyebrow">One pair</p><h2>${a} ↔ ${b}</h2><p class="sub">${frame.label}</p></div>
+        <div><p class="q">Detail · pair</p><h2>${a} ↔ ${b}</h2><p class="sub">${frame.label}</p></div>
         <button class="icon-btn" id="clear" aria-label="Clear pair">✕</button>
       </div>
       <p class="pair-statement">${statement}</p>
@@ -417,7 +430,7 @@ async function main() {
     const el = $("detail");
     const name = s.selected ?? s.hovered;
     if (!name) {
-      el.innerHTML = `<div class="card-head"><div><h2>Pick a market</h2><p class="sub">Click any circle, bar or matrix label to see where its risk goes and comes from.</p></div></div>
+      el.innerHTML = `<div class="card-head"><div><p class="q">Detail · graphs 2 and 3</p><h2>Pick a market or a pair</h2><p class="sub">Click a market (a circle, a bar or a heatmap label) to see where its risk goes and comes from, or a pair (an arrow or a heatmap cell) to follow it over time.</p></div></div>
         <div class="empty">${names
           .slice()
           .sort()
@@ -436,7 +449,7 @@ async function main() {
     const net = frame.net[i];
     el.innerHTML = `
       <div class="card-head">
-        <div><p class="eyebrow">${REGION_OF[name]}</p><h2>${name}</h2><p class="sub">${frame.label}</p></div>
+        <div><p class="q">Detail · market · ${REGION_OF[name]}</p><h2>${name}</h2><p class="sub">${frame.label}</p></div>
         ${s.selected ? `<button class="icon-btn" id="clear" aria-label="Clear selection">✕</button>` : ""}
       </div>
       <div class="trio">
