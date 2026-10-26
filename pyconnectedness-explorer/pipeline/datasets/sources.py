@@ -14,6 +14,7 @@ from __future__ import annotations
 import io
 import json
 import time
+import urllib.error
 import urllib.request
 import zipfile
 from datetime import date, datetime, timedelta, timezone
@@ -24,14 +25,19 @@ import pandas as pd
 UA = {"User-Agent": "pyconnectedness-explorer/0.1 (+https://github.com/Memo-Es/dataviz)"}
 
 
-def get(url: str, *, tries: int = 4, timeout: int = 60) -> bytes:
+def get(url: str, *, tries: int = 5, timeout: int = 60) -> bytes:
     last = None
     for i in range(tries):
         try:
             req = urllib.request.Request(url, headers=UA)
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 return r.read()
-        except Exception as e:  # network hiccups and rate limits: back off and retry
+        except urllib.error.HTTPError as e:
+            last = e
+            # rate limited: wait as long as the server asks, or a full minute
+            wait = int(e.headers.get("Retry-After") or 0) or 60 if e.code == 429 else 2 * 2**i
+            time.sleep(wait)
+        except Exception as e:  # network hiccups: back off and retry
             last = e
             time.sleep(2 * 2**i)
     raise RuntimeError(f"GET {url} failed: {last}")
@@ -227,15 +233,23 @@ def fetch_rivers() -> pd.DataFrame:
     cols = {}
     for ts in data["value"]["timeSeries"]:
         site = ts["sourceInfo"]["siteCode"][0]["value"]
-        vals = ts["values"][0]["value"]
-        s = pd.Series({pd.Timestamp(v["dateTime"][:10]): float(v["value"]) for v in vals})
-        cols[GAUGES[site][0]] = s.where(s > 0)
-    return pd.DataFrame(cols).sort_index()
+        # a site can return several series (e.g. per method): keep its fullest one
+        vals = max((v["value"] for v in ts["values"]), key=len, default=[])
+        s = pd.Series({pd.Timestamp(v["dateTime"][:10]): float(v["value"]) for v in vals}, dtype=float)
+        s = s.where(s > 0)  # USGS marks missing values with negative sentinels
+        name = GAUGES[site][0]
+        if name not in cols or s.count() > cols[name].count():
+            cols[name] = s
+    df = pd.DataFrame(cols).sort_index()
+    print("    rivers: days per gauge", df.count().to_dict(), flush=True)
+    return df
 
 
 def prepare_rivers(daily: pd.DataFrame) -> pd.DataFrame:
     weekly = np.log(daily.resample("W-FRI").mean())
-    return seasonal_anomaly(weekly)  # log-flow anomaly: wetter or drier than usual for the week
+    # drop gauges that miss more than a tenth of the weeks, then keep weeks where all report
+    weekly = weekly.loc[:, weekly.notna().mean() >= 0.9]
+    return seasonal_anomaly(weekly.dropna())  # log-flow anomaly: wetter or drier than usual for the week
 
 
 # ---------------------------------------------------------------------------------------------
@@ -257,11 +271,11 @@ def fetch_climate() -> pd.DataFrame:
     cols = {}
     for city, (lat, lon, _) in CITIES.items():
         url = ("https://archive-api.open-meteo.com/v1/archive?"
-               f"latitude={lat}&longitude={lon}&start_date=1990-01-01&end_date={end:%Y-%m-%d}"
+               f"latitude={lat}&longitude={lon}&start_date=1995-01-01&end_date={end:%Y-%m-%d}"
                "&daily=temperature_2m_mean&timezone=UTC")
-        d = json.loads(get(url, timeout=120))["daily"]
+        d = json.loads(get(url, timeout=120, tries=6))["daily"]
         cols[city] = pd.Series(d["temperature_2m_mean"], index=pd.to_datetime(d["time"]), dtype=float)
-        time.sleep(1.0)
+        time.sleep(15)  # the free tier weighs long histories heavily: stay well under its rate limit
     return pd.DataFrame(cols)
 
 
