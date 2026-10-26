@@ -857,8 +857,20 @@ svg {
 
 /* ---- network ---- */
 .network-host {
-  max-width: 680px;
+  max-width: 720px;
   margin: 0 auto;
+}
+
+.net-side {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.legend .arrowkey {
+  width: 30px;
+  height: 10px;
+  background: var(--bead-ink);
+  clip-path: polygon(0 40%, 70% 40%, 70% 0, 100% 50%, 70% 100%, 70% 60%, 0 60%);
 }
 
 /* graph 2: the network and its node values in one card */
@@ -926,8 +938,13 @@ svg {
 }
 
 .node-label {
-  font-size: 13px;
+  font-size: 12px;
   fill: var(--fg);
+  paint-order: stroke;
+  stroke: var(--panel);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: none;
 }
 
 .region-arc {
@@ -941,7 +958,7 @@ svg {
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.12em;
-  fill: var(--muted);
+  fill: var(--fg);
   paint-order: stroke;
   stroke: var(--panel);
   stroke-width: 4px;

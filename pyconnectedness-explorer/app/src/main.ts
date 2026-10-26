@@ -75,11 +75,9 @@ app.innerHTML = `
       <div class="graph2-net">
         <div id="network" class="chart-host network-host"></div>
         <div class="legend">
-          <span><i class="dot solid"></i>Solid: passes on more than it takes</span>
-          <span><i class="dot ring"></i>Ring: takes more than it passes on</span>
-          <span>Colour: its region; an arrow wears its sender's</span>
-          <span><i class="taper"></i>Arrow narrows toward the receiver; width = size of the flow</span>
-          <span><i class="sizes"><b></b><b></b><b></b></i>Circle size = |net|</span>
+          <span title="PyConnectedness: net"><i class="dot solid"></i>Height: net position · solid above the line, ring below</span>
+          <span title="PyConnectedness: pairwise_net"><i class="arrowkey"></i>Line: from sender to receiver · thicker = stronger</span>
+          <span>Colour: region</span>
         </div>
       </div>
       <div class="graph2-side">
@@ -262,7 +260,7 @@ async function main() {
   $("measure").innerHTML = measures.map((k) => `<button data-measure="${k}">${mName(k)}</button>`).join("");
   $("measure").hidden = measures.length < 2;
   $("side-title").innerHTML = `Net connectedness by ${ds.item} <code>net</code>`;
-  $("side-sub").textContent = `What each ${ds.item} gives minus what it takes, in pp: the network's circle sizes, as bars.`;
+  $("side-sub").textContent = `What each ${ds.item} gives minus what it takes, in pp: the map's heights, as bars.`;
 
   const dm = meta.dynamic.returns;
   $("footer").innerHTML = `
@@ -322,11 +320,9 @@ async function main() {
     // charts
     renderTimeline(s, p);
 
-    $("network-sub").innerHTML = `${mName(m)}, ${frame.label.replace(/^Full/, "full")}: an arrow from each net
-      transmitter to each net receiver, for the strongest 10% of pairs ("net pairwise connectedness").
-      ${REGION_ORDER.length > 1 ? `${ds.items.charAt(0).toUpperCase() + ds.items.slice(1)} are grouped (${REGION_ORDER.join(" · ")}); ` : ""}Sizes use one scale across all ${ds.steps}.`;
+    $("network-sub").textContent = `The strongest 10% of flows, ${frame.label.toLowerCase().startsWith("full") ? "over the " : "in the "}${frame.label.replace(/^Full/, "full")}: higher ${ds.items} pass on more, lines run downhill to who takes it in.`;
     renderNetReadout(s, frame);
-    network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion, s.pair);
+    network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion, s.pair, readBeadColors().ink);
     ranking.render(frame, p, model.maxNet[m], focus, s.selected, motion);
     $("heatmap-sub").textContent = `Each pair once, in the row of the ${ds.item} that passes more to the other, ${frame.label.toLowerCase().startsWith("full") ? "over the " : "in the "}${frame.label.replace(/^Full/, "full")}.`;
     heatmap.render(frame, p, model.maxPair[m], focus, s.pair, (n) => hueOfNow(n), p.band);
