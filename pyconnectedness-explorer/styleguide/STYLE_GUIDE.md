@@ -119,9 +119,11 @@ The short/medium/long-term ramp of each is an ordinal ramp in the painting's ink
 with `--ordinal`. The highlight is each painting's focal colour, as the sun is Monet's: the eye
 goes there first, so it marks what you picked.
 
-**WCAG AAA, text included.** Every text token clears 7:1 on every surface of every palette, light
-and dark (secondary `#3b3834` / `#d9d6d0`, muted `#4a4843` / `#b8b5b0`); hierarchy comes from size
-and weight, not paler greys. No text ever sits on a data colour or on the highlight: picked
+**All text is one stone grey** (`#4a4843` light, `#b8b5b0` dark), 7:1 on every surface of every
+palette (WCAG AAA): titles, labels, axes, legends, buttons. Hierarchy comes from size and weight
+only. **Colour is saved for the visuals and the big numbers**: the readout's large values (20px
+bold, so 4.5:1 is the AAA bar) wear their region's colour, deepened (lifted in dark) just enough to
+clear it; the index value wears the index's ink. No text ever sits on a data colour or on the highlight: picked
 buttons and the date tag are ink with panel-coloured text, the highlight only rings what's picked
 (>= 3:1 against card and page; Monet's sun and Van Gogh's yellow were deepened to clear it). Faded
 context fades marks, never labels. Numbers live in ink next to coloured marks, not inside them.

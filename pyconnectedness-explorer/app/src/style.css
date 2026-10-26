@@ -5,11 +5,13 @@
 :root {
   --bg: #f8f7f0;
   --panel: #ffffff;
-  --fg: #111111;
-  /* WCAG AAA: every text token clears 7:1 on every surface of every palette (palettes.ts);
-     hierarchy comes from size and weight, not from paler greys */
-  --secondary: #3b3834;
-  --muted: #4a4843;
+  /* All text is one stone grey that clears 7:1 (WCAG AAA) on every surface of every palette:
+     hierarchy comes from size and weight only. Colour is saved for the charts and the big
+     numbers. --fg, --secondary and --muted are kept as names so nothing drifts, all the stone. */
+  --stone: #4a4843;
+  --fg: var(--stone);
+  --secondary: var(--stone);
+  --muted: var(--stone);
   --line: rgba(17, 17, 17, 0.08);
   --grid: #eeede8;
   --axis: #d3d3d2;
@@ -49,9 +51,10 @@
 :root[data-theme="dark"] {
   --bg: #13120f;
   --panel: #1c1b18;
-  --fg: #f3f1ec;
-  --secondary: #d9d6d0;
-  --muted: #b8b5b0;
+  --stone: #b8b5b0;
+  --fg: var(--stone);
+  --secondary: var(--stone);
+  --muted: var(--stone);
   --line: rgba(255, 255, 255, 0.08);
   --grid: #2a2926;
   --axis: #3d3c38;
@@ -475,8 +478,9 @@ main {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--panel);
-  background: var(--fg);
+  color: var(--stone);
+  background: var(--panel);
+  box-shadow: inset 0 0 0 1.5px var(--stone);
 }
 
 .ro-stats {
@@ -511,8 +515,9 @@ main {
   background: transparent;
 }
 
+/* the big numbers: large text (>= 18.66px bold), so 4.5:1 is the AAA bar and they may wear colour */
 .ro-value {
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 700;
   line-height: 1.3;
   letter-spacing: -0.01em;
@@ -836,11 +841,13 @@ svg {
   color: var(--fg);
 }
 
+/* pressed: the same stone text, bolder, on the pale fill with a stone edge (text stays stone) */
 .windows button[aria-pressed="true"],
 .tabs button[aria-selected="true"] {
-  background: var(--fg);
-  border-color: var(--fg);
-  color: var(--panel);
+  background: var(--band);
+  border: 2px solid var(--stone);
+  color: var(--stone);
+  font-weight: 800;
 }
 
 /* the picked step: ink like every pressed button, ringed in the highlight colour */

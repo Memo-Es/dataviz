@@ -10,7 +10,7 @@ import { HeatmapChart } from "./charts/heatmap";
 import { sparkline } from "./charts/sparkline";
 import { bandCopy } from "./charts/frequency";
 import { loadUpload, runUpload, saveUpload } from "./upload/upload";
-import { PALETTES, applyPalette } from "./palettes";
+import { PALETTES, applyPalette, textSafe } from "./palettes";
 import { hueOf as hueOfNow } from "./encoding";
 
 
@@ -160,6 +160,12 @@ async function main() {
     });
   };
   paint(palette, theme);
+  // a region colour as big-number text: deepened (lifted, in dark) to >= 4.6:1, the AAA bar for large text
+  const bigHue = (n: string) => {
+    const p = readPalette();
+    const bg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+    return textSafe(hueOfNow(n), [p.panel, p.band, bg], store.get().theme === "dark");
+  };
 
   const store = new Store({
     measure: "returns",
@@ -407,9 +413,9 @@ async function main() {
   function renderNetReadout(s: State, f: ReturnType<Model["frame"]>) {
     const el = $("net-readout");
     const name = s.hovered ?? s.selected;
-    const stat = (label: string, field: string, value: string, sub: string, cls = "") =>
-      `<div class="ro-stat"><span class="ro-label">${label}${field ? ` <code>${field}</code>` : ""}</span>
-        <span class="ro-value ${cls}">${value}</span><span class="ro-sub">${sub}</span></div>`;
+    const stat = (label: string, field: string, value: string, sub: string, cls = "", color = "") =>
+      `<div class="ro-stat"><span class="ro-label"${field ? ` title="PyConnectedness: ${field}"` : ""}>${label}</span>
+        <span class="ro-value ${cls}"${color ? ` style="color:${color}"` : ""}>${value}</span><span class="ro-sub">${sub}</span></div>`;
     if (name) {
       const i = names.indexOf(name);
       const links = f.matrix[i].filter((v) => Math.abs(v) > f.threshold);
@@ -417,9 +423,9 @@ async function main() {
       el.innerHTML = `
         <p class="ro-when">${s.hovered && s.hovered !== s.selected ? `<span class="ro-tag">Hover</span>` : ""}${name} <span class="ro-hint">· ${REGION_OF[name]} · ${f.label}</span></p>
         <div class="ro-stats">
-          ${stat("Gives to others", "directional_to", `<span class="num">${f.to[i].toFixed(1)}</span>`, "pp of others' variance")}
-          ${stat("Takes from others", "directional_from", `<span class="num">${f.from[i].toFixed(1)}</span>`, "pp of its own variance")}
-          ${stat("Net position", "net", `<span class="num">${fmtSigned(f.net[i])}</span>`, f.net[i] >= 0 ? "a net transmitter" : "a net receiver", f.net[i] >= 0 ? "send" : "recv")}
+          ${stat("Gives to others", "directional_to", `<span class="num">${f.to[i].toFixed(1)}</span>`, "pp of others' variance", "", bigHue(name))}
+          ${stat("Takes from others", "directional_from", `<span class="num">${f.from[i].toFixed(1)}</span>`, "pp of its own variance", "", bigHue(name))}
+          ${stat("Net position", "net", `<span class="num">${fmtSigned(f.net[i])}</span>`, f.net[i] >= 0 ? "a net transmitter" : "a net receiver", f.net[i] >= 0 ? "send" : "recv", bigHue(name))}
           ${stat("Links drawn", "", `<span class="num">${links.length}</span>`, `${out} out, ${links.length - out} in`)}
         </div>`;
     } else {
@@ -591,9 +597,9 @@ async function main() {
       : s.window === "t"
         ? `${week(s.t)} <span class="ro-hint">· the ${dyn.window} ${ds.steps} up to it</span>`
         : f.label;
-    const stat = (label: string, field: string, value: string, sub: string, cls = "") =>
+    const stat = (label: string, field: string, value: string, sub: string, cls = "", color = "") =>
       `<div class="ro-stat"><span class="ro-label" title="PyConnectedness: ${field}">${label}</span>
-        <span class="ro-value ${cls}">${value}</span><span class="ro-sub">${sub}</span></div>`;
+        <span class="ro-value ${cls}"${color ? ` style="color:${color}"` : ""}>${value}</span><span class="ro-sub">${sub}</span></div>`;
     const el = $("readout");
     el.classList.toggle("preview", preview);
     el.innerHTML = `
@@ -604,11 +610,12 @@ async function main() {
           "total",
           `<span class="num">${f.total.toFixed(1)}%</span>`,
           f.key === "full" ? "the long-run level" : `<span class="num">${fmtSigned(diff)}</span> pp vs full sample`,
-          f.key === "full" ? "" : diff >= 0 ? "up" : "down" // nothing to compare the full sample with
+          f.key === "full" ? "" : diff >= 0 ? "up" : "down", // nothing to compare the full sample with
+          "var(--bead-ink)" // the index's own colour, as its beads
         )}
-        ${stat("Top net transmitter", "net", top.n, `<span class="num">${fmtSigned(top.v)}</span> pp`, "send")}
-        ${stat("Top net receiver", "net", bottom.n, `<span class="num">${fmtSigned(bottom.v)}</span> pp`, "recv")}
-        ${stat("Strongest link", "pairwise_net", `${names[link.s]} → ${names[link.r]}`, `<span class="num">${link.v.toFixed(2)}</span> pp`)}
+        ${stat("Top net transmitter", "net", top.n, `<span class="num">${fmtSigned(top.v)}</span> pp`, "send", bigHue(top.n))}
+        ${stat("Top net receiver", "net", bottom.n, `<span class="num">${fmtSigned(bottom.v)}</span> pp`, "recv", bigHue(bottom.n))}
+        ${stat("Strongest link", "pairwise_net", `${names[link.s]} → ${names[link.r]}`, `<span class="num">${link.v.toFixed(2)}</span> pp`, "", bigHue(names[link.s]))}
       </div>
       ${speedLine(s, preview)}`;
     tightenDecimals(el, ".num");
@@ -729,6 +736,7 @@ async function main() {
   $("palette").innerHTML =
     PALETTES.map((x) => `<option value="${x.id}">${x.painter} · ${x.painting.split(" (")[0]}, ${x.year}</option>`).join("") +
     `<option value="agam">Agam (the first look)</option>`;
+  $<HTMLSelectElement>("palette").value = store.get().palette;
   $("palette").addEventListener("change", (ev) => {
     const id = (ev.target as HTMLSelectElement).value;
     try {

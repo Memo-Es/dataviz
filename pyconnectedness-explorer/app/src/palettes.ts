@@ -133,6 +133,20 @@ function lum(hex: string) {
   return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 }
 export const inkOn = (hex: string) => (lum(hex) > 0.3 ? "#141414" : "#ffffff");
+const ratio = (a: string, b: string) => {
+  const [h, l] = [lum(a), lum(b)].sort((x, y) => y - x);
+  return (h + 0.05) / (l + 0.05);
+};
+const mix = (hex: string, to: number, t: number) =>
+  "#" + [1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - t) + to * t).toString(16).padStart(2, "0")).join("");
+
+/** A data colour deepened (or, in dark mode, lifted) just enough to be large text: >= 4.6:1
+ * against every surface given, the AAA bar for big numbers. */
+export function textSafe(hex: string, surfaces: string[], dark: boolean, min = 4.6) {
+  let out = hex;
+  for (let t = 0; t <= 1 && Math.min(...surfaces.map((s) => ratio(out, s))) < min; t += 0.02) out = mix(hex, dark ? 255 : 0, t);
+  return out;
+}
 
 const VARS = ["--bg", "--panel", "--band", "--bead-ink", "--accent", "--accent-ink", "--accent-wash", "--band-fast", "--band-mid", "--band-slow", "--band-fast-ink", "--band-mid-ink", "--band-slow-ink", "--send", "--recv", ...[1, 2, 3, 4, 5, 6, 7, 8].map((i) => `--bead-${i}`)];
 

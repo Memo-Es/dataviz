@@ -413,7 +413,7 @@ export class BeadsChart {
       const label = `${dyn.total[t].toFixed(1)}% · ${fmtDate(dates[t])}`;
       const lw = label.length * 7.8 + 18;
       const lx = Math.min(Math.max(x - lw / 2, M.left), M.left + this.plotW - lw);
-      svg.append("rect").attr("x", lx).attr("y", 4).attr("width", lw).attr("height", 22).attr("rx", 11).attr("fill", p.fg); // ink pill: text never sits on the highlight (AAA)
+      svg.append("rect").attr("x", lx).attr("y", 4).attr("width", lw).attr("height", 22).attr("rx", 11).attr("fill", p.panel).attr("stroke", p.accent).attr("stroke-width", 2); // stone text on the card, ringed in the highlight
       svg
         .append("text")
         .attr("class", "cursor-label")
@@ -421,7 +421,7 @@ export class BeadsChart {
         .attr("y", 15)
         .attr("dy", "0.35em")
         .attr("text-anchor", "middle")
-        .style("fill", "var(--panel)")
+        .style("fill", "var(--stone)")
         .text(label);
     }
     tightenDecimals(svg.node()!, ".axis-label, .cursor-label");
