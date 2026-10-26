@@ -119,6 +119,16 @@ The short/medium/long-term ramp of each is an ordinal ramp in the painting's ink
 with `--ordinal`. The highlight is each painting's focal colour, as the sun is Monet's: the eye
 goes there first, so it marks what you picked.
 
+**WCAG AAA, text included.** Every text token clears 7:1 on every surface of every palette, light
+and dark (secondary `#3b3834` / `#d9d6d0`, muted `#4a4843` / `#b8b5b0`); hierarchy comes from size
+and weight, not paler greys. No text ever sits on a data colour or on the highlight: picked
+buttons and the date tag are ink with panel-coloured text, the highlight only rings what's picked
+(>= 3:1 against card and page; Monet's sun and Van Gogh's yellow were deepened to clear it). Faded
+context fades marks, never labels. Numbers live in ink next to coloured marks, not inside them.
+Every control is at least 44 x 44 px, focus shows a 3px ink ring, and paragraphs stop at 75
+characters with 1.5 line spacing. Chart marks (rows, circles, dots) are smaller than 44 px; the
+same picks are available as 44 px buttons in the detail panel.
+
 The table below is the original pair, still used by the matplotlib recipes in this guide.
 
 

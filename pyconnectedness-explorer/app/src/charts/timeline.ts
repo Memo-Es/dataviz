@@ -307,7 +307,7 @@ export class TimelineChart {
       const lw = label.length * 7.8 + 18; // B612 Mono: ~0.65em per glyph at 12px bold
       const lx = Math.min(Math.max(cx - lw / 2, M.left), W - this.right - lw);
       const ly = cy - 34 < M.top ? cy + 12 : cy - 34;
-      svg.append("rect").attr("x", lx).attr("y", ly).attr("width", lw).attr("height", 22).attr("rx", 11).attr("fill", p.accent);
+      svg.append("rect").attr("x", lx).attr("y", ly).attr("width", lw).attr("height", 22).attr("rx", 11).attr("fill", p.fg); // ink pill: text never sits on the highlight (AAA)
       svg
         .append("text")
         .attr("class", "cursor-label")
@@ -315,7 +315,7 @@ export class TimelineChart {
         .attr("y", ly + 11)
         .attr("dy", "0.35em")
         .attr("text-anchor", "middle")
-        .style("fill", "var(--accent-ink)")
+        .style("fill", "var(--panel)")
         .text(label);
     }
     tightenDecimals(this.svg.node()!, ".axis-label, .row-value, .cursor-label, .band-label, .mono");

@@ -66,7 +66,7 @@ export const PALETTES: Palette[] = [
     light: {
       bg: "#eeeeea", panel: "#fbfaf7", base: "#e9e8e3", ink: "#1f2a3a",
       hues: ["#1e52ae", "#009d90", "#886dbd", "#b98711", "#a23c57", "#5c8f45", "#467cbe", "#7a3d7a"],
-      accent: "#e0601c", ramp: ["#26364f", "#566a88", "#97a7bf"],
+      accent: "#dc5d17", ramp: ["#26364f", "#566a88", "#97a7bf"],
     },
     dark: {
       bg: "#121418", panel: "#1b1d22", base: "#262932", ink: "#e7e9ef",
@@ -100,7 +100,7 @@ export const PALETTES: Palette[] = [
     light: {
       bg: "#efece0", panel: "#fbf9f2", base: "#ebe6d4", ink: "#141c3a",
       hues: ["#3352a2", "#ba3d09", "#198b5f", "#bd74ce", "#898825", "#5090d1", "#b64368", "#c58009"],
-      accent: "#e0a81c", ramp: ["#1f2a52", "#4f5c8a", "#929cc0"],
+      accent: "#a57900", ramp: ["#1f2a52", "#4f5c8a", "#929cc0"],
     },
     dark: {
       bg: "#0e1120", panel: "#171a26", base: "#232738", ink: "#ece9dc",

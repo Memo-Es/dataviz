@@ -75,7 +75,11 @@ export class RankingChart {
     // rows slide to their new rank instead of jumping
     tr(g).attr("transform", (_d: unknown, i: number) => `translate(0,${4 + i * ROW})`);
     g.attr("aria-label", (d) => `${d.name}: net ${fmtSigned(d.v)} percentage points`)
-      .style("opacity", (d) => (focus && focus !== d.name ? 0.45 : 1));
+      // fade the bar, not the row's text (WCAG AAA keeps every label at 7:1)
+      .style("opacity", null)
+      .each(function (d) {
+        d3.select(this).select("rect.bar").style("opacity", focus && focus !== d.name ? 0.35 : 1);
+      });
     g.select("rect.row-bg")
       .attr("x", 0)
       .attr("width", W)

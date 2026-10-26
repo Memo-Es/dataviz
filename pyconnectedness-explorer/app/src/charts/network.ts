@@ -221,7 +221,10 @@ export class NetworkChart {
       });
 
     nodes.attr("aria-label", (d) => `${d.name}, net ${fmtSigned(frame.net[d.idx])} percentage points`);
-    nodes.style("opacity", (d) => ((focusIdx < 0 && !pairIdx) || linked.has(d.idx) ? 1 : 0.28));
+    // fade the circles that aren't linked, never their names: text keeps its 7:1 (WCAG AAA)
+    const lit = (d: Pos) => (focusIdx < 0 && !pairIdx) || linked.has(d.idx);
+    nodes.style("opacity", null);
+    nodes.select<SVGCircleElement>("circle.dot").style("opacity", (d) => (lit(d) ? 1 : 0.28));
     nodes
       .select<SVGCircleElement>("circle.hit")
       .attr("cx", (d) => d.x)

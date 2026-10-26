@@ -6,8 +6,10 @@
   --bg: #f8f7f0;
   --panel: #ffffff;
   --fg: #111111;
-  --secondary: #4a4946;
-  --muted: #8c8882;
+  /* WCAG AAA: every text token clears 7:1 on every surface of every palette (palettes.ts);
+     hierarchy comes from size and weight, not from paler greys */
+  --secondary: #3b3834;
+  --muted: #4a4843;
   --line: rgba(17, 17, 17, 0.08);
   --grid: #eeede8;
   --axis: #d3d3d2;
@@ -48,8 +50,8 @@
   --bg: #13120f;
   --panel: #1c1b18;
   --fg: #f3f1ec;
-  --secondary: #c9c5bc;
-  --muted: #8f8a82;
+  --secondary: #d9d6d0;
+  --muted: #b8b5b0;
   --line: rgba(255, 255, 255, 0.08);
   --grid: #2a2926;
   --axis: #3d3c38;
@@ -473,8 +475,8 @@ main {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--accent-ink);
-  background: var(--accent);
+  color: var(--panel);
+  background: var(--fg);
 }
 
 .ro-stats {
@@ -841,10 +843,9 @@ svg {
   color: var(--panel);
 }
 
+/* the picked step: ink like every pressed button, ringed in the highlight colour */
 .windows button:first-child[aria-pressed="true"] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-ink);
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent);
 }
 
 /* ---- network ---- */
@@ -1222,7 +1223,19 @@ svg {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--secondary);
+}
+
+/* the highlight colour marks the question, as a bar; text never sits in it (AAA) */
+.q::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 3px;
+  margin-right: 8px;
+  vertical-align: 3px;
+  border-radius: 2px;
+  background: var(--accent);
 }
 
 .card h2 .tag {
@@ -1559,4 +1572,37 @@ svg {
   .topbar .select.small select {
     max-width: 150px;
   }
+}
+
+/* ---- WCAG AAA ---- */
+/* 2.4.13 focus appearance: a 3px ink ring, offset, on everything you can reach by keyboard */
+:focus-visible {
+  outline: 3px solid var(--fg);
+  outline-offset: 2px;
+}
+
+/* 2.5.5 target size: every control is at least 44 x 44 px */
+.segmented button,
+.windows button,
+.beads-regions button,
+.file-btn,
+.select select,
+.empty button,
+.tabs button {
+  min-height: 44px;
+}
+
+.icon-btn,
+.play {
+  width: 44px;
+  height: 44px;
+}
+
+/* 1.4.8 visual presentation: lines no longer than about 80 characters, 1.5 line spacing */
+.sub,
+.lede,
+.footer p,
+.side-sub {
+  max-width: 75ch;
+  line-height: 1.5;
 }

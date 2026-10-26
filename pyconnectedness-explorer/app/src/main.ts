@@ -555,7 +555,8 @@ async function main() {
     const segs = fb.bands
       .map((b) => {
         const c = bandCopy(b.label);
-        return `<span class="seg ${c.cls}" style="flex:${b.total}" title="${c.name}, ${c.phrase}: ${b.total.toFixed(1)} pp"><b class="num">${b.total.toFixed(1)}</b></span>`;
+        // no number inside: the legend under the bar carries it, in ink (AAA)
+        return `<span class="seg ${c.cls}" style="flex:${b.total}" title="${c.name}, ${c.phrase}: ${b.total.toFixed(1)} pp"></span>`;
       })
       .join("");
     const words = fb.bands
