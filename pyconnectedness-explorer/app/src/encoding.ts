@@ -50,31 +50,43 @@ export function diverging(maxAbs: number, p: Palette) {
     .clamp(true);
 }
 
-export const REGION_ORDER = ["Americas", "Europe", "Asia Pacific"] as const;
-export type Region = (typeof REGION_ORDER)[number];
+// Groups (regions, sectors, river basins...) and event dates belong to the picked dataset. They're
+// filled once at start-up by setDatasetEncoding(); switching dataset reloads the page.
+export type Region = string;
+export const REGION_ORDER: string[] = [];
+export const REGION_OF: Record<string, Region> = {};
+export const EPISODE_LABELS: Record<string, string> = {};
 
-export const REGION_OF: Record<string, Region> = {
-  US: "Americas", Canada: "Americas", Mexico: "Americas", Brazil: "Americas", Argentina: "Americas",
-  UK: "Europe", Germany: "Europe", France: "Europe", Switzerland: "Europe", Spain: "Europe", Turkey: "Europe",
-  Japan: "Asia Pacific", "South Korea": "Asia Pacific", China: "Asia Pacific", "Hong Kong": "Asia Pacific",
-  Taiwan: "Asia Pacific", Singapore: "Asia Pacific", Malaysia: "Asia Pacific", Indonesia: "Asia Pacific",
-  Australia: "Asia Pacific",
-};
+/** The dataset's time step and its words: "week"/"weeks", "day"/"days", "month"/"months". */
+export const STEP = { step: "week" as "day" | "week" | "month", steps: "weeks" };
 
-/** Market names grouped by region, notebook order kept inside each region. */
-export function regionOrder(names: string[]): string[] {
-  return REGION_ORDER.flatMap((r) => names.filter((n) => REGION_OF[n] === r));
+export function setDatasetEncoding(
+  groups: Record<string, string>,
+  order: string[],
+  episodes: Record<string, string>,
+  step: "day" | "week" | "month",
+  steps: string
+) {
+  Object.assign(REGION_OF, groups);
+  REGION_ORDER.splice(0, REGION_ORDER.length, ...order);
+  Object.assign(EPISODE_LABELS, episodes);
+  STEP.step = step;
+  STEP.steps = steps;
 }
 
-/** The notebook's own comments on cell 15's episode dates. */
-export const EPISODE_LABELS: Record<string, string> = {
-  "2001-09-30": "Dot-com",
-  "2008-10-31": "Lehman",
-  "2011-09-30": "Euro-area crisis",
-  "2015-08-31": "China devaluation",
-  "2020-03-31": "COVID crash",
-  "2022-09-30": "Inflation shock",
-};
+/** One time step, as a reader would name it: "week of 4 Sep 2026", "4 Sep 2026", "Sep 2026". */
+export function fmtStep(iso: string, capital = true): string {
+  const d = parseDate(iso)!;
+  const s =
+    STEP.step === "month" ? d3.utcFormat("%b %Y")(d) : STEP.step === "day" ? fmtDate(d) : `week of ${fmtDate(d)}`;
+  return capital ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
+/** Item names grouped (by region, sector, basin...), the data's own order kept inside each group. */
+export function regionOrder(names: string[]): string[] {
+  const known = REGION_ORDER.flatMap((r) => names.filter((n) => REGION_OF[n] === r));
+  return known.concat(names.filter((n) => !known.includes(n)));
+}
 
 export const fmtPct = (v: number, digits = 1) => `${v.toFixed(digits)}%`;
 export const fmtSigned = (v: number, digits = 1) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(digits)}`;

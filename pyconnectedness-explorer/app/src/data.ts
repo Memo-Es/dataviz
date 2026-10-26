@@ -78,14 +78,45 @@ export interface ExplorerData {
 
 const DATA_BASE = `${import.meta.env.BASE_URL}data/`;
 
-export async function loadExplorerData(): Promise<ExplorerData> {
+/** One entry of data/datasets.json (pipeline/datasets/sources.py DESCRIPTORS): what a dataset is,
+ * where it comes from, and the words the page uses for it. */
+export interface Dataset {
+  id: string;
+  dir: string;
+  title: string;
+  headline: string;
+  items: string; // "stock markets", "currencies"...
+  item: string; // "market", "currency"...
+  source: string;
+  api: string;
+  api_url: string;
+  step: "day" | "week" | "month";
+  steps: string;
+  series: string;
+  built_by: string;
+  measures: Partial<Record<Measure, string>>; // measure key -> its name on the page
+  episodes: Record<string, string>; // ISO date -> label
+  groups: Record<string, string>;
+  group_order: string[];
+  labels: Record<string, string>; // item -> longer label (index name, ticker...)
+}
+
+export async function loadDatasets(): Promise<Dataset[]> {
+  const r = await fetch(`${DATA_BASE}datasets.json`);
+  if (!r.ok) throw new Error(`datasets.json: ${r.status}`);
+  return r.json();
+}
+
+export async function loadExplorerData(ds: Dataset): Promise<ExplorerData> {
+  const base = `${DATA_BASE}${ds.dir}`;
+  const hasVol = "volatility" in ds.measures;
   const [meta, returnsBuf, volBuf] = await Promise.all([
-    fetch(`${DATA_BASE}connectedness.json`).then((r) => {
-      if (!r.ok) throw new Error(`connectedness.json: ${r.status}`);
+    fetch(`${base}connectedness.json`).then((r) => {
+      if (!r.ok) throw new Error(`${ds.id}/connectedness.json: ${r.status}`);
       return r.json() as Promise<ConnectednessMeta>;
     }),
-    fetch(`${DATA_BASE}pairwise_returns.f32`).then((r) => r.arrayBuffer()),
-    fetch(`${DATA_BASE}pairwise_volatility.f32`).then((r) => r.arrayBuffer()),
+    fetch(`${base}pairwise_returns.f32`).then((r) => r.arrayBuffer()),
+    hasVol ? fetch(`${base}pairwise_volatility.f32`).then((r) => r.arrayBuffer()) : Promise.resolve(new ArrayBuffer(0)),
   ]);
 
   const k = meta.names.length;
@@ -127,7 +158,7 @@ export function totalAt(data: ExplorerData, measure: Measure, t: number): number
  * finding 5 requires (node size / edge width must not rescale frame to frame). */
 export function globalMaxAbsNet(data: ExplorerData, measure: Measure): number {
   let m = 0;
-  for (const row of data.meta.dynamic[measure].net) {
+  for (const row of data.meta.dynamic[measure]?.net ?? []) {
     for (const v of row) m = Math.max(m, Math.abs(v));
   }
   return m;

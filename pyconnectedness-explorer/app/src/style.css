@@ -224,25 +224,100 @@ main {
   padding: 0 16px 40px;
 }
 
-/* the dataset, above everything: the one table every graph is computed from */
-.dataset {
-  margin: 28px 0 0;
-  padding: 20px 24px;
+/* the top: pick a dataset, and the picked dataset's panel (title included) hangs off its tab */
+.top {
+  margin: 28px 0 8px;
+}
+
+.ds-pick .q {
+  margin-bottom: 8px;
+}
+
+.ds-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto; /* seven tabs scroll sideways on a phone; the page itself doesn't */
+  scrollbar-width: none;
+}
+
+.ds-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1 0 auto;
+  min-width: 128px;
+  padding: 10px 14px 12px;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+  background: transparent;
+  color: var(--secondary);
+  text-decoration: none;
+}
+
+.ds-tab b {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ds-tab span {
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.ds-tab:hover {
+  background: var(--panel);
+  color: var(--fg);
+}
+
+.ds-tab[aria-current="true"] {
+  position: relative;
+  background: var(--panel);
+  color: var(--fg);
+  border-color: var(--line);
+  box-shadow: inset 0 3px 0 var(--accent);
+}
+
+/* the selected tab joins the panel: no line between them */
+.ds-tab[aria-current="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
   background: var(--panel);
 }
 
-.dataset h2 {
-  margin: 0 0 12px;
-  font-size: 19px;
-  font-weight: 700;
+.ds-panel {
+  padding: 26px 28px 24px;
+  border: 1px solid var(--line);
+  border-radius: 0 0 var(--radius) var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.ds-source {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ds-source a {
+  color: var(--secondary);
+}
+
+.ds-panel h1 {
+  margin: 0;
+  max-width: 980px;
+  font: 500 clamp(26px, 3.2vw, 40px) / 1.15 var(--f-serif);
   letter-spacing: -0.015em;
 }
 
-.ds-src {
-  font-weight: 500;
-  color: var(--muted);
+.ds-panel .lede {
+  margin: 12px 0 20px;
 }
 
 .ds-facts {
@@ -250,6 +325,8 @@ main {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px 20px;
   margin: 0 0 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
 }
 
 .ds-facts dt,
@@ -267,7 +344,7 @@ main {
 
 .ds-regions {
   display: grid;
-  grid-template-columns: 5fr 6fr 9fr;
+  grid-template-columns: repeat(var(--groups, 3), minmax(0, 1fr));
   gap: 16px;
   padding-top: 14px;
   border-top: 1px solid var(--line);
@@ -295,13 +372,11 @@ main {
   color: var(--fg);
 }
 
-.ds-any {
-  margin: 14px 0 0;
-  font-size: 13.5px;
-  color: var(--secondary);
-}
-
 @media (max-width: 960px) {
+  .ds-panel {
+    padding: 20px 18px;
+  }
+
   .ds-facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -311,10 +386,6 @@ main {
   }
 }
 
-.hero {
-  padding: 48px 0 28px;
-}
-
 .eyebrow {
   margin: 0 0 10px;
   font-size: 12px;
@@ -322,13 +393,6 @@ main {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
-}
-
-.hero h1 {
-  margin: 0;
-  max-width: 980px;
-  font: 500 clamp(26px, 3.6vw, 44px) / 1.15 var(--f-serif);
-  letter-spacing: -0.015em;
 }
 
 .hl {
@@ -1138,55 +1202,6 @@ svg {
   font-size: 11px;
 }
 
-/* the three questions in the intro, as links to their graphs */
-.questions {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin: 24px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.questions a {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  height: 100%;
-  padding: 14px 16px 14px 48px;
-  position: relative;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--panel);
-  font-size: 15px;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.questions a:hover {
-  border-color: var(--axis);
-}
-
-.questions em {
-  font-style: normal;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--muted);
-}
-
-.qn {
-  position: absolute;
-  left: 16px;
-  top: 14px;
-  font: 700 15px var(--f-num);
-  color: var(--accent);
-}
-
-@media (max-width: 760px) {
-  .questions {
-    grid-template-columns: 1fr;
-  }
-}
 
 .speed-bar {
   display: flex;
@@ -1306,10 +1321,6 @@ svg {
 @media (max-width: 560px) {
   .brand span {
     display: none;
-  }
-
-  .hero {
-    padding-top: 28px;
   }
 
   .card {

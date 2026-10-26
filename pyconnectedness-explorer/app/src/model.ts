@@ -13,7 +13,7 @@ import {
   matrixAt,
   staticBlock,
 } from "./data";
-import { fmtDate, parseDate, percentile } from "./encoding";
+import { STEP, fmtDate, fmtStep, parseDate, percentile } from "./encoding";
 
 export type WindowKey = StaticWindow; // "t" = the rolling week picked on the timeline
 
@@ -69,11 +69,14 @@ export interface WindowOption {
 
 export function windowOptions(data: ExplorerData, measure: Measure): WindowOption[] {
   const blocks = data.meta.static[measure] as Record<string, { label: string; start: string; end: string }>;
-  const out: WindowOption[] = [{ key: "t", label: "Selected week" }];
+  const out: WindowOption[] = [{ key: "t", label: `Selected ${STEP.step}` }];
+  const window = data.meta.dynamic[measure].window;
   for (const key of ["full", "last200", "p1", "p2", "p3", "p4"] as const) {
     const b = blocks[key];
     if (!b) continue;
-    out.push({ key, label: key === "full" ? "Full sample" : key === "last200" ? "Last 200 weeks" : `${b.start}–${b.end}` });
+    // the demo's periods carry plain years ("1997"); the API datasets' carry dates and a label
+    const period = /^\d{4}$/.test(b.start) ? `${b.start}–${b.end}` : b.label;
+    out.push({ key, label: key === "full" ? "Full sample" : key === "last200" ? `Last ${window} ${STEP.steps}` : period });
   }
   return out;
 }
@@ -83,6 +86,7 @@ export class Model {
   readonly maxPair: Record<Measure, number>;
 
   constructor(readonly data: ExplorerData) {
+    // a dataset may have only one measure ("returns"); the other's scale is then unused
     this.maxNet = { returns: globalMaxAbsNet(data, "returns"), volatility: globalMaxAbsNet(data, "volatility") };
     this.maxPair = {
       returns: globalMaxAbsPairwise(data, "returns"),
@@ -105,7 +109,7 @@ export class Model {
       const dyn = this.data.meta.dynamic[measure];
       f = {
         key: "t",
-        label: `200 weeks to ${fmtDate(parseDate(dyn.dates[s.t])!)}`,
+        label: `${dyn.window} ${STEP.steps} to ${fmtStep(dyn.dates[s.t], false).replace(/^week of /, "")}`,
         short: dyn.dates[s.t],
         total: dyn.total[s.t],
         matrix: matrixAt(this.data, measure, s.t),

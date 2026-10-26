@@ -89,9 +89,10 @@ export class TimelineChart {
     p: Palette,
     other: { measure: "returns" | "volatility"; dyn: DynamicBlock } | null = null,
     measure: "returns" | "volatility" = "returns",
-    hoverT: number | null = null
+    hoverT: number | null = null,
+    names: Partial<Record<"returns" | "volatility", string>> = { returns: "Returns", volatility: "Volatility" }
   ) {
-    this.last = [dyn, full, episodes, periods, t, activePeriod, p, other, measure, hoverT];
+    this.last = [dyn, full, episodes, periods, t, activePeriod, p, other, measure, hoverT, names];
     // both measures come from the same balanced panel, so their windows line up week for week
     const cmp = other && other.dyn.total.length === dyn.total.length ? other : null;
     this.dates = dyn.dates.map((d) => parseDate(d)!);
@@ -234,7 +235,7 @@ export class TimelineChart {
       .attr("stroke-linejoin", "round");
 
     // direct labels at the right end instead of a legend; clicking one switches the page to it
-    const NAME = { returns: "Returns", volatility: "Volatility" } as const;
+    const NAME = { returns: names.returns ?? "Returns", volatility: names.volatility ?? "Volatility" };
     const ends = [{ m: measure, v: dyn.total[dyn.total.length - 1], on: true }];
     if (cmp) ends.push({ m: cmp.measure, v: cmp.dyn.total[cmp.dyn.total.length - 1], on: false });
     const endY = ends.map((e) => y(e.v));

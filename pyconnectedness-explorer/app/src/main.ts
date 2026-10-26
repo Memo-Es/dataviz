@@ -1,13 +1,13 @@
 import "./style.css";
-import { type Measure, loadExplorerData, pairSeriesAt, staticBlock } from "./data";
+import { type Dataset, type Measure, loadDatasets, loadExplorerData, pairSeriesAt, staticBlock } from "./data";
 import { Model, type State, Store, type WindowKey, windowOptions } from "./model";
-import { REGION_OF, fmtDate, fmtSigned, parseDate, readPalette, tightenDecimals } from "./encoding";
+import { REGION_OF, REGION_ORDER, STEP, fmtDate, fmtSigned, fmtStep, parseDate, readPalette, setDatasetEncoding, tightenDecimals } from "./encoding";
 import { NetworkChart } from "./charts/network";
 import { TimelineChart, type PeriodBand } from "./charts/timeline";
 import { RankingChart } from "./charts/ranking";
 import { HeatmapChart } from "./charts/heatmap";
 import { sparkline } from "./charts/sparkline";
-import { BAND_COPY } from "./charts/frequency";
+import { bandCopy } from "./charts/frequency";
 
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
@@ -18,41 +18,26 @@ app.innerHTML = `
     <span>PyConnectedness <b>Explorer</b></span>
   </div>
   <div class="topbar-right">
-    <div class="segmented" id="measure" role="group" aria-label="Measure">
-      <button data-measure="returns">Returns</button>
-      <button data-measure="volatility">Volatility</button>
-    </div>
+    <div class="segmented" id="measure" role="group" aria-label="Measure"></div>
     <button class="icon-btn" id="theme" type="button" aria-label="Toggle dark mode"></button>
   </div>
 </header>
 
 <main>
-  <!-- the dataset comes first: every graph below is computed from this one table -->
-  <section class="dataset" id="dataset" aria-labelledby="dataset-title"></section>
-
-  <section class="hero">
-    <h1>How shocks travel between the world's stock markets</h1>
-    <p class="lede">Spillover is the share of a market's weekly moves that is explained by shocks
-      that started in <em>other</em> markets. The higher it is, the faster trouble in one place
-      becomes trouble everywhere.</p>
-    <ol class="questions" aria-label="Three questions, three graphs">
-      <li><a href="#g1"><span class="qn">1</span>When did markets become fragile?<em>Rolling spillover index</em></a></li>
-      <li><a href="#g2"><span class="qn">2</span>Who passes risk to whom?<em>Connectedness network</em></a></li>
-      <li><a href="#g3"><span class="qn">3</span>How much does each pair pass on?<em>Spillover heatmap</em></a></li>
-    </ol>
-  </section>
+  <!-- the dataset selector comes first; the title and everything below belong to the pick -->
+  <section class="top" id="top" aria-label="Dataset"></section>
 
   <section class="card span-12" id="g1">
     <div class="card-head">
       <div>
-        <p class="q">1 · When did markets become fragile?</p>
+        <p class="q">1 · When did shocks spread most?</p>
         <h2>Rolling spillover index <code class="tag">dynamic_connectedness(…).total</code></h2>
         <p class="sub" id="timeline-sub"></p>
       </div>
       <div class="player">
-        <button class="icon-btn" id="prev" aria-label="Previous week">‹</button>
+        <button class="icon-btn" id="prev" aria-label="Previous step">‹</button>
         <button class="play" id="play" aria-label="Play"></button>
-        <button class="icon-btn" id="next" aria-label="Next week">›</button>
+        <button class="icon-btn" id="next" aria-label="Next step">›</button>
       </div>
     </div>
     <!-- the chart's own readout: what the picked (or hovered) week says -->
@@ -65,7 +50,7 @@ app.innerHTML = `
   <section class="card span-12 graph2" id="g2">
     <div class="card-head">
       <div>
-        <p class="q">2 · Who passes risk to whom?</p>
+        <p class="q">2 · Who passes shocks to whom?</p>
         <h2>Connectedness network <code class="tag">connectedness_graph</code></h2>
         <p class="sub" id="network-sub"></p>
       </div>
@@ -82,8 +67,8 @@ app.innerHTML = `
         </div>
       </div>
       <div class="graph2-side">
-        <p class="side-title">Net connectedness by market <code>net</code></p>
-        <p class="side-sub">What each market gives minus what it takes, in pp: the network's circle sizes, as bars.</p>
+        <p class="side-title" id="side-title"></p>
+        <p class="side-sub" id="side-sub"></p>
         <div id="ranking" class="chart-host"></div>
       </div>
     </div>
@@ -118,7 +103,13 @@ app.innerHTML = `
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 async function main() {
-  const data = await loadExplorerData();
+  const datasets = await loadDatasets();
+  const wanted = new URLSearchParams(location.search).get("d");
+  const ds: Dataset = datasets.find((d) => d.id === wanted) ?? datasets[0];
+  setDatasetEncoding(ds.groups, ds.group_order, ds.episodes, ds.step, ds.steps);
+  const measures = Object.keys(ds.measures) as Measure[];
+  const mName = (m: Measure) => ds.measures[m] ?? m;
+  const data = await loadExplorerData(ds);
   const model = new Model(data);
   const names = model.names;
   const meta = data.meta;
@@ -175,16 +166,28 @@ async function main() {
     }
   );
 
-  renderDataset();
+  renderTop();
+  $("measure").innerHTML = measures.map((k) => `<button data-measure="${k}">${mName(k)}</button>`).join("");
+  $("measure").hidden = measures.length < 2;
+  $("side-title").innerHTML = `Net connectedness by ${ds.item} <code>net</code>`;
+  $("side-sub").textContent = `What each ${ds.item} gives minus what it takes, in pp: the network's circle sizes, as bars.`;
 
+  const dm = meta.dynamic.returns;
   $("footer").innerHTML = `
-    <p><b>Where the numbers come from.</b> Every value on this page was produced by running
-    PyConnectedness's own <a href="https://github.com/zstoi/PyConnectedness/blob/main/examples/Demo.ipynb">examples/Demo.ipynb</a>
-    unchanged (commit <code>4cc953f</code>) on Yahoo Finance data, with one extra cell at the end that only
-    exports objects the notebook already made. The run is checked against every number the notebook prints.</p>
-    <p>${meta.weeks} weeks, ${fmtDate(parseDate(meta.sample[0])!)} to ${fmtDate(parseDate(meta.sample[1])!)}.
-    Generalized variance decomposition, VAR(${meta.dynamic.returns.lags}), ${meta.dynamic.returns.horizon}-week horizon,
-    ${meta.dynamic.returns.window}-week rolling window. Each week's value describes the ${meta.dynamic.returns.window} weeks ending that week.</p>
+    <p><b>Where the numbers come from.</b> ${
+      ds.id === "stocks"
+        ? `Every value on this page was produced by running PyConnectedness's own
+          <a href="https://github.com/zstoi/PyConnectedness/blob/main/examples/Demo.ipynb">examples/Demo.ipynb</a>
+          unchanged (commit <code>4cc953f</code>) on Yahoo Finance data, with one extra cell at the end that only
+          exports what the demo already made. The run is checked against every number the demo prints.`
+        : `The data comes from the ${ds.source} (${ds.api}). Every value on this page is computed by
+          PyConnectedness's own functions (<code>static_connectedness</code>, <code>dynamic_connectedness</code>,
+          <code>frequency_connectedness</code>, commit <code>4cc953f</code>) with the authors' demo settings, and checked
+          against the library's own identities.`
+    }</p>
+    <p>${meta.weeks} ${ds.steps}, ${fmtDate(parseDate(meta.sample[0])!)} to ${fmtDate(parseDate(meta.sample[1])!)}.
+    Generalized variance decomposition, VAR(${dm.lags}), ${dm.horizon}-${ds.step} horizon,
+    ${dm.window}-${ds.step} rolling window. Each ${ds.step}'s value describes the ${dm.window} ${ds.steps} ending then.</p>
     <p class="muted">A design prototype for the coaching, not the stage 2 browser interface.</p>`;
 
   // a change of week/window/measure animates; hover, selection and theme changes don't
@@ -208,12 +211,12 @@ async function main() {
     $("measure").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.measure === m)));
     $("theme").textContent = s.theme === "dark" ? "☀" : "☾";
     $("play").textContent = s.playing ? "❚❚" : "▶";
-    $("play").setAttribute("aria-label", s.playing ? "Pause" : "Play through the weeks");
+    $("play").setAttribute("aria-label", s.playing ? "Pause" : `Play through the ${ds.steps}`);
     const wins = $("windows");
     wins.innerHTML = "";
     for (const o of windowOptions(data, m)) {
       const b = document.createElement("button");
-      b.textContent = o.key === "t" ? `Week of ${fmtDate(parseDate(dyn.dates[s.t])!)}` : o.label;
+      b.textContent = o.key === "t" ? fmtStep(dyn.dates[s.t]) : o.label;
       b.setAttribute("aria-pressed", String(o.key === s.window));
       b.onclick = () => store.set({ window: o.key, playing: false });
       wins.appendChild(b);
@@ -222,9 +225,9 @@ async function main() {
     // charts
     renderTimeline(s, p);
 
-    $("network-sub").innerHTML = `${m === "returns" ? "Returns" : "Volatility"}, ${frame.label.replace(/^Full/, "full")}: an arrow from
-      each net transmitter to each net receiver, for the strongest 10% of pairs (the notebook's "net pairwise
-      ${word} connectedness"). Markets are grouped by region; sizes use one scale across all weeks.`;
+    $("network-sub").innerHTML = `${mName(m)}, ${frame.label.replace(/^Full/, "full")}: an arrow from each net
+      transmitter to each net receiver, for the strongest 10% of pairs ("net pairwise connectedness").
+      ${ds.items.charAt(0).toUpperCase() + ds.items.slice(1)} are grouped (${REGION_ORDER.join(" · ")}); sizes use one scale across all ${ds.steps}.`;
     renderNetReadout(s, frame);
     network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion, s.pair);
     ranking.render(frame, p, model.maxNet[m], focus, s.selected, motion);
@@ -234,26 +237,28 @@ async function main() {
     tightenDecimals(document, ".num");
   };
 
+  function periodBounds(b: { start: string; end: string }): [Date, Date] {
+    return /^\d{4}$/.test(b.start)
+      ? [new Date(Date.UTC(+b.start, 0, 1)), new Date(Date.UTC(+b.end, 11, 31))]
+      : [parseDate(b.start)!, parseDate(b.end)!];
+  }
+
   /** The first graph: the notebook's rolling spillover index (cell 14), named as there, with its
    * readout. Also the only thing a timeline hover re-renders. */
   function renderTimeline(s: State, p: ReturnType<typeof readPalette>) {
     const m = s.measure;
-    const word = m === "returns" ? "return" : "volatility";
-    const other: Measure = m === "returns" ? "volatility" : "returns";
+    const other = measures.find((k) => k !== m) ?? null; // drawn grey behind, when there is one
     const periods: PeriodBand[] = (["p1", "p2", "p3", "p4"] as const).map((k) => {
       const b = staticBlock(data, m, k);
-      return {
-        key: k,
-        start: new Date(Date.UTC(+b.start, 0, 1)),
-        end: new Date(Date.UTC(+b.end, 11, 31)),
-        label: `${b.start}–${b.end}`,
-        total: b.total,
-      };
+      const [a, z] = periodBounds(b);
+      return { key: k, start: a, end: z, label: b.label, total: b.total };
     });
     const dyn = meta.dynamic[m];
-    $("timeline-sub").innerHTML = `${m === "returns" ? "Returns" : "Volatility"}: the share of each market's moves
-      caused by shocks elsewhere, each week measured over the ${dyn.window} weeks before it. Grey: ${other === "returns" ? "returns" : "volatility"}, to compare. Dashed:
-      the notebook's crisis dates. <b>Hover to preview a week; click or drag to pick it.</b>`;
+    const events = Object.keys(ds.episodes).length;
+    $("timeline-sub").innerHTML = `${mName(m)}: the share of each ${ds.item}'s ups and downs caused by shocks at other
+      ${ds.items}, each ${ds.step} measured over the ${dyn.window} ${ds.steps} before it.${
+        other ? ` Grey: ${mName(other).toLowerCase()}, to compare.` : ""
+      }${events ? " Dashed: notable events." : ""} <b>Hover to preview a ${ds.step}; click or drag to pick it.</b>`;
     timeline.render(
       dyn,
       staticBlock(data, m, "full"),
@@ -262,9 +267,10 @@ async function main() {
       s.window === "t" ? s.t : null,
       s.window.startsWith("p") ? s.window : null,
       p,
-      { measure: other, dyn: meta.dynamic[other] },
+      other ? { measure: other, dyn: meta.dynamic[other] } : null,
       m,
-      s.hoverT
+      s.hoverT,
+      ds.measures
     );
     renderReadout(s);
   }
@@ -292,7 +298,7 @@ async function main() {
     } else {
       const connected = names.filter((_, i) => f.matrix[i].some((v) => Math.abs(v) > f.threshold)).length;
       el.innerHTML = `
-        <p class="ro-when">${f.label} <span class="ro-hint">· hover a market for its TO, FROM and NET</span></p>
+        <p class="ro-when">${f.label} <span class="ro-hint">· hover a ${ds.item} for its TO, FROM and NET</span></p>
         <div class="ro-stats">
           ${stat("Links drawn", "", `<span class="num">${f.edgeCount}</span>`, `of ${(names.length * (names.length - 1)) / 2} pairs`)}
           ${stat("Cut-off", "pairwise_net", `<span class="num">${f.threshold.toFixed(2)}</span> pp`, "90th percentile of all cells")}
@@ -303,42 +309,42 @@ async function main() {
     tightenDecimals(el, ".num");
   }
 
-  /** The table every graph is computed from: what the authors' demo downloads and builds. */
-  function renderDataset() {
-    // the index behind each Yahoo Finance ticker the demo downloads (Demo.ipynb, cell 4)
-    const INDEX: Record<string, string> = {
-      "^AORD": "All Ordinaries", "^N225": "Nikkei 225", "^HSI": "Hang Seng", "^GDAXI": "DAX",
-      "^FCHI": "CAC 40", "^FTSE": "FTSE 100", "^GSPTSE": "S&P/TSX Composite", "^GSPC": "S&P 500",
-      "^SSMI": "SMI", "^STI": "Straits Times", "^JKSE": "Jakarta Composite", "^MXX": "IPC",
-      "^BVSP": "Bovespa", "^IBEX": "IBEX 35", "^KLSE": "FTSE Bursa Malaysia KLCI", "^MERV": "MERVAL",
-      "^KS11": "KOSPI", "XU100.IS": "BIST 100", "000001.SS": "SSE Composite", "^TWII": "TAIEX",
-    };
+  /** The top of the page: the dataset selector, and under it the picked dataset's own panel,
+   * its title, where it comes from and what's in it. */
+  function renderTop() {
     const [from, to] = meta.sample.map((d) => fmtDate(parseDate(d)!));
-    const groups = (["Americas", "Europe", "Asia Pacific"] as const)
-      .map((r) => {
-        const chips = names
-          .filter((n) => REGION_OF[n] === r)
-          .map((n) => {
-            const t = meta.tickers[n];
-            return `<li title="Yahoo Finance ticker ${t}"><b>${n}</b> ${INDEX[t] ?? t}</li>`;
-          })
-          .join("");
-        return `<div class="ds-region"><p class="ds-k">${r}</p><ul>${chips}</ul></div>`;
-      })
+    const tabs = datasets
+      .map(
+        (d) => `<a class="ds-tab" href="?d=${d.id}" aria-current="${d.id === ds.id}">
+          <b>${d.title}</b><span>${d.source.split(",")[0]}</span></a>`
+      )
       .join("");
-    $("dataset").innerHTML = `
-      <p class="q">Dataset</p>
-      <h2 id="dataset-title">${names.length} national stock market indices <span class="ds-src">· Yahoo Finance</span></h2>
-      <dl class="ds-facts">
-        <div><dt>Period</dt><dd>${from} to ${to}</dd></div>
-        <div><dt>Rows</dt><dd><span class="num">${meta.weeks}</span> weeks, Friday to Friday, only weeks where all ${names.length} markets traded</dd></div>
-        <div><dt>Columns</dt><dd>one per market, for two series: <b>returns</b>, the weekly % change, and <b>volatility</b>, the weekly high-low swing</dd></div>
-        <div><dt>Built by</dt><dd>the authors' demo, <code>examples/Demo.ipynb</code>, from daily closing, high and low prices</dd></div>
-      </dl>
-      <div class="ds-regions">${groups}</div>
-      <p class="ds-any">PyConnectedness works on any table like this, one column per variable and one row per time
-        step: river levels, energy prices, banks. The three graphs below would come out of any of them.</p>`;
-    tightenDecimals($("dataset"), ".num");
+    const groups = REGION_ORDER.map((r) => {
+      const chips = names
+        .filter((n) => REGION_OF[n] === r)
+        .map((n) => `<li title="${ds.labels[n] ?? n}"><b>${n}</b>${ds.labels[n] && ds.labels[n] !== n ? ` ${ds.labels[n]}` : ""}</li>`)
+        .join("");
+      return chips ? `<div class="ds-region"><p class="ds-k">${r}</p><ul>${chips}</ul></div>` : "";
+    }).join("");
+    $("top").innerHTML = `
+      <div class="ds-pick">
+        <p class="q">Pick a dataset · ${datasets.length} public sources</p>
+        <nav class="ds-tabs" aria-label="Datasets">${tabs}</nav>
+      </div>
+      <div class="ds-panel">
+        <p class="ds-source">${ds.title} · from the <a href="${ds.api_url}" target="_blank" rel="noopener">${ds.api}</a></p>
+        <h1>${ds.headline}</h1>
+        <p class="lede">Spillover is the share of each ${ds.item}'s ups and downs explained by shocks that started at
+          <em>other</em> ${ds.items}. The higher it is, the faster trouble in one place becomes trouble everywhere.</p>
+        <dl class="ds-facts">
+          <div><dt>Period</dt><dd>${from} to ${to}</dd></div>
+          <div><dt>Rows</dt><dd><span class="num">${meta.weeks}</span> ${ds.steps}, only those where all ${names.length} ${ds.items} have data</dd></div>
+          <div><dt>Columns</dt><dd>${names.length} ${ds.items}: ${ds.series}</dd></div>
+          <div><dt>Computed by</dt><dd>${ds.built_by}</dd></div>
+        </dl>
+        <div class="ds-regions" style="--groups:${REGION_ORDER.length}">${groups}</div>
+      </div>`;
+    tightenDecimals($("top"), ".num");
   }
 
   /** "Short vs long term": the library's frequency_connectedness (export_cell.py), which exists per
@@ -348,23 +354,28 @@ async function main() {
     const m = s.measure;
     const blocks = meta.frequency[m] as Record<string, (typeof meta.frequency.returns)["full"]>;
     const week = preview ? s.hoverT! : s.t;
-    const yr = +meta.dynamic[m].dates[week].slice(0, 4);
-    const periodOfWeek = yr <= 2006 ? "p1" : yr <= 2012 ? "p2" : yr <= 2019 ? "p3" : "p4";
+    const when = parseDate(meta.dynamic[m].dates[week])!;
+    // the sub-period this step falls in (a rolling window ends after the first period starts)
+    const periodOfWeek =
+      (["p1", "p2", "p3", "p4"] as const).find((k) => {
+        const [a, z] = periodBounds(staticBlock(data, m, k));
+        return when >= a && when <= z;
+      }) ?? "p4";
     const fromChip = !preview && s.window !== "t" && blocks[s.window];
     const key = fromChip ? s.window : periodOfWeek;
     const fb = blocks[key];
     const option = windowOptions(data, m).find((o) => o.key === key)!;
-    const context = fromChip ? option.label : `${option.label}, the period this week falls in`;
+    const context = fromChip ? option.label : `${option.label}, the period this ${ds.step} falls in`;
     const sum = fb.bands.reduce((a, b) => a + b.total, 0);
     const segs = fb.bands
       .map((b) => {
-        const c = BAND_COPY[b.label];
+        const c = bandCopy(b.label);
         return `<span class="seg ${c.cls}" style="flex:${b.total}" title="${c.name}, ${c.phrase}: ${b.total.toFixed(1)} pp"><b class="num">${b.total.toFixed(1)}</b></span>`;
       })
       .join("");
     const words = fb.bands
       .map((b) => {
-        const c = BAND_COPY[b.label];
+        const c = bandCopy(b.label);
         return `<span><i class="key ${c.cls}"></i>${c.name} <b class="num">${((b.total / sum) * 100).toFixed(0)}%</b> <em>${c.phrase}</em></span>`;
       })
       .join("");
@@ -372,7 +383,7 @@ async function main() {
       <p class="ro-speed-head"><b>Short vs long term</b> <code>frequency_connectedness</code> <span class="ro-hint">· ${context}</span></p>
       <div class="speed-bar">${segs}</div>
       <div class="speed-words">${words}</div>
-      <span class="ro-note">How long shocks take to play out (Baruník–Křehlík), on a ${fb.horizon}-week horizon, so the
+      <span class="ro-note">How long shocks take to play out (Baruník–Křehlík), on a ${fb.horizon}-${ds.step} horizon, so the
         three add up to <span class="num">${fb.static_total.toFixed(1)}%</span> rather than exactly the index.</span></div>`;
   }
 
@@ -390,11 +401,11 @@ async function main() {
     let link = { s: 0, r: 0, v: -Infinity };
     f.matrix.forEach((row, i) => row.forEach((v, j) => v > link.v && (link = { s: i, r: j, v })));
     const diff = f.total - full.total;
-    const week = (i: number) => fmtDate(parseDate(dyn.dates[i])!);
+    const week = (i: number) => fmtStep(dyn.dates[i]);
     const when = preview
-      ? `<span class="ro-tag">Preview</span> Week of ${week(s.hoverT!)} <span class="ro-hint">· click to pick it</span>`
+      ? `<span class="ro-tag">Preview</span> ${week(s.hoverT!)} <span class="ro-hint">· click to pick it</span>`
       : s.window === "t"
-        ? `Week of ${week(s.t)} <span class="ro-hint">· the ${dyn.window} weeks up to it</span>`
+        ? `${week(s.t)} <span class="ro-hint">· the ${dyn.window} ${ds.steps} up to it</span>`
         : f.label;
     const stat = (label: string, field: string, value: string, sub: string, cls = "") =>
       `<div class="ro-stat"><span class="ro-label">${label} <code>${field}</code></span>
@@ -452,7 +463,7 @@ async function main() {
           ? `One of the ${frame.edgeCount} strongest links in this window, so it's drawn in the network.`
           : `Below the strongest-10% cut-off (<span class="num">${frame.threshold.toFixed(2)}</span> pp), so the network doesn't draw it.`
       }</p>
-      <p class="k spark-k">Net flow between them, every week (scale fits this pair)</p>
+      <p class="k spark-k">Net flow between them, every ${ds.step} (scale fits this pair)</p>
       <div id="spark"></div>
       <p class="k spark-k">By period</p>
       <ul class="pair-windows">${windows}</ul>`;
@@ -471,7 +482,7 @@ async function main() {
     const el = $("detail");
     const name = s.selected ?? s.hovered;
     if (!name) {
-      el.innerHTML = `<div class="card-head"><div><p class="q">Detail · graphs 2 and 3</p><h2>Pick a market or a pair</h2><p class="sub">Click a market (a circle, a bar or a heatmap label) to see where its risk goes and comes from, or a pair (an arrow or a heatmap cell) to follow it over time.</p></div></div>
+      el.innerHTML = `<div class="card-head"><div><p class="q">Detail · graphs 2 and 3</p><h2>Pick a ${ds.item} or a pair</h2><p class="sub">Click a ${ds.item} (a circle, a bar or a heatmap label) to see where its shocks go and come from, or a pair (an arrow or a heatmap cell) to follow it over time.</p></div></div>
         <div class="empty">${names
           .slice()
           .sort()
@@ -490,7 +501,7 @@ async function main() {
     const net = frame.net[i];
     el.innerHTML = `
       <div class="card-head">
-        <div><p class="q">Detail · market · ${REGION_OF[name]}</p><h2>${name}</h2><p class="sub">${frame.label}</p></div>
+        <div><p class="q">Detail · ${ds.item} · ${REGION_OF[name]}</p><h2>${name}</h2><p class="sub">${frame.label}</p></div>
         ${s.selected ? `<button class="icon-btn" id="clear" aria-label="Clear selection">✕</button>` : ""}
       </div>
       <div class="trio">
@@ -498,7 +509,7 @@ async function main() {
         <div><span class="k">Takes from others</span><span class="v num">${frame.from[i].toFixed(1)}</span></div>
         <div><span class="k">Net</span><span class="v num ${net >= 0 ? "send" : "recv"}">${fmtSigned(net)}</span></div>
       </div>
-      <p class="k spark-k">Net spillover, every week</p>
+      <p class="k spark-k">Net spillover, every ${ds.step}</p>
       <div id="spark"></div>
       <div class="lists">
         <div><p class="k">Sends most to</p><ul>${list(sends, "send")}</ul></div>
