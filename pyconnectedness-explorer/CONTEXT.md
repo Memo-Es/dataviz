@@ -193,3 +193,23 @@ and the questionnaire's "layered network". It's summarised, with design notes, i
 of `LIBRARY_NOTES.md`. The library has no code for it yet (`causality/` is empty), so under the
 "exact same code" rule it can't feed the explorer until that module, or the authors' R package,
 exists.
+
+## Tabled: the 4th graph (layered extreme-risk network), Oct 26
+
+Memo's call: **parked for now; work continues on the other three graphs** (heatmap, circular
+network, time series). Pick it up again later from here:
+
+- **Why it's not on the site:** PyConnectedness has no code for it yet (`causality/` is empty),
+  so under the "exact same code" rule the site can't compute it. The paper's real 30-industry
+  result (Figure 4) has 150+ overlapping arrows that can't be read off reliably.
+- **What exists already:** the design spec and a working matplotlib recipe in
+  `styleguide/STYLE_GUIDE.md` ("The layered network"), a sketch in
+  `styleguide/examples/layered_network_sketch.png`, and the paper summary in `LIBRARY_NOTES.md`.
+- **Options when it comes back:**
+  - A: a design preview on the paper's exact 4-node example (Example 6);
+  - B: the real 30 industries in their causal rows, without arrows;
+  - C: wait for the library module, the authors' R package (github.com/mariokrali), or the
+    edge list from Klüppelberg/Krali.
+  - The recommendation was A + B, labelled "design preview, not computed by PyConnectedness".
+- **Easiest unblock:** the team asks Klüppelberg or Krali for the estimated DAG's edge list and
+  stability counts.
