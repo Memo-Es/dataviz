@@ -1,8 +1,10 @@
-name: Rebuild explorer data from Demo.ipynb
+name: Rebuild explorer data from Demo.ipynb and the public APIs
 
 # Runs PyConnectedness's own examples/Demo.ipynb, unchanged, at the pinned submodule commit,
-# against live Yahoo Finance data, then commits what export_cell.py wrote. This is the only
-# way the explorer's numbers get made: no synthetic input, no reimplementation.
+# against live Yahoo Finance data (the stock-market dataset), then builds the other datasets
+# from their public APIs with the library's own functions (run_datasets.py), and commits the
+# results. This is the only way the explorer's numbers get made: no synthetic input, no
+# reimplementation.
 
 on:
   push:
@@ -12,6 +14,8 @@ on:
       - "pyconnectedness-explorer/pipeline/export_cell.py"
       - "pyconnectedness-explorer/pipeline/validate.py"
       - "pyconnectedness-explorer/pipeline/requirements.txt"
+      - "pyconnectedness-explorer/pipeline/run_datasets.py"
+      - "pyconnectedness-explorer/pipeline/datasets/**"
       - ".github/workflows/notebook-data.yml"
   workflow_dispatch:
 
@@ -51,14 +55,27 @@ jobs:
             pyconnectedness-explorer/app/public/data/
             pyconnectedness-explorer/pipeline/out/
       - name: Validate against the numbers the notebook itself printed
+        id: validate
+        continue-on-error: true
         run: python validate.py
+      - name: Build the other datasets from their public APIs (each independent)
+        continue-on-error: true
+        run: python run_datasets.py
       - name: Commit the data
         working-directory: .
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898+github-actions[bot]@users.noreply.github.com"
+          if [ "${{ steps.validate.outcome }}" != "success" ]; then
+            echo "stock data failed validation: keeping its last good build"
+            git checkout -- pyconnectedness-explorer/app/public/data/connectedness.json \
+              pyconnectedness-explorer/app/public/data/pairwise_returns.f32 \
+              pyconnectedness-explorer/app/public/data/pairwise_volatility.f32 \
+              pyconnectedness-explorer/app/public/data/raw_snapshot.csv.gz \
+              pyconnectedness-explorer/pipeline/out/reference
+          fi
           git add pyconnectedness-explorer/app/public/data pyconnectedness-explorer/pipeline/out/reference
           git diff --cached --quiet && { echo "no change"; exit 0; }
-          git commit -m "Data: run Demo.ipynb (pinned 4cc953f) on live Yahoo Finance data"
+          git commit -m "Data: Demo.ipynb (pinned 4cc953f) on Yahoo Finance, plus the public-API datasets"
           git pull --rebase origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"

@@ -1,0 +1,78 @@
+[
+ {
+  "id": "stocks",
+  "dir": "",
+  "title": "World stock markets",
+  "headline": "How shocks travel between the world's stock markets",
+  "items": "stock markets",
+  "item": "market",
+  "source": "Yahoo Finance",
+  "api": "Yahoo Finance chart API, via yfinance",
+  "api_url": "https://finance.yahoo.com",
+  "step": "week",
+  "steps": "weeks",
+  "series": "returns (the weekly % change) and volatility (the weekly high–low swing) per market",
+  "built_by": "the authors' demo, examples/Demo.ipynb, run unchanged",
+  "measures": {
+   "returns": "Returns",
+   "volatility": "Volatility"
+  },
+  "episodes": {
+   "2001-09-30": "Dot-com",
+   "2008-10-31": "Lehman",
+   "2011-09-30": "Euro-area crisis",
+   "2015-08-31": "China devaluation",
+   "2020-03-31": "COVID crash",
+   "2022-09-30": "Inflation shock"
+  },
+  "groups": {
+   "US": "Americas",
+   "Canada": "Americas",
+   "Mexico": "Americas",
+   "Brazil": "Americas",
+   "Argentina": "Americas",
+   "UK": "Europe",
+   "Germany": "Europe",
+   "France": "Europe",
+   "Switzerland": "Europe",
+   "Spain": "Europe",
+   "Turkey": "Europe",
+   "Japan": "Asia Pacific",
+   "South Korea": "Asia Pacific",
+   "China": "Asia Pacific",
+   "Hong Kong": "Asia Pacific",
+   "Taiwan": "Asia Pacific",
+   "Singapore": "Asia Pacific",
+   "Malaysia": "Asia Pacific",
+   "Indonesia": "Asia Pacific",
+   "Australia": "Asia Pacific"
+  },
+  "group_order": [
+   "Americas",
+   "Europe",
+   "Asia Pacific"
+  ],
+  "labels": {
+   "Australia": "All Ordinaries",
+   "Japan": "Nikkei 225",
+   "Hong Kong": "Hang Seng",
+   "Germany": "DAX",
+   "France": "CAC 40",
+   "UK": "FTSE 100",
+   "Canada": "S&P/TSX Composite",
+   "US": "S&P 500",
+   "Switzerland": "SMI",
+   "Singapore": "Straits Times",
+   "Indonesia": "Jakarta Composite",
+   "Mexico": "IPC",
+   "Brazil": "Bovespa",
+   "Spain": "IBEX 35",
+   "Malaysia": "FTSE Bursa Malaysia KLCI",
+   "Argentina": "MERVAL",
+   "South Korea": "KOSPI",
+   "Turkey": "BIST 100",
+   "China": "SSE Composite",
+   "Taiwan": "TAIEX"
+  }
+ }
+]
