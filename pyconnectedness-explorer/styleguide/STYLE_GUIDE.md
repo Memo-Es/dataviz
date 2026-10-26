@@ -44,6 +44,21 @@ The explorer adds a fifth view, not from a library plot: **speed bars** for the 
 (`frequency_connectedness`). They use an ordinal one-hue ramp, darker = faster, which is also
 kept away from red/blue (see Palette).
 
+## Layout rule: controls above what they control
+
+Anything that changes in response to a control sits **below** that control, so the reader looks
+at the cause first and sees the effect right under it. In the explorer:
+
+- The Returns / Volatility toggle sits in the top bar, because it changes everything.
+- The timeline (pick a week or period) comes next.
+- The summary sentence and the four key numbers sit directly under the timeline, because they
+  describe the picked week.
+- The charts come after.
+- The page title above the timeline is fixed text; it never changes with a selection.
+
+When you add a view, put it under whichever control drives it. If a control's effect would
+land above it, move the control.
+
 ## Palette
 
 

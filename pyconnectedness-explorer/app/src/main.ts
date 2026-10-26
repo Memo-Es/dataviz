@@ -37,11 +37,11 @@ app.innerHTML = `
 <main>
   <section class="hero">
     <p class="eyebrow">20 stock markets · weekly, 1997–2026 · from the PyConnectedness Demo notebook</p>
-    <h1 id="headline"></h1>
+    <h1>How shocks travel between the world's stock markets</h1>
     <p class="lede">Spillover is the share of a market's weekly moves that is explained by shocks
       that started in <em>other</em> markets. The higher it is, the faster trouble in one place
-      becomes trouble everywhere.</p>
-    <div class="kpis" id="kpis"></div>
+      becomes trouble everywhere. Pick a week or a period on the timeline; everything below it
+      follows.</p>
   </section>
 
   <section class="card span-12">
@@ -58,6 +58,12 @@ app.innerHTML = `
     </div>
     <div id="timeline" class="chart-host"></div>
     <div class="windows" id="windows" role="group" aria-label="Window shown on every chart"></div>
+  </section>
+
+  <!-- reacts to the timeline, so it sits right under it -->
+  <section class="summary" aria-live="polite">
+    <p class="summary-line" id="headline"></p>
+    <div class="kpis" id="kpis"></div>
   </section>
 
   <div class="grid">

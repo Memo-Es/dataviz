@@ -261,11 +261,22 @@ main {
   color: var(--secondary);
 }
 
+/* the selected week's summary, directly under the timeline that drives it */
+.summary {
+  margin: 28px 0 8px;
+}
+
+.summary-line {
+  margin: 0 0 16px;
+  max-width: 980px;
+  font: 500 clamp(21px, 2.4vw, 30px) / 1.25 var(--f-serif);
+  letter-spacing: -0.01em;
+}
+
 .kpis {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1px;
-  margin-top: 32px;
   background: var(--line);
   border: 1px solid var(--line);
   border-radius: var(--radius);
