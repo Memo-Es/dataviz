@@ -213,3 +213,11 @@ network, time series). Pick it up again later from here:
   - The recommendation was A + B, labelled "design preview, not computed by PyConnectedness".
 - **Easiest unblock:** the team asks Klüppelberg or Krali for the estimated DAG's edge list and
   stability counts.
+
+Oct 26: dataset selector. Memo asked for 5–8 public datasets available through APIs, so the
+explorer shows the method works on any table of time series. Added: currencies (FRED), euro-area
+bonds (ECB), crypto (Coinbase), US industries (Kenneth French), rivers (USGS), European
+temperatures (Open-Meteo). The stock markets stay the authors' demo, unchanged; the others use the
+library's own functions with the demo's settings, on preparation we wrote (README, "The other
+datasets"). Note for the client conversation: a dataset selector edges toward the stage 2 browser
+interface; it stays a design exploration with pre-built datasets, no upload.

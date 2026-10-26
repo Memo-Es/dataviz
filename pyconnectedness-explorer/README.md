@@ -30,6 +30,26 @@ library's own `frequency_connectedness` (Baruník-Křehlík) on the notebook's o
 weeks, 100-week horizon). `validate.py` checks that the bands add up, the same identity the
 library's tests check.
 
+### The other datasets (public APIs)
+
+The selector at the top of the app offers more datasets, each fetched from a public API and run
+through the library's own `static_connectedness`, `dynamic_connectedness` and
+`frequency_connectedness` with the demo's settings (generalized, VAR(2), 10-step horizon), by
+`pipeline/run_datasets.py`. Fetching and preparing each one is in `pipeline/datasets/sources.py`:
+
+| Dataset | API | Series modelled |
+|---|---|---|
+| Currencies | FRED (St. Louis Fed) | weekly % change in each currency's US-dollar value, 2006– |
+| Euro-area government bonds | ECB Data Portal (IRS) | monthly change in 10-year yields, basis points |
+| Crypto | Coinbase Exchange | daily % change in US-dollar prices |
+| US industries | Kenneth French Data Library | weekly returns of 30 industry portfolios, 1990– |
+| Rivers | USGS Water Services | weekly log-flow anomaly at Mississippi-system gauges |
+| European temperatures | Open-Meteo (ERA5) | weekly temperature anomaly in 15 capitals |
+
+The preparation (which series, which transform, the window length) is ours, not the authors';
+the numbers are the library's. Each build is checked against the library's own identities.
+Datasets are independent: one API failing keeps that dataset's last good build.
+
 It runs on every push that touches the pipeline, or by hand from the Actions tab. The app
 never computes a statistic itself: the one derived value is the strongest-10% cut-off, which
 applies the notebook's own rule (cells 19/21) to whichever matrix is on screen.
