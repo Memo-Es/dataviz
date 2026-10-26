@@ -1501,3 +1501,7 @@ svg {
 .beads-hint {
   font-size: 11px;
 }
+
+.beads-floor {
+  font-weight: 700;
+}

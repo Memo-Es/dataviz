@@ -202,14 +202,19 @@ export class BeadsChart {
 
     const key = `${paintKey}|${this.width}|${activePeriod}|${this.T}|${region}`;
     if (key !== this.paintedKey) {
-      this.paint(dyn, periods, activePeriod, c);
+      this.paint(dyn, periods, activePeriod, c, p.panel);
       this.paintedKey = key;
     }
     this.overlay(dyn, t, p, hoverT, hoveredItem, multi && !region);
   }
 
   /** the beads themselves: only when the data, size, theme, period or region changes */
-  private paint(dyn: DynamicBlock, periods: PeriodBand[], activePeriod: string | null, c: BeadColors) {
+  /** the floor the strings stand on: the bottom of the % scale, not 0 */
+  get floor() {
+    return this.y.domain()[0];
+  }
+
+  private paint(dyn: DynamicBlock, periods: PeriodBand[], activePeriod: string | null, c: BeadColors, panel: string) {
     const dpr = window.devicePixelRatio || 1;
     const W = this.width;
     this.canvas.width = Math.round(W * dpr);
@@ -259,6 +264,10 @@ export class BeadsChart {
       ctx.globalAlpha = alpha;
       ctx.fillStyle = c.ink;
       ctx.fillRect(x - maxW / 2, top - BEAD_H / 2, maxW, BEAD_H);
+      // a gap of page colour around it, so a region bead at the same height can't merge into it
+      ctx.strokeStyle = panel;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x - maxW / 2 - 1, top - BEAD_H / 2 - 1, maxW + 2, BEAD_H + 2);
     });
     ctx.globalAlpha = 1;
   }
@@ -273,12 +282,27 @@ export class BeadsChart {
     const small = W < 600;
     const y = this.y;
 
+    // the floor the strings stand on, named: the scale starts there, not at 0
+    const floorY = bottom;
+    svg.append("line").attr("x1", M.left).attr("x2", M.left + this.plotW).attr("y1", floorY).attr("y2", floorY).attr("stroke", p.axis);
+    svg
+      .append("text")
+      .attr("class", "axis-label beads-floor")
+      .attr("x", M.left - 10)
+      .attr("y", floorY)
+      .attr("dy", "0.35em")
+      .attr("text-anchor", "end")
+      .attr("fill", p.secondary)
+      .text(`${this.floor}%`)
+      .append("title")
+      .text(`The strings start at ${this.floor}%, not at 0`);
+
     // a few % ticks, quiet
     svg
       .append("g")
       .attr("class", "axis-label")
       .selectAll("text")
-      .data(y.ticks(4))
+      .data(y.ticks(4).filter((d) => floorY - y(d) > 16))
       .join("text")
       .attr("x", M.left - 10)
       .attr("y", (d) => y(d))

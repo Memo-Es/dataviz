@@ -323,11 +323,11 @@ async function main() {
     $("beads-regions").hidden = !asBeads || regions.length < 2;
     if (asBeads) {
       $("timeline-sub").textContent = `How much of each ${ds.item}'s moves came from shocks elsewhere, over rolling ${dyn.window}-${ds.step} windows.`;
-      $("beads-legend").innerHTML = `<span title="PyConnectedness: total"><i class="bk-index"></i>Spillover index</span>
+      $("beads-legend").innerHTML = `<span title="PyConnectedness: total"><i class="bk-index"></i>Spillover index: the average of all ${ds.items}</span>
         <span title="PyConnectedness: directional_from"><i class="bk-height"></i>Height: share of moves from shocks elsewhere</span>
         <span title="PyConnectedness: directional_to"><i class="bk-to"></i>Width: how much it passes on</span>${
           events ? `<span class="muted">▲ events</span>` : ""
-        }`;
+        }<span class="muted" id="beads-floor"></span>`;
       $("beads-regions").innerHTML = [null, ...regions]
         .map((g, i) => `<button type="button" data-region="${g ?? ""}" aria-pressed="${g === beadRegion}">${
           g ? `<i style="background:var(--bead-${i})"></i>${g}` : "All regions"
@@ -345,6 +345,7 @@ async function main() {
         beadRegion,
         `${m}|${s.theme}`
       );
+      $("beads-floor").textContent = `Strings start at ${beads.floor}%, not 0`;
       renderReadout(s);
       return;
     }
