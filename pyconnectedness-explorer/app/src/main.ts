@@ -1,7 +1,7 @@
 import "./style.css";
 import { type Dataset, type Measure, loadDatasets, loadExplorerData, pairSeriesAt, staticBlock } from "./data";
 import { Model, type State, Store, type WindowKey, windowOptions } from "./model";
-import { REGION_OF, REGION_ORDER, STEP, fmtDate, fmtSigned, fmtStep, parseDate, readPalette, setDatasetEncoding, tightenDecimals } from "./encoding";
+import { REGION_OF, REGION_ORDER, STEP, setHueOf, fmtDate, fmtSigned, fmtStep, parseDate, readPalette, setDatasetEncoding, tightenDecimals } from "./encoding";
 import { NetworkChart } from "./charts/network";
 import { TimelineChart, type PeriodBand } from "./charts/timeline";
 import { BeadsChart, readBeadColors } from "./charts/beads";
@@ -10,16 +10,22 @@ import { HeatmapChart } from "./charts/heatmap";
 import { sparkline } from "./charts/sparkline";
 import { bandCopy } from "./charts/frequency";
 import { loadUpload, runUpload, saveUpload } from "./upload/upload";
+import { PALETTES, applyPalette } from "./palettes";
+import { hueOf as hueOfNow } from "./encoding";
 
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
 <header class="topbar">
   <div class="brand">
-    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 7 7 24h18z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="16" cy="7" r="4.5" fill="var(--send)"/><circle cx="7" cy="24" r="4.5" fill="var(--recv)"/><circle cx="25" cy="24" r="4.5" fill="var(--recv)"/></svg>
+    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 7 7 24h18z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="16" cy="7" r="4.5" fill="var(--bead-1)"/><circle cx="7" cy="24" r="4.5" fill="var(--bead-2)"/><circle cx="25" cy="24" r="4.5" fill="var(--bead-3)"/></svg>
     <span>PyConnectedness <b>Explorer</b></span>
   </div>
   <div class="topbar-right">
+    <label class="select small" title="Colour palette">
+      <span class="sr">Colour palette</span>
+      <select id="palette"></select>
+    </label>
     <div class="segmented" id="measure" role="group" aria-label="Measure"></div>
     <button class="icon-btn" id="theme" type="button" aria-label="Toggle dark mode"></button>
   </div>
@@ -69,8 +75,9 @@ app.innerHTML = `
       <div class="graph2-net">
         <div id="network" class="chart-host network-host"></div>
         <div class="legend">
-          <span><i class="dot send"></i>Net transmitter</span>
-          <span><i class="dot recv"></i>Net receiver</span>
+          <span><i class="dot solid"></i>Solid: passes on more than it takes</span>
+          <span><i class="dot ring"></i>Ring: takes more than it passes on</span>
+          <span>Colour: its region; an arrow wears its sender's</span>
           <span><i class="taper"></i>Arrow narrows toward the receiver; width = size of the flow</span>
           <span><i class="sizes"><b></b><b></b><b></b></i>Circle size = |net|</span>
         </div>
@@ -131,6 +138,28 @@ async function main() {
     /* storage unavailable: fall back to light */
   }
   document.documentElement.dataset.theme = theme;
+  let palette = "seurat";
+  try {
+    const saved = localStorage.getItem("pc-palette");
+    if (saved && (saved === "agam" || PALETTES.some((x) => x.id === saved))) palette = saved;
+  } catch {
+    /* storage unavailable: the default */
+  }
+
+  // The one colour rule: an item wears its region's colour on every graph (or its own, when the
+  // dataset has a single region; in fixed order, and past the eighth a quiet grey, never cycled)
+  const presentRegions = REGION_ORDER.filter((g) => names.some((n) => REGION_OF[n] === g));
+  let hues: string[] = [];
+  const paint = (id: string, th: State["theme"]) => {
+    applyPalette(id, th);
+    hues = readBeadColors().hues;
+    const p = readPalette();
+    setHueOf((n) => {
+      const i = presentRegions.length > 1 ? presentRegions.indexOf(REGION_OF[n]) : names.indexOf(n);
+      return hues[i] ?? p.muted;
+    });
+  };
+  paint(palette, theme);
 
   const store = new Store({
     measure: "returns",
@@ -142,6 +171,7 @@ async function main() {
     hoverT: null,
     playing: false,
     theme,
+    palette,
   });
 
   const hover = (n: string | null) => {
@@ -204,13 +234,6 @@ async function main() {
     renderTimeline(store.get(), readPalette());
   });
 
-  // graph 1's colours: one per region (or per item, when there's only one region)
-  const presentRegions = REGION_ORDER.filter((g) => names.some((n) => REGION_OF[n] === g));
-  const hueOf = (n: string) => {
-    const hues = readBeadColors().hues;
-    const i = presentRegions.length > 1 ? presentRegions.indexOf(REGION_OF[n]) : names.indexOf(n);
-    return hues[i % hues.length];
-  };
   $("heatmap-legend").innerHTML = `
     <span title="PyConnectedness: pairwise_net"><i class="hm-dot"></i>Dot: the row passes more to the column than it gets back · bigger = more</span>
     <span><i class="hm-ring"></i>Ring: among the strongest 10%, drawn in the network</span>
@@ -300,7 +323,8 @@ async function main() {
     network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion, s.pair);
     ranking.render(frame, p, model.maxNet[m], focus, s.selected, motion);
     $("heatmap-sub").textContent = `Each pair once, in the row of the ${ds.item} that passes more to the other, ${frame.label.toLowerCase().startsWith("full") ? "over the " : "in the "}${frame.label.replace(/^Full/, "full")}.`;
-    heatmap.render(frame, p, model.maxPair[m], focus, s.pair, hueOf, p.band);
+    heatmap.render(frame, p, model.maxPair[m], focus, s.pair, (n) => hueOfNow(n), p.band);
+    $<HTMLSelectElement>("palette").value = s.palette;
     renderDetail(s, frame, p);
     tightenDecimals(document, ".num");
   };
@@ -352,7 +376,7 @@ async function main() {
         s.hoverT,
         s.hovered,
         beadRegion,
-        `${m}|${s.theme}`
+        `${m}|${s.theme}|${s.palette}`
       );
       $("beads-floor").textContent = `Strings start at ${beads.floor}%, not 0`;
       renderReadout(s);
@@ -701,6 +725,19 @@ async function main() {
     if (!b) return;
     setMeasure(b.dataset.measure as Measure);
   });
+  $("palette").innerHTML =
+    PALETTES.map((x) => `<option value="${x.id}">${x.painter} · ${x.painting.split(" (")[0]}, ${x.year}</option>`).join("") +
+    `<option value="agam">Agam (the first look)</option>`;
+  $("palette").addEventListener("change", (ev) => {
+    const id = (ev.target as HTMLSelectElement).value;
+    try {
+      localStorage.setItem("pc-palette", id);
+    } catch {
+      /* ignore */
+    }
+    paint(id, store.get().theme);
+    store.set({ palette: id });
+  });
   $("theme").addEventListener("click", () => {
     const theme = store.get().theme === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = theme;
@@ -709,6 +746,7 @@ async function main() {
     } catch {
       /* ignore */
     }
+    paint(store.get().palette, theme);
     store.set({ theme });
   });
   const step = (d: number) => {

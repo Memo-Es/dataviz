@@ -315,7 +315,7 @@ export class TimelineChart {
         .attr("y", ly + 11)
         .attr("dy", "0.35em")
         .attr("text-anchor", "middle")
-        .attr("fill", "#fff")
+        .style("fill", "var(--accent-ink)")
         .text(label);
     }
     tightenDecimals(this.svg.node()!, ".axis-label, .row-value, .cursor-label, .band-label, .mono");

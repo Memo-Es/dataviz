@@ -91,6 +91,36 @@ land above it, move the control.
 
 ## Palette
 
+### Explorer, October 2026: one colour rule, palettes after the Impressionists
+
+The explorer has moved past the red/blue pair below. **Colour = region, on every graph**: graph
+1's beads, graph 2's circles and arrows (an arrow wears its sender's colour), graph 3's dots.
+Sending vs receiving is said by form, never by a second hue: a solid circle passes on more than it
+takes, a ring takes more than it passes on; bars right or left of zero; the sign on the number.
+Text stays ink. An item outside any region (a one-region dataset or an upload) takes the slots in
+fixed order, and past the eighth a quiet grey; slots are never cycled.
+
+Five palettes, after French and Dutch paintings, all in `../app/src/palettes.ts`:
+
+| Palette | Painting | Highlight (what's picked) | Regions, in order |
+|---|---|---|---|
+| Seurat (default) | *Un dimanche après-midi à l'Île de la Grande Jatte*, 1884–86 | parasol vermilion | emerald · orange · ultramarine · sky |
+| Monet | *Impression, soleil levant*, 1872 | the orange sun | cobalt · teal · violet · ochre |
+| Renoir | *Bal du moulin de la Galette*, 1876 | the dancers' rose | blue-violet · gold · green · coral |
+| Van Gogh | *Caféterras bij nacht*, 1888 | the café's chrome yellow | ultramarine · terracotta · green · lilac |
+| Breitner | *Meisje in witte kimono*, 1894 | the kimono's vermilion | ochre · slate blue · olive · plum |
+
+The hexes approximate each painting's pigments as reproduced, then were snapped (hue kept,
+lightness and chroma moved as little as possible) until they pass `validate_palette.js`, light
+and dark: lightness band, chroma floor, >= 3:1 on the surface, CVD Delta E >= 8 and normal-vision
+>= 15 for every pair of the first three slots and for neighbours across all eight. The fourth slot
+(only the four-region datasets use it) stays above the 6 floor and always ships with direct labels.
+The short/medium/long-term ramp of each is an ordinal ramp in the painting's ink hue, validated
+with `--ordinal`. The highlight is each painting's focal colour, as the sun is Monet's: the eye
+goes there first, so it marks what you picked.
+
+The table below is the original pair, still used by the matplotlib recipes in this guide.
+
 
 Diverging pair, validated with the `dataviz` skill's checker (`validate_palette.js`): CVD
 Delta E 21.6 (protan) / 34.5 (tritan) on light, 19.2 / 31.4 on dark -- both comfortably past the

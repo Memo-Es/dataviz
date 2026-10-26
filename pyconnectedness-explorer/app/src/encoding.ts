@@ -19,6 +19,13 @@ export interface Palette {
   accent: string;
 }
 
+/** The one colour rule: an item's colour is its region's (graph 1's beads, graph 2's circles and
+ * arrows, graph 3's dots). Set by main.ts for the dataset and palette on show. */
+export let hueOf: (name: string) => string = () => "#888888";
+export function setHueOf(f: (name: string) => string) {
+  hueOf = f;
+}
+
 export function readPalette(): Palette {
   const cs = getComputedStyle(document.documentElement);
   const v = (name: string) => cs.getPropertyValue(name).trim();

@@ -11,7 +11,7 @@
  */
 import * as d3 from "d3";
 import type { Frame } from "../model";
-import { type Palette, REGION_OF, REGION_ORDER, fmtSigned, regionOrder } from "../encoding";
+import { type Palette, REGION_OF, REGION_ORDER, fmtSigned, regionOrder, hueOf } from "../encoding";
 import { hideTooltip, showTooltip } from "../tooltip";
 
 const SIZE = 720;
@@ -149,11 +149,12 @@ export class NetworkChart {
     edges.sort((a, b) => a.v - b.v); // strongest on top
 
     const edgeStyle = (e: Edge) => {
-      if (pairIdx) return isPair(e) ? { fill: p.accent, op: 0.95 } : { fill: p.secondary, op: 0.07 };
-      if (focusIdx < 0) return { fill: p.secondary, op: 0.42 };
-      if (e.s === focusIdx) return { fill: p.send, op: 0.85 };
-      if (e.r === focusIdx) return { fill: p.recv, op: 0.85 };
-      return { fill: p.secondary, op: 0.07 };
+      // an arrow wears its sender's region colour, like every mark on the page
+      const hue = hueOf(this.names[e.s]);
+      if (pairIdx) return isPair(e) ? { fill: p.accent, op: 0.95 } : { fill: hue, op: 0.06 };
+      if (focusIdx < 0) return { fill: hue, op: 0.5 };
+      if (e.s === focusIdx || e.r === focusIdx) return { fill: hue, op: 0.9 };
+      return { fill: hue, op: 0.06 };
     };
 
     const shape = (e: Edge) =>
@@ -231,12 +232,14 @@ export class NetworkChart {
       .select<SVGCircleElement>("circle.dot")
       .attr("cx", (d) => d.x)
       .attr("cy", (d) => d.y);
+    // region colour; a net transmitter is a solid circle, a net receiver a ring
+    const sends = (d: Pos) => frame.net[d.idx] >= 0;
     tr(dots)
       .attr("r", (d: Pos) => nodeR(Math.abs(frame.net[d.idx])))
-      .attr("fill", (d: Pos) => (frame.net[d.idx] >= 0 ? p.send : p.recv));
+      .attr("fill", (d: Pos) => (sends(d) ? hueOf(d.name) : p.panel));
     dots
-      .attr("stroke", (d) => (d.name === selected ? p.fg : p.panel))
-      .attr("stroke-width", (d) => (d.name === selected ? 2.5 : 1.5));
+      .attr("stroke", (d) => (d.name === selected ? p.fg : sends(d) ? p.panel : hueOf(d.name)))
+      .attr("stroke-width", (d) => (d.name === selected ? 2.5 : sends(d) ? 1.5 : 3));
     nodes
       .select<SVGTextElement>("text.node-label")
       .attr("x", (d) => C + (R + NODE_MAX + 22) * Math.cos(d.angle))

@@ -11,8 +11,10 @@
   --line: rgba(17, 17, 17, 0.08);
   --grid: #eeede8;
   --axis: #d3d3d2;
-  --send: #e34948;
-  --recv: #2a78d6;
+  /* sending vs receiving is said by form (solid vs ring) and sign, not by hue: text stays ink */
+  --send: var(--fg);
+  --recv: var(--fg);
+  --accent-ink: #ffffff;
   --mid: #f0efec;
   --crisis: #6b6a66;
   --band: #f1efe8;
@@ -34,6 +36,8 @@
   --bead-4: #2f9a4c;
   --bead-5: #5a3c9f;
   --bead-6: #d0237a;
+  --bead-7: #7a9a2a;
+  --bead-8: #b86a2a;
   --f-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
   --f-serif: "Source Serif 4", Georgia, serif;
   --f-num: "B612 Mono", ui-monospace, SFMono-Regular, monospace; /* every number on the page */
@@ -49,8 +53,8 @@
   --line: rgba(255, 255, 255, 0.08);
   --grid: #2a2926;
   --axis: #3d3c38;
-  --send: #ee6b6a;
-  --recv: #4a95ef;
+  --send: var(--fg);
+  --recv: var(--fg);
   --mid: #34332f;
   --crisis: #a9a59c;
   --band: #262521;
@@ -469,7 +473,7 @@ main {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #fff;
+  color: var(--accent-ink);
   background: var(--accent);
 }
 
@@ -840,7 +844,7 @@ svg {
 .windows button:first-child[aria-pressed="true"] {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
 }
 
 /* ---- network ---- */
@@ -1528,4 +1532,31 @@ svg {
 .heatmap .cell .dot,
 .heatmap .cell .ring {
   transition: r 0.18s ease;
+}
+
+.legend .dot.solid {
+  background: var(--bead-1);
+}
+
+.legend .dot.ring {
+  background: transparent;
+  box-shadow: inset 0 0 0 2.5px var(--bead-1);
+}
+
+.select.small select {
+  min-width: 0;
+  max-width: 300px;
+  padding: 6px 32px 6px 12px;
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+}
+
+.select.small::after {
+  right: 13px;
+}
+
+@media (max-width: 600px) {
+  .topbar .select.small select {
+    max-width: 150px;
+  }
 }

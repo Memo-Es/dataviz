@@ -29,6 +29,8 @@ export interface State {
   hoverT: number | null;
   playing: boolean;
   theme: "light" | "dark";
+  /** a palette id from palettes.ts, or "agam" for the original */
+  palette: string;
 }
 
 export interface Frame {

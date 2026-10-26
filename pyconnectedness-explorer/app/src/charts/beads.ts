@@ -24,7 +24,7 @@ export interface BeadColors {
 export function readBeadColors(): BeadColors {
   const cs = getComputedStyle(document.documentElement);
   const v = (n: string) => cs.getPropertyValue(n).trim();
-  return { ink: v("--bead-ink"), hues: [1, 2, 3, 4, 5, 6].map((i) => v(`--bead-${i}`)) };
+  return { ink: v("--bead-ink"), hues: [1, 2, 3, 4, 5, 6, 7, 8].map((i) => v(`--bead-${i}`)) };
 }
 
 const H = 360;
@@ -421,7 +421,7 @@ export class BeadsChart {
         .attr("y", 15)
         .attr("dy", "0.35em")
         .attr("text-anchor", "middle")
-        .attr("fill", "#fff")
+        .style("fill", "var(--accent-ink)")
         .text(label);
     }
     tightenDecimals(svg.node()!, ".axis-label, .cursor-label");
