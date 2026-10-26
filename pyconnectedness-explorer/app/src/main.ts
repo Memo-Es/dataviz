@@ -345,21 +345,30 @@ async function main() {
     let link = { s: 0, r: 0, v: -Infinity };
     f.matrix.forEach((row, i) => row.forEach((v, j) => v > link.v && (link = { s: i, r: j, v })));
     const diff = f.total - full.total;
+    const week = (i: number) => fmtDate(parseDate(dyn.dates[i])!);
     const when = preview
-      ? `Previewing the week of ${fmtDate(parseDate(dyn.dates[s.hoverT!])!)} · click to pick it`
+      ? `<span class="ro-tag">Preview</span> Week of ${week(s.hoverT!)} <span class="ro-hint">· click to pick it</span>`
       : s.window === "t"
-        ? `Week of ${fmtDate(parseDate(dyn.dates[s.t])!)} · the ${dyn.window} weeks up to it`
+        ? `Week of ${week(s.t)} <span class="ro-hint">· the ${dyn.window} weeks up to it</span>`
         : f.label;
+    const stat = (label: string, field: string, value: string, sub: string, cls = "") =>
+      `<div class="ro-stat"><span class="ro-label">${label} <code>${field}</code></span>
+        <span class="ro-value ${cls}">${value}</span><span class="ro-sub">${sub}</span></div>`;
     const el = $("readout");
     el.classList.toggle("preview", preview);
     el.innerHTML = `
-      <p class="readout-when">${when}</p>
-      <div class="kpis">
-        <div class="kpi"><span class="k">Spillover index <code>total</code></span><span class="v num">${f.total.toFixed(1)}<small>%</small></span>
-          <span class="d ${diff >= 0 ? "up" : "down"}">${f.key === "full" ? "the long-run level" : `<span class="num">${fmtSigned(diff)}</span> pp vs full sample`}</span></div>
-        <div class="kpi"><span class="k">Top net transmitter <code>net</code></span><span class="v send">${top.n}</span><span class="d"><span class="num">${fmtSigned(top.v)}</span> pp</span></div>
-        <div class="kpi"><span class="k">Top net receiver <code>net</code></span><span class="v recv">${bottom.n}</span><span class="d"><span class="num">${fmtSigned(bottom.v)}</span> pp</span></div>
-        <div class="kpi"><span class="k">Strongest link <code>pairwise_net</code></span><span class="v small">${names[link.s]} → ${names[link.r]}</span><span class="d"><span class="num">${link.v.toFixed(2)}</span> pp</span></div>
+      <p class="ro-when">${when}</p>
+      <div class="ro-stats">
+        ${stat(
+          "Spillover index",
+          "total",
+          `<span class="num">${f.total.toFixed(1)}%</span>`,
+          f.key === "full" ? "the long-run level" : `<span class="num">${fmtSigned(diff)}</span> pp vs full sample`,
+          diff >= 0 ? "up" : "down"
+        )}
+        ${stat("Top net transmitter", "net", top.n, `<span class="num">${fmtSigned(top.v)}</span> pp`, "send")}
+        ${stat("Top net receiver", "net", bottom.n, `<span class="num">${fmtSigned(bottom.v)}</span> pp`, "recv")}
+        ${stat("Strongest link", "pairwise_net", `${names[link.s]} → ${names[link.r]}`, `<span class="num">${link.v.toFixed(2)}</span> pp`)}
       </div>`;
     tightenDecimals(el, ".num");
   }
