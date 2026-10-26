@@ -7,7 +7,7 @@ import { TimelineChart, type PeriodBand } from "./charts/timeline";
 import { RankingChart } from "./charts/ranking";
 import { HeatmapChart } from "./charts/heatmap";
 import { sparkline } from "./charts/sparkline";
-import { type FrequencyRow, dominantBand, renderFrequency } from "./charts/frequency";
+import { BAND_COPY } from "./charts/frequency";
 
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
@@ -81,21 +81,6 @@ app.innerHTML = `
     </div>
   </section>
 
-  <section class="card span-12">
-    <div class="card-head">
-      <div>
-        <h2>How fast shocks travel</h2>
-        <p class="sub" id="freq-finding"></p>
-      </div>
-    </div>
-    <div id="frequency" class="freq"></div>
-    <div class="legend">
-      <span><i class="key fast"></i>Plays out within 5 weeks</span>
-      <span><i class="key mid"></i>5 to 20 weeks</span>
-      <span><i class="key slow"></i>Over 20 weeks</span>
-    </div>
-    <p class="note">Baruník–Křehlík split from the library's own <code>frequency_connectedness</code>, on a 100-week horizon, so totals can differ slightly from the 10-week figures above.</p>
-  </section>
 
   <div class="grid">
 
@@ -236,25 +221,8 @@ async function main() {
     $("heatmap-sub").textContent = `${frame.label} · row → column, in percentage points. Click a cell to follow that pair over time.`;
     heatmap.render(frame, p, model.maxPair[m], focus, s.pair);
     renderDetail(s, frame, p);
-    renderSpeed(s);
     tightenDecimals(document, ".num");
   };
-
-  function renderSpeed(s: State) {
-    const fblocks = meta.frequency[s.measure] as Record<string, FrequencyRow["block"]>;
-    const rows: FrequencyRow[] = windowOptions(data, s.measure)
-      .filter((o) => o.key !== "t" && fblocks[o.key])
-      .map((o) => ({ key: o.key, label: o.label, block: fblocks[o.key] }));
-    const selKey = s.window !== "t" && fblocks[s.window] ? s.window : "full";
-    const sel = rows.find((r) => r.key === selKey)!;
-    const d = dominantBand(sel.block);
-    const word = s.measure === "returns" ? "return" : "volatility";
-    const where = selKey === "full" ? "Over the full sample" : `In ${sel.label}`;
-    $("freq-finding").innerHTML = `${where}, <b class="num">${d.pct.toFixed(0)}%</b> of ${word} spillover plays out <b>${d.copy.phrase}</b>.${
-      s.window === "t" ? " The split is computed per period, not per week, so this shows the full sample; pick a bar to compare." : " Pick a bar to compare periods."
-    }`;
-    renderFrequency($("frequency"), rows, selKey, names, (key) => store.set({ window: key as WindowKey, playing: false }));
-  }
 
   /** The first graph: the notebook's rolling spillover index (cell 14), named as there, with its
    * readout. Also the only thing a timeline hover re-renders. */
@@ -327,6 +295,33 @@ async function main() {
     tightenDecimals(el, ".num");
   }
 
+  /** The spillover index split by how fast shocks play out: the library's frequency_connectedness
+   * (export_cell.py), which exists per period, not per week. */
+  function speedLine(s: State, preview: boolean) {
+    const blocks = meta.frequency[s.measure] as Record<string, (typeof meta.frequency.returns)["full"]>;
+    const fb = !preview && s.window !== "t" ? blocks[s.window] : undefined;
+    const label = `<span class="ro-label">How fast it plays out <code>frequency_connectedness</code></span>`;
+    if (!fb) {
+      return `<div class="ro-speed empty">${label}<span class="ro-sub">Pick a period below to see it: the library
+        computes this split per period, not per week.</span></div>`;
+    }
+    const sum = fb.bands.reduce((a, b) => a + b.total, 0);
+    const segs = fb.bands
+      .map((b) => {
+        const c = BAND_COPY[b.label];
+        return `<span class="seg ${c.cls}" style="flex:${b.total}" title="${c.short}: ${b.total.toFixed(1)} pp"><b class="num">${b.total.toFixed(1)}</b></span>`;
+      })
+      .join("");
+    const words = fb.bands
+      .map((b) => `<span><i class="key ${BAND_COPY[b.label].cls}"></i><b class="num">${((b.total / sum) * 100).toFixed(0)}%</b> ${BAND_COPY[b.label].phrase}</span>`)
+      .join("");
+    return `<div class="ro-speed">${label}
+      <div class="speed-bar">${segs}</div>
+      <div class="speed-words">${words}</div>
+      <span class="ro-note">Baruník–Křehlík bands on a ${fb.horizon}-week horizon, so they add up to
+        <span class="num">${fb.static_total.toFixed(1)}%</span> rather than exactly the index above.</span></div>`;
+  }
+
   /** The graph's readout: the library's own measures for the picked week or period, or for the
    * hovered week as a preview. Field names in the labels are the library's. */
   function renderReadout(s: State) {
@@ -360,12 +355,13 @@ async function main() {
           "total",
           `<span class="num">${f.total.toFixed(1)}%</span>`,
           f.key === "full" ? "the long-run level" : `<span class="num">${fmtSigned(diff)}</span> pp vs full sample`,
-          diff >= 0 ? "up" : "down"
+          f.key === "full" ? "" : diff >= 0 ? "up" : "down" // nothing to compare the full sample with
         )}
         ${stat("Top net transmitter", "net", top.n, `<span class="num">${fmtSigned(top.v)}</span> pp`, "send")}
         ${stat("Top net receiver", "net", bottom.n, `<span class="num">${fmtSigned(bottom.v)}</span> pp`, "recv")}
         ${stat("Strongest link", "pairwise_net", `${names[link.s]} → ${names[link.r]}`, `<span class="num">${link.v.toFixed(2)}</span> pp`)}
-      </div>`;
+      </div>
+      ${speedLine(s, preview)}`;
     tightenDecimals(el, ".num");
   }
 

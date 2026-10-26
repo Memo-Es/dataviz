@@ -62,8 +62,7 @@ npm run build   # static build, deployed by .github/workflows/pages.yml
 
 One page, top to bottom: a headline finding for the selected window, the rolling spillover
 timeline (click/drag or press play to move through the weeks, click a period to compare), the
-network grouped by region, net senders and receivers, how fast shocks travel (the frequency
-split), the full pair matrix, and a detail panel for
+network grouped by region with its net bars, the full pair matrix, and a detail panel for
 the selected market or pair. Returns/volatility and
 light/dark sit in the top bar. `styleguide/` has the matplotlib-portable version of the same
 colour system.

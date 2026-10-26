@@ -114,7 +114,10 @@ export class Model {
         net: dyn.net[s.t],
       };
     } else {
-      const b = staticBlock(this.data, measure, s.window);
+      const raw = staticBlock(this.data, measure, s.window);
+      // full-sample and last-200 blocks carry ISO dates; periods carry plain years
+      const day = (d: string) => (/^\d{4}-\d{2}-\d{2}$/.test(d) ? fmtDate(parseDate(d)!) : d);
+      const b = { ...raw, start: day(raw.start), end: day(raw.end) };
       f = {
         key: s.window,
         label: s.window === "full" ? `Full sample, ${b.start} to ${b.end}` : `${b.label} (${b.start} to ${b.end})`,
