@@ -75,9 +75,10 @@ app.innerHTML = `
       <div class="graph2-net">
         <div id="network" class="chart-host network-host"></div>
         <div class="legend">
-          <span title="PyConnectedness: net"><i class="dot solid"></i>Height: net position · solid above the line, ring below</span>
-          <span title="PyConnectedness: pairwise_net"><i class="arrowkey"></i>Line: from sender to receiver · thicker = stronger</span>
-          <span>Colour: region</span>
+          <span title="PyConnectedness: net"><i class="dot solid"></i>Solid: passes on more</span>
+          <span title="PyConnectedness: net"><i class="dot ring"></i>Ring: takes in more · bigger = more</span>
+          <span title="PyConnectedness: pairwise_net"><i class="arrowkey"></i>Arrow: sender to receiver · thicker and darker = stronger</span>
+          <span id="net-regions"></span>
         </div>
       </div>
       <div class="graph2-side">
@@ -238,6 +239,9 @@ async function main() {
     renderTimeline(store.get(), readPalette());
   });
 
+  $("net-regions").innerHTML = presentRegions.length > 1
+    ? presentRegions.map((g, i) => `<span class="reg"><i style="background:var(--bead-${i + 1})"></i>${g}</span>`).join("")
+    : "";
   $("heatmap-legend").innerHTML = `
     <span title="PyConnectedness: pairwise_net"><i class="hm-dot"></i>Dot: the row passes more to the column than it gets back · bigger = more</span>
     <span><i class="hm-ring"></i>Ring: among the strongest 10%, drawn in the network</span>
@@ -260,7 +264,7 @@ async function main() {
   $("measure").innerHTML = measures.map((k) => `<button data-measure="${k}">${mName(k)}</button>`).join("");
   $("measure").hidden = measures.length < 2;
   $("side-title").innerHTML = `Net connectedness by ${ds.item} <code>net</code>`;
-  $("side-sub").textContent = `What each ${ds.item} gives minus what it takes, in pp: the map's heights, as bars.`;
+  $("side-sub").textContent = `What each ${ds.item} gives minus what it takes, in pp: the circles' sizes, as bars.`;
 
   const dm = meta.dynamic.returns;
   $("footer").innerHTML = `
@@ -320,7 +324,7 @@ async function main() {
     // charts
     renderTimeline(s, p);
 
-    $("network-sub").textContent = `The strongest 10% of flows, ${frame.label.toLowerCase().startsWith("full") ? "over the " : "in the "}${frame.label.replace(/^Full/, "full")}: higher ${ds.items} pass on more, lines run downhill to who takes it in.`;
+    $("network-sub").textContent = `The strongest 10% of flows, ${frame.label.toLowerCase().startsWith("full") ? "over the " : "in the "}${frame.label.replace(/^Full/, "full")}: each arrow runs from the ${ds.item} that passes on more to the one that takes it in.`;
     renderNetReadout(s, frame);
     network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion, s.pair, readBeadColors().ink);
     ranking.render(frame, p, model.maxNet[m], focus, s.selected, motion);
@@ -425,14 +429,9 @@ async function main() {
           ${stat("Links drawn", "", `<span class="num">${links.length}</span>`, `${out} out, ${links.length - out} in`)}
         </div>`;
     } else {
-      const connected = names.filter((_, i) => f.matrix[i].some((v) => Math.abs(v) > f.threshold)).length;
+      // nothing picked: one line, not a row of bookkeeping (the cut-off stays in the arrow tooltips)
       el.innerHTML = `
-        <p class="ro-when">${f.label} <span class="ro-hint">· hover a ${ds.item} for its TO, FROM and NET</span></p>
-        <div class="ro-stats">
-          ${stat("Links drawn", "", `<span class="num">${f.edgeCount}</span>`, `of ${(names.length * (names.length - 1)) / 2} pairs`)}
-          ${stat("Cut-off", "pairwise_net", `<span class="num">${f.threshold.toFixed(2)}</span> pp`, "90th percentile of all cells")}
-          ${stat("Markets with a link", "", `<span class="num">${connected}</span> of ${names.length}`, `${names.length - connected} have none this window`)}
-        </div>`;
+        <p class="ro-when">${f.label} <span class="ro-hint">· the ${f.edgeCount} strongest flows · hover or pick a ${ds.item} for what it gives, takes and nets</span></p>`;
     }
     el.classList.toggle("preview", !!s.hovered && s.hovered !== s.selected);
     tightenDecimals(el, ".num");

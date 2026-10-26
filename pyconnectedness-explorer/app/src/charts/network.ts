@@ -1,34 +1,35 @@
 /**
  * "Who passes shocks to whom": the connectedness network, drawn from the same rule as the
  * library's connectedness_graph() -- one link per pair, from net transmitter to net receiver,
- * keeping only flows above the strongest-10% cut-off (notebook cells 19/21) -- laid out like a
- * transit map on a grid:
- * - a market's height is its net position (`net`): above the middle line it passes on more than
- *   it takes, below it takes more. Shocks run downhill, and markets climb and sink as the weeks
- *   play, like graph 1. Columns are regions; each market keeps its region's colour.
- * - every link is an ink line running straight and at 45 degrees, from sender to receiver, ending
- *   in an arrowhead at the receiver; its weight and its arrowhead grow with the flow
- *   (`pairwise_net`), on one scale across every week.
- * Positions snap to the grid's crossings; a market whose crossing is taken moves to the nearest
- * free one in its region's columns.
+ * keeping only flows above the strongest-10% cut-off (notebook cells 19/21) -- on a ring:
+ * - markets sit around the circle grouped by region, under an arc in the region's colour; each
+ *   wears its region's colour, solid if it passes on more than it takes, a ring if it takes more;
+ *   its size is how far it leans either way (|net|);
+ * - every link is an ink curve from sender to receiver, ending in an arrowhead at the receiver;
+ *   its weight, its arrowhead and its darkness all grow with the flow (`pairwise_net`), so the big
+ *   transfers come forward and the small ones recede;
+ * - names sit outside the ring and the regions are named in the legend, so no text lies on a line.
+ * Scales are fixed across every week, so scrubbing or playing never rescales the picture.
  */
 import * as d3 from "d3";
 import type { Frame } from "../model";
 import { type Palette, REGION_OF, REGION_ORDER, fmtSigned, regionOrder, hueOf } from "../encoding";
 import { hideTooltip, showTooltip } from "../tooltip";
 
-const CELL = 40;
-const W = 720;
-const TOP = 54; // room for the region names
-const ROWS = 15; // grid rows: net from +max (top) to -max (bottom)
-const H = TOP + ROWS * CELL + 24;
-const NODE_R = 13;
+const SIZE = 760;
+const C = SIZE / 2;
+const R = 228; // the ring
+const NODE_MIN = 6;
+const NODE_MAX = 19;
 const LINE_MIN = 1.2;
-const LINE_MAX = 5.5;
+const LINE_MAX = 6.5;
+const GAP_SLOTS = 1.6; // empty slots between regions
+const BEND = 0.35; // how far a link bows toward the centre
 
 interface Pos {
   name: string;
   idx: number;
+  angle: number;
   x: number;
   y: number;
 }
@@ -47,13 +48,12 @@ export interface NetworkCallbacks {
 
 export class NetworkChart {
   private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
-  private gGrid: d3.Selection<SVGGElement, unknown, null, undefined>;
+  private gRegions: d3.Selection<SVGGElement, unknown, null, undefined>;
   private gEdges: d3.Selection<SVGGElement, unknown, null, undefined>;
   private gNodes: d3.Selection<SVGGElement, unknown, null, undefined>;
-  private order: string[];
-  /** each region's grid columns (x of the crossings) */
-  private lanes = new Map<string, number[]>();
+  private pos: Pos[];
   private byIdx: Pos[] = [];
+  private slots: number;
 
   constructor(
     host: HTMLElement,
@@ -64,110 +64,86 @@ export class NetworkChart {
       .select(host)
       .append("svg")
       .attr("class", "network")
-      .attr("viewBox", `0 0 ${W} ${H}`)
+      .attr("viewBox", `0 0 ${SIZE} ${SIZE}`)
       .attr("role", "img")
-      .attr("aria-label", "Map of the strongest net spillovers: higher markets pass on more, lines run from sender to receiver");
+      .attr("aria-label", "Ring of markets with arrows for the strongest net spillovers, from sender to receiver");
     this.svg.on("click", (ev) => {
       if (ev.target === this.svg.node()) cb.onSelect(null);
     });
-    this.gGrid = this.svg.append("g").attr("class", "grid");
+    this.gRegions = this.svg.append("g").attr("class", "regions");
     this.gEdges = this.svg.append("g").attr("class", "edges");
     this.gNodes = this.svg.append("g").attr("class", "nodes");
-    this.order = regionOrder(names);
 
-    // columns: markets stand on every other grid line (two cells apart, so names have room);
-    // each region gets a share of those in proportion to its size, at least two, with a gap
-    // of one between regions
+    const order = regionOrder(names);
     const regions = REGION_ORDER.filter((g) => names.some((n) => REGION_OF[n] === g));
-    // grid lines two cells apart, leaving room on the right for the last column's names
-    const slots = Math.floor((W - CELL - 110) / (2 * CELL)) + 1;
-    const usable = slots - (regions.length - 1);
-    const counts = regions.map((g) => names.filter((n) => REGION_OF[n] === g).length);
-    const sum = d3.sum(counts);
-    const share = counts.map((c) => Math.max(2, Math.round((c / sum) * usable)));
-    while (d3.sum(share) > usable) share[share.indexOf(d3.max(share)!)]--;
-    let col = 0;
-    regions.forEach((g, i) => {
-      this.lanes.set(g, d3.range(share[i]).map((k) => CELL / 2 + CELL / 2 + (col + k) * 2 * CELL));
-      col += share[i] + 1;
+    this.slots = order.length + GAP_SLOTS * Math.max(1, regions.length);
+    let slot = GAP_SLOTS / 2;
+    let prev = REGION_OF[order[0]];
+    this.pos = order.map((name) => {
+      if (REGION_OF[name] !== prev) {
+        slot += GAP_SLOTS;
+        prev = REGION_OF[name];
+      }
+      const angle = -Math.PI / 2 + (slot / this.slots) * 2 * Math.PI;
+      slot += 1;
+      return { name, idx: names.indexOf(name), angle, x: C + R * Math.cos(angle), y: C + R * Math.sin(angle) };
     });
+    for (const p of this.pos) this.byIdx[p.idx] = p;
   }
 
-  /** where each market sits this frame: its net on the rows, its region on the columns */
-  private layout(frame: Frame, maxNet: number): Pos[] {
-    const row = d3.scaleLinear().domain([maxNet, -maxNet]).range([0, ROWS]).clamp(true);
-    const taken = new Set<string>();
-    const out: Pos[] = [];
-    // the strongest positions claim their crossing first
-    const byStrength = [...this.order].sort((a, b) => Math.abs(frame.net[this.names.indexOf(b)]) - Math.abs(frame.net[this.names.indexOf(a)]));
-    for (const name of byStrength) {
-      const idx = this.names.indexOf(name);
-      const lane = this.lanes.get(REGION_OF[name])!;
-      const want = Math.round(row(frame.net[idx]));
-      let spot: [number, number] | null = null;
-      // nearest free crossing: same row first (any of the region's columns), then a row away...
-      for (let d = 0; d <= ROWS && !spot; d++)
-        for (const r of d === 0 ? [want] : [want - d, want + d]) {
-          if (r < 0 || r > ROWS || spot) continue;
-          const mid = (lane.length - 1) / 2;
-          const cols = [...lane.keys()].sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid));
-          for (const c of cols) if (!taken.has(`${c}|${r}`)) { spot = [c, r]; break; }
-        }
-      const [c, r] = spot ?? [0, want];
-      taken.add(`${c}|${r}`);
-      out.push({ name, idx, x: lane[c], y: TOP + r * CELL });
-    }
-    return out;
-  }
-
-  private drawGrid(p: Palette) {
-    this.gGrid.selectAll("*").remove();
-    const g = this.gGrid;
-    const xs = d3.range(CELL / 2, W, CELL);
-    const ys = d3.range(0, ROWS + 1).map((r) => TOP + r * CELL);
-    g.selectAll("line.v").data(xs).join("line").attr("class", "v").attr("x1", (x) => x).attr("x2", (x) => x).attr("y1", TOP).attr("y2", TOP + ROWS * CELL).attr("stroke", p.grid);
-    g.selectAll("line.h").data(ys).join("line").attr("class", "h").attr("x1", CELL / 2).attr("x2", xs[xs.length - 1]).attr("y1", (y) => y).attr("y2", (y) => y).attr("stroke", p.grid);
-    // the middle line: passes on more above, takes more below
-    const zero = TOP + (ROWS / 2) * CELL;
-    g.append("line").attr("x1", CELL / 2).attr("x2", xs[xs.length - 1]).attr("y1", zero).attr("y2", zero).attr("stroke", p.axis).attr("stroke-width", 1.5);
-    g.append("text").attr("class", "net-side").attr("x", CELL / 2).attr("y", TOP - 8).attr("fill", p.fg).text("↑ passes on more");
-    g.append("text").attr("class", "net-side").attr("x", CELL / 2).attr("y", TOP + ROWS * CELL + 18).attr("fill", p.fg).text("↓ takes in more");
-    for (const [region, lane] of this.lanes) {
-      g.append("text")
-        .attr("class", "region-label")
-        .attr("x", (lane[0] + lane[lane.length - 1]) / 2)
-        .attr("y", TOP - 30)
-        .attr("text-anchor", "middle")
-        .attr("fill", p.fg)
-        .text(region.toUpperCase());
+  /** each region: an arc in its colour just outside its markets (named in the legend, so no text
+   * competes with the market names around the ring) */
+  private drawRegions(_p: Palette) {
+    this.gRegions.selectAll("*").remove();
+    const regions = REGION_ORDER.filter((g) => this.names.some((n) => REGION_OF[n] === g));
+    if (regions.length < 2) return;
+    const rr = R + NODE_MAX + 8;
+    const pad = (0.45 / this.slots) * 2 * Math.PI;
+    const pt = (a: number, rad: number) => [C + rad * Math.cos(a), C + rad * Math.sin(a)];
+    for (const region of regions) {
+      const members = this.pos.filter((q) => REGION_OF[q.name] === region);
+      const a0 = members[0].angle - pad;
+      const a1 = members[members.length - 1].angle + pad;
+      const [x0, y0] = pt(a0, rr);
+      const [x1, y1] = pt(a1, rr);
+      this.gRegions
+        .append("path")
+        .attr("d", `M${x0},${y0} A${rr},${rr} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1},${y1}`)
+        .attr("fill", "none")
+        .attr("stroke", hueOf(members[0].name))
+        .attr("stroke-width", 3)
+        .attr("stroke-linecap", "round");
     }
   }
 
-  /** a transit-map route: 45 degrees until level with the receiver, then straight; trimmed at
-   * both circles; returns the line and the arrowhead at the receiver */
-  private route(a: Pos, b: Pos, w: number): { line: string; head: string } {
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const diag = Math.min(Math.abs(dx), Math.abs(dy));
-    const bend: [number, number] = [a.x + Math.sign(dx) * diag, a.y + Math.sign(dy) * diag];
-    const far = (p: [number, number], q: [number, number]) => Math.hypot(q[0] - p[0], q[1] - p[1]) > 1;
-    const A: [number, number] = [a.x, a.y];
-    const B: [number, number] = [b.x, b.y];
-    const pts: [number, number][] = far(A, bend) && far(bend, B) ? [A, bend, B] : [A, B];
-    const toward = (p: [number, number], q: [number, number], by: number): [number, number] => {
-      const L = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1;
-      return [p[0] + ((q[0] - p[0]) * by) / L, p[1] + ((q[1] - p[1]) * by) / L];
+  /** a curve from a to b bowed toward the centre, trimmed at both circles, plus the arrowhead at b */
+  private link(e: Edge, rs: number, rr: number, w: number): { line: string; head: string } {
+    const a = this.byIdx[e.s];
+    const b = this.byIdx[e.r];
+    const mx = (a.x + b.x) / 2;
+    const my = (a.y + b.y) / 2;
+    const cx = mx + (C - mx) * BEND;
+    const cy = my + (C - my) * BEND;
+    const at = (t: number): [number, number] => {
+      const u = 1 - t;
+      return [u * u * a.x + 2 * u * t * cx + t * t * b.x, u * u * a.y + 2 * u * t * cy + t * t * b.y];
     };
-    const headLen = 6 + w * 1.6;
-    const headW = 3.5 + w * 1.2;
-    const prev = pts[pts.length - 2];
-    const start = toward(A, pts[1], NODE_R + 3);
-    const tip = toward(B, prev, NODE_R + 3);
-    const base = toward(tip, prev, headLen);
+    // where the curve leaves the sender, meets the arrowhead's base, and touches the receiver
+    const len = Math.hypot(b.x - a.x, b.y - a.y) * 1.08 || 1;
+    const headLen = 7 + w * 1.7;
+    const headW = 4 + w * 1.25;
+    const t0 = Math.min(0.4, (rs + 3) / len);
+    const tTip = 1 - Math.min(0.4, (rr + 3) / len);
+    const tBase = Math.max(t0 + 0.02, tTip - headLen / len);
+    const n = 20;
+    const pts = d3.range(n + 1).map((i) => at(t0 + ((tBase - t0) * i) / n));
     const f = ([x, y]: [number, number]) => `${x.toFixed(1)},${y.toFixed(1)}`;
-    const line = pts.length === 3 ? `M${f(start)}L${f(bend)}L${f(base)}` : `M${f(start)}L${f(base)}L${f(base)}`;
-    const ux = (tip[0] - base[0]) / headLen;
-    const uy = (tip[1] - base[1]) / headLen;
+    const line = `M${pts.map(f).join("L")}`;
+    const tip = at(tTip);
+    const base = at(tBase);
+    const L = Math.hypot(tip[0] - base[0], tip[1] - base[1]) || 1;
+    const ux = (tip[0] - base[0]) / L;
+    const uy = (tip[1] - base[1]) / L;
     const head = `M${f(tip)}L${f([base[0] - uy * headW, base[1] + ux * headW])}L${f([base[0] + uy * headW, base[1] - ux * headW])}Z`;
     return { line, head };
   }
@@ -187,12 +163,11 @@ export class NetworkChart {
   ) {
     const tr = <S extends d3.Selection<any, any, any, any>>(sel: S): S =>
       (duration > 0 ? sel.transition().duration(duration).ease(d3.easeLinear) : sel.interrupt()) as unknown as S;
-    this.drawGrid(p);
-    const pos = this.layout(frame, maxNet);
-    this.byIdx = [];
-    for (const q of pos) this.byIdx[q.idx] = q;
+    this.drawRegions(p);
     const k = this.names.length;
+    const nodeR = d3.scaleSqrt().domain([0, maxNet]).range([NODE_MIN, NODE_MAX]).clamp(true);
     const weight = d3.scaleSqrt().domain([0, maxPair]).range([LINE_MIN, LINE_MAX]).clamp(true);
+    const strength = d3.scaleLinear().domain([frame.threshold, maxPair]).range([0.45, 1]).clamp(true);
     const focusIdx = focus ? this.names.indexOf(focus) : -1;
     const pairIdx = pair && focusIdx < 0 ? pair.map((n) => this.names.indexOf(n)) : null;
     const isPair = (e: Edge) =>
@@ -203,11 +178,12 @@ export class NetworkChart {
       for (let r = 0; r < k; r++) if (frame.matrix[s][r] > frame.threshold) edges.push({ s, r, v: frame.matrix[s][r] });
     edges.sort((a, b) => a.v - b.v); // strongest on top
 
-    const edgeStyle = (e: Edge) => {
-      if (pairIdx) return isPair(e) ? { c: p.accent, op: 1 } : { c: ink, op: 0.08 };
-      if (focusIdx < 0) return { c: ink, op: 0.85 };
-      return e.s === focusIdx || e.r === focusIdx ? { c: ink, op: 1 } : { c: ink, op: 0.08 };
+    const style = (e: Edge) => {
+      if (pairIdx) return isPair(e) ? { c: p.accent, op: 1 } : { c: ink, op: 0.06 };
+      if (focusIdx < 0) return { c: ink, op: strength(e.v) };
+      return e.s === focusIdx || e.r === focusIdx ? { c: ink, op: 1 } : { c: ink, op: 0.06 };
     };
+    const shape = (e: Edge) => this.link(e, nodeR(Math.abs(frame.net[e.s])), nodeR(Math.abs(frame.net[e.r])), weight(e.v));
 
     const joined = this.gEdges.selectAll<SVGGElement, Edge>("g.edge:not(.exiting)").data(edges, (e) => `${e.s}-${e.r}`);
     const leaving = joined.exit().classed("exiting", true).on("mousemove", null);
@@ -218,19 +194,17 @@ export class NetworkChart {
     entering.append("path").attr("class", "line");
     entering.append("path").attr("class", "head");
     const edgeSel = entering.merge(joined);
-    const shape = (e: Edge) => this.route(this.byIdx[e.s], this.byIdx[e.r], weight(e.v));
     edgeSel.select<SVGPathElement>("path.hit").attr("d", (e) => shape(e).line).attr("fill", "none").attr("stroke", "transparent").attr("stroke-width", 14);
     tr(edgeSel.select<SVGPathElement>("path.line"))
       .attr("d", (e: Edge) => shape(e).line)
       .attr("fill", "none")
-      .attr("stroke", (e: Edge) => edgeStyle(e).c)
+      .attr("stroke", (e: Edge) => style(e).c)
       .attr("stroke-width", (e: Edge) => weight(e.v))
-      .attr("stroke-linejoin", "round")
       .attr("stroke-linecap", "round");
     tr(edgeSel.select<SVGPathElement>("path.head"))
       .attr("d", (e: Edge) => shape(e).head)
-      .attr("fill", (e: Edge) => edgeStyle(e).c);
-    tr(edgeSel).style("opacity", (e: Edge) => edgeStyle(e).op);
+      .attr("fill", (e: Edge) => style(e).c);
+    tr(edgeSel).style("opacity", (e: Edge) => style(e).op);
     edgeSel
       .on("mousemove", (ev: MouseEvent, e) => {
         showTooltip(ev.clientX, ev.clientY, `${this.names[e.s]} → ${this.names[e.r]}`, [
@@ -256,7 +230,7 @@ export class NetworkChart {
 
     const nodes = this.gNodes
       .selectAll<SVGGElement, Pos>("g.node")
-      .data(pos, (d) => d.name)
+      .data(this.pos, (d) => d.name)
       .join((enter) => {
         const g = enter.append("g").attr("class", "node").attr("tabindex", 0).attr("role", "button");
         g.append("circle").attr("class", "hit");
@@ -281,23 +255,26 @@ export class NetworkChart {
       });
 
     nodes.attr("aria-label", (d) => `${d.name}, net ${fmtSigned(frame.net[d.idx])} percentage points`);
-    tr(nodes).attr("transform", (d: Pos) => `translate(${d.x},${d.y})`);
     // fade the circles that aren't linked, never their names: text keeps its 7:1 (WCAG AAA)
     const lit = (d: Pos) => (focusIdx < 0 && !pairIdx) || linked.has(d.idx);
-    nodes.select<SVGCircleElement>("circle.hit").attr("r", CELL / 2).attr("fill", "transparent");
-    // region colour; a net transmitter is a solid circle, a net receiver a ring
     const sends = (d: Pos) => frame.net[d.idx] >= 0;
-    nodes
-      .select<SVGCircleElement>("circle.dot")
-      .attr("r", NODE_R)
+    nodes.select<SVGCircleElement>("circle.hit").attr("cx", (d) => d.x).attr("cy", (d) => d.y).attr("r", NODE_MAX + 6).attr("fill", "transparent");
+    const dots = nodes.select<SVGCircleElement>("circle.dot").attr("cx", (d) => d.x).attr("cy", (d) => d.y);
+    dots
       .style("opacity", (d) => (lit(d) ? 1 : 0.28))
       .attr("fill", (d) => (sends(d) ? hueOf(d.name) : p.panel))
       .attr("stroke", (d) => (d.name === selected ? p.fg : hueOf(d.name)))
-      .attr("stroke-width", (d) => (d.name === selected ? 3.5 : sends(d) ? 0 : 3.5));
+      .attr("stroke-width", (d) => (d.name === selected ? 3.5 : sends(d) ? 0 : 3));
+    tr(dots).attr("r", (d: Pos) => nodeR(Math.abs(frame.net[d.idx])));
     nodes
       .select<SVGTextElement>("text.node-label")
-      .attr("x", NODE_R * 0.7)
-      .attr("y", NODE_R + 12)
+      .attr("x", (d) => C + (R + NODE_MAX + 20) * Math.cos(d.angle))
+      .attr("y", (d) => C + (R + NODE_MAX + 20) * Math.sin(d.angle))
+      .attr("dy", "0.35em")
+      .attr("text-anchor", (d) => {
+        const c = Math.cos(d.angle);
+        return c > 0.25 ? "start" : c < -0.25 ? "end" : "middle";
+      })
       .attr("fill", p.fg)
       .attr("font-weight", (d) => (d.name === selected || d.idx === focusIdx ? 700 : 500))
       .text((d) => d.name);
