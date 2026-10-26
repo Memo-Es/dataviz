@@ -7,7 +7,7 @@ checked out at the pinned commit. .github/workflows/notebook-data.yml runs it on
 runner (which can reach Yahoo) and commits the result; it also runs fine locally.
 
 Also saves the notebook's own figures (its matplotlib outputs, untouched) to
-pipeline/out/reference/ so the app's charts can be checked against them by eye.
+pipeline/out/reference/, for checking the app's charts against by eye.
 """
 import base64
 import hashlib
@@ -51,8 +51,8 @@ REFERENCE = {
     21: "05_last_200_weeks.png",
     28: "periods_heatmaps.png",
 }
-# out/reference/ for checking by eye, app/public/data/figures/ so the app can show them as-is
-targets = [ROOT / "pipeline" / "out" / "reference", ROOT / "app" / "public" / "data" / "figures"]
+# kept in out/reference/ for checking the app's charts against by eye (not shown in the app)
+targets = [ROOT / "pipeline" / "out" / "reference"]
 for d in targets:
     d.mkdir(parents=True, exist_ok=True)
 for idx, name in REFERENCE.items():

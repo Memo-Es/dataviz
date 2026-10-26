@@ -9,14 +9,6 @@ import { HeatmapChart } from "./charts/heatmap";
 import { sparkline } from "./charts/sparkline";
 import { type FrequencyRow, dominantBand, renderFrequency } from "./charts/frequency";
 
-const FIGURES = [
-  { file: "01_rolling_spillover_index.png", cell: 14, title: "Rolling spillover index" },
-  { file: "02_net_small_multiples.png", cell: 17, title: "Net spillover by market" },
-  { file: "03_net_pairwise_heatmaps.png", cell: 18, title: "Pairwise heatmaps" },
-  { file: "04_connectedness_network.png", cell: 19, title: "Network, strongest 10%" },
-  { file: "05_last_200_weeks.png", cell: 21, title: "Last 200 weeks" },
-  { file: "periods_heatmaps.png", cell: 28, title: "Four periods" },
-];
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
@@ -124,16 +116,6 @@ app.innerHTML = `
     <section class="card span-5 detail" id="detail"></section>
   </div>
 
-  <section class="card span-12">
-    <div class="card-head">
-      <div>
-        <h2>The notebook's own figures</h2>
-        <p class="sub">Exactly as <code>examples/Demo.ipynb</code> drew them with matplotlib on this run, for comparison.</p>
-      </div>
-    </div>
-    <div class="tabs" id="fig-tabs" role="tablist"></div>
-    <figure class="nb-figure"><img id="fig-img" alt="" /><figcaption id="fig-cap"></figcaption></figure>
-  </section>
 </main>
 
 <footer class="footer" id="footer"></footer>
@@ -198,29 +180,6 @@ async function main() {
       if (hoverT !== store.get().hoverT) store.set({ hoverT });
     }
   );
-
-  // notebook figures
-  const figTabs = $("fig-tabs");
-  let fig = 3;
-  const showFig = () => {
-    figTabs.querySelectorAll("button").forEach((b, i) => b.setAttribute("aria-selected", String(i === fig)));
-    const f = FIGURES[fig];
-    const img = $<HTMLImageElement>("fig-img");
-    img.src = `${import.meta.env.BASE_URL}data/figures/${f.file}`;
-    img.alt = `Notebook cell ${f.cell}: ${f.title}`;
-    $("fig-cap").textContent = `Cell ${f.cell} of Demo.ipynb, unmodified plotting code.`;
-  };
-  FIGURES.forEach((f, i) => {
-    const b = document.createElement("button");
-    b.role = "tab";
-    b.textContent = f.title;
-    b.onclick = () => {
-      fig = i;
-      showFig();
-    };
-    figTabs.appendChild(b);
-  });
-  showFig();
 
   $("footer").innerHTML = `
     <p><b>Where the numbers come from.</b> Every value on this page was produced by running
