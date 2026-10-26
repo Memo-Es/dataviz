@@ -25,6 +25,8 @@ export interface State {
   /** [row, column] of the pair picked on the matrix or network; row → column when positive */
   pair: [string, string] | null;
   hovered: string | null;
+  /** week under the pointer on the timeline: previews the readout, changes nothing else */
+  hoverT: number | null;
   playing: boolean;
   theme: "light" | "dark";
 }

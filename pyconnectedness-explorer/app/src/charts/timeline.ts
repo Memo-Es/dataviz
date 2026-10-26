@@ -28,7 +28,8 @@ export class TimelineChart {
     private host: HTMLElement,
     private onPick: (t: number) => void,
     private onPickPeriod: (key: string) => void,
-    private onPickMeasure: (measure: "returns" | "volatility") => void
+    private onPickMeasure: (measure: "returns" | "volatility") => void,
+    private onHoverWeek: (t: number | null) => void = () => {}
   ) {
     this.svg = d3.select(host).append("svg").attr("class", "timeline").attr("height", H);
     new ResizeObserver(() => {
@@ -40,12 +41,14 @@ export class TimelineChart {
     }).observe(host);
 
     let dragging = false;
-    const pick = (ev: PointerEvent) => {
+    const weekAt = (ev: PointerEvent) => {
       const [mx] = d3.pointer(ev, this.svg.node());
-      const x = this.x();
-      const d = x.invert(mx);
-      const i = d3.bisector((v: Date) => v).center(this.dates, d);
-      if (i >= 0 && i < this.dates.length) this.onPick(i);
+      const i = d3.bisector((v: Date) => v).center(this.dates, this.x().invert(mx));
+      return i >= 0 && i < this.dates.length ? i : null;
+    };
+    const pick = (ev: PointerEvent) => {
+      const i = weekAt(ev);
+      if (i !== null) this.onPick(i);
     };
     this.svg
       .on("pointerdown", (ev: PointerEvent) => {
@@ -54,7 +57,12 @@ export class TimelineChart {
         (ev.target as Element).setPointerCapture?.(ev.pointerId);
         pick(ev);
       })
-      .on("pointermove", (ev: PointerEvent) => dragging && pick(ev))
+      .on("pointermove", (ev: PointerEvent) => {
+        if (dragging) return pick(ev);
+        // mouse only: on touch, a move is a drag, and there is no hover to preview
+        if (ev.pointerType === "mouse") this.onHoverWeek((ev.target as Element).closest(".band-hit") ? null : weekAt(ev));
+      })
+      .on("pointerleave", () => this.onHoverWeek(null))
       .on("pointerup pointercancel", () => (dragging = false));
   }
 
@@ -80,9 +88,10 @@ export class TimelineChart {
     activePeriod: string | null,
     p: Palette,
     other: { measure: "returns" | "volatility"; dyn: DynamicBlock } | null = null,
-    measure: "returns" | "volatility" = "returns"
+    measure: "returns" | "volatility" = "returns",
+    hoverT: number | null = null
   ) {
-    this.last = [dyn, full, episodes, periods, t, activePeriod, p, other, measure];
+    this.last = [dyn, full, episodes, periods, t, activePeriod, p, other, measure, hoverT];
     // both measures come from the same balanced panel, so their windows line up week for week
     const cmp = other && other.dyn.total.length === dyn.total.length ? other : null;
     this.dates = dyn.dates.map((d) => parseDate(d)!);
@@ -293,6 +302,14 @@ export class TimelineChart {
       g.append("text").attr("class", "end-name").attr("y", -2).attr("fill", e.on ? p.fg : p.muted).text(NAME[e.m]);
       g.append("text").attr("class", "end-value axis-label").attr("y", 12).attr("fill", e.on ? p.fg : p.muted).text(`${e.v.toFixed(1)}%`);
     });
+
+    // the week under the pointer: a quiet guide; its numbers are in the readout above the chart
+    if (hoverT !== null && hoverT !== t) {
+      const hx = x(this.dates[hoverT]);
+      svg.append("line").attr("class", "hover-guide").attr("x1", hx).attr("x2", hx).attr("y1", M.top).attr("y2", H - M.bottom).attr("stroke", p.fg).attr("stroke-opacity", 0.35).attr("stroke-dasharray", "3 3");
+      svg.append("circle").attr("cx", hx).attr("cy", y(dyn.total[hoverT])).attr("r", 4).attr("fill", p.fg);
+      if (cmp) svg.append("circle").attr("cx", hx).attr("cy", y(cmp.dyn.total[hoverT])).attr("r", 3).attr("fill", p.panel).attr("stroke", p.muted).attr("stroke-width", 1.5);
+    }
 
     // the selected week
     if (t !== null) {

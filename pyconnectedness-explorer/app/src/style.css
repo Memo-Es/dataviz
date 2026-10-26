@@ -261,16 +261,45 @@ main {
   color: var(--secondary);
 }
 
-/* the selected week's summary, directly under the timeline that drives it */
-.summary {
-  margin: 28px 0 8px;
+/* the first graph's readout: part of the chart card, directly above the line it describes */
+.readout {
+  margin: 4px 0 10px;
 }
 
-.summary-line {
-  margin: 0 0 16px;
-  max-width: 980px;
-  font: 500 clamp(21px, 2.4vw, 30px) / 1.25 var(--f-serif);
-  letter-spacing: -0.01em;
+.readout-when {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--secondary);
+}
+
+.readout .kpis {
+  box-shadow: none;
+  border-radius: 14px;
+}
+
+.readout .kpi {
+  padding: 14px 16px;
+}
+
+/* hover preview: same layout, visibly provisional */
+.readout.preview .kpis {
+  border-style: dashed;
+  border-color: var(--axis);
+}
+
+.readout.preview .readout-when {
+  color: var(--accent);
+}
+
+.kpi .k code {
+  margin-left: 4px;
+  padding: 0 4px;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
 }
 
 .kpis {

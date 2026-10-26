@@ -47,7 +47,7 @@ app.innerHTML = `
   <section class="card span-12">
     <div class="card-head">
       <div>
-        <h2>When markets became fragile</h2>
+        <h2 id="timeline-title"></h2>
         <p class="sub" id="timeline-sub"></p>
       </div>
       <div class="player">
@@ -56,14 +56,10 @@ app.innerHTML = `
         <button class="icon-btn" id="next" aria-label="Next week">›</button>
       </div>
     </div>
+    <!-- the chart's own readout: what the picked (or hovered) week says -->
+    <div class="readout" id="readout" aria-live="polite"></div>
     <div id="timeline" class="chart-host"></div>
     <div class="windows" id="windows" role="group" aria-label="Window shown on every chart"></div>
-  </section>
-
-  <!-- reacts to the timeline, so it sits right under it -->
-  <section class="summary" aria-live="polite">
-    <p class="summary-line" id="headline"></p>
-    <div class="kpis" id="kpis"></div>
   </section>
 
   <div class="grid">
@@ -76,7 +72,7 @@ app.innerHTML = `
       </div>
       <div id="network" class="chart-host network-host"></div>
       <div class="legend">
-        <span><i class="dot send"></i>Net sender</span>
+        <span><i class="dot send"></i>Net transmitter</span>
         <span><i class="dot recv"></i>Net receiver</span>
         <span><i class="taper"></i>Arrow narrows toward the receiver; width = size of the flow</span>
         <span><i class="sizes"><b></b><b></b><b></b></i>Circle size = net spillover</span>
@@ -86,7 +82,7 @@ app.innerHTML = `
     <section class="card span-5">
       <div class="card-head">
         <div>
-          <h2>Net senders and receivers</h2>
+          <h2>Net transmitters and receivers</h2>
           <p class="sub">Shocks given minus shocks received, in percentage points</p>
         </div>
       </div>
@@ -170,6 +166,7 @@ async function main() {
     selected: null,
     pair: null,
     hovered: null,
+    hoverT: null,
     playing: false,
     theme,
   });
@@ -195,9 +192,12 @@ async function main() {
   const heatmap = new HeatmapChart($("heatmap"), names, hover, (n) => select(n), pickPair);
   const timeline = new TimelineChart(
     $("timeline"),
-    (t) => store.set({ t, window: "t" }),
+    (t) => store.set({ t, window: "t", hoverT: null }),
     (key) => store.set({ window: store.get().window === key ? "t" : (key as WindowKey) }),
-    (measure) => setMeasure(measure)
+    (measure) => setMeasure(measure),
+    (hoverT) => {
+      if (hoverT !== store.get().hoverT) store.set({ hoverT });
+    }
   );
 
   // notebook figures
@@ -265,48 +265,8 @@ async function main() {
       wins.appendChild(b);
     }
 
-    // headline + KPIs
-    const order = names.map((n, i) => ({ n, v: frame.net[i] })).sort((a, b) => b.v - a.v);
-    const top = order[0];
-    const bottom = order[order.length - 1];
-    let link = { s: 0, r: 0, v: -Infinity };
-    frame.matrix.forEach((row, i) => row.forEach((v, j) => v > link.v && (link = { s: i, r: j, v })));
-    const diff = frame.total - full.total;
-    const when = s.window === "t" ? `In the 200 weeks to ${fmtDate(parseDate(dyn.dates[s.t])!)}` : `Over ${frame.short.toLowerCase() === "full sample" ? "the full sample" : frame.short}`;
-    $("headline").innerHTML = `${when}, <span class="hl num">${frame.total.toFixed(1)}%</span> of ${word} moves came from shocks in other markets. <span class="hl-send">${top.n}</span> sent the most.`;
-    $("kpis").innerHTML = `
-      <div class="kpi"><span class="k">Total ${word} spillover</span><span class="v num">${frame.total.toFixed(1)}<small>%</small></span>
-        <span class="d ${diff >= 0 ? "up" : "down"}">${s.window === "full" ? "the long-run level" : `<span class="num">${fmtSigned(diff)}</span> pp vs full sample`}</span></div>
-      <div class="kpi"><span class="k">Biggest sender</span><span class="v send">${top.n}</span><span class="d">net <span class="num">${fmtSigned(top.v)}</span> pp</span></div>
-      <div class="kpi"><span class="k">Biggest receiver</span><span class="v recv">${bottom.n}</span><span class="d">net <span class="num">${fmtSigned(bottom.v)}</span> pp</span></div>
-      <div class="kpi"><span class="k">Strongest single link</span><span class="v small">${names[link.s]} → ${names[link.r]}</span><span class="d"><span class="num">${link.v.toFixed(2)}</span> pp</span></div>`;
-
     // charts
-    const periods: PeriodBand[] = (["p1", "p2", "p3", "p4"] as const).map((k) => {
-      const b = staticBlock(data, m, k);
-      return {
-        key: k,
-        start: new Date(Date.UTC(+b.start, 0, 1)),
-        end: new Date(Date.UTC(+b.end, 11, 31)),
-        label: `${b.start}–${b.end}`,
-        total: b.total,
-      };
-    });
-    $("timeline-sub").textContent = `Total ${word} spillover (dark line), with ${
-      m === "returns" ? "volatility" : "return"
-    } spillover behind it (grey) to compare. Each week is measured over the 200 weeks before it; dashed lines mark the notebook's six crisis dates. Click or drag to pick a week, or click a period below.`;
-    const otherMeasure: Measure = m === "returns" ? "volatility" : "returns";
-    timeline.render(
-      dyn,
-      full,
-      meta.episodes,
-      periods,
-      s.window === "t" ? s.t : null,
-      s.window.startsWith("p") ? s.window : null,
-      p,
-      { measure: otherMeasure, dyn: meta.dynamic[otherMeasure] },
-      m
-    );
+    renderTimeline(s, p);
 
     $("network-sub").textContent = `${frame.label} · ${frame.edgeCount} strongest links (top 10%, above ${frame.threshold.toFixed(2)} pp)`;
     network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion, s.pair);
@@ -332,6 +292,76 @@ async function main() {
       s.window === "t" ? " The split is computed per period, not per week, so this shows the full sample; pick a bar to compare." : " Pick a bar to compare periods."
     }`;
     renderFrequency($("frequency"), rows, selKey, names, (key) => store.set({ window: key as WindowKey, playing: false }));
+  }
+
+  /** The first graph: the notebook's rolling spillover index (cell 14), named as there, with its
+   * readout. Also the only thing a timeline hover re-renders. */
+  function renderTimeline(s: State, p: ReturnType<typeof readPalette>) {
+    const m = s.measure;
+    const word = m === "returns" ? "return" : "volatility";
+    const other: Measure = m === "returns" ? "volatility" : "returns";
+    const periods: PeriodBand[] = (["p1", "p2", "p3", "p4"] as const).map((k) => {
+      const b = staticBlock(data, m, k);
+      return {
+        key: k,
+        start: new Date(Date.UTC(+b.start, 0, 1)),
+        end: new Date(Date.UTC(+b.end, 11, 31)),
+        label: `${b.start}–${b.end}`,
+        total: b.total,
+      };
+    });
+    const dyn = meta.dynamic[m];
+    $("timeline-title").textContent = `Rolling ${word} spillover index`;
+    $("timeline-sub").innerHTML = `The total connectedness index (<code>dynamic_connectedness(…).total</code>): each week is
+      measured over the ${dyn.window} weeks before it, VAR(${dyn.lags}), ${dyn.horizon}-week horizon. Grey: the ${
+        other === "returns" ? "return" : "volatility"
+      } index, to compare. Dashed lines: the notebook's six crisis dates. <b>Hover to preview a week; click or drag to pick it.</b>`;
+    timeline.render(
+      dyn,
+      staticBlock(data, m, "full"),
+      meta.episodes,
+      periods,
+      s.window === "t" ? s.t : null,
+      s.window.startsWith("p") ? s.window : null,
+      p,
+      { measure: other, dyn: meta.dynamic[other] },
+      m,
+      s.hoverT
+    );
+    renderReadout(s);
+  }
+
+  /** The graph's readout: the library's own measures for the picked week or period, or for the
+   * hovered week as a preview. Field names in the labels are the library's. */
+  function renderReadout(s: State) {
+    const m = s.measure;
+    const dyn = meta.dynamic[m];
+    const preview = s.hoverT !== null && !(s.window === "t" && s.hoverT === s.t);
+    const f = model.frame(preview ? { ...s, window: "t", t: s.hoverT! } : s);
+    const full = staticBlock(data, m, "full");
+    const order = names.map((n, i) => ({ n, v: f.net[i] })).sort((a, b) => b.v - a.v);
+    const top = order[0];
+    const bottom = order[order.length - 1];
+    let link = { s: 0, r: 0, v: -Infinity };
+    f.matrix.forEach((row, i) => row.forEach((v, j) => v > link.v && (link = { s: i, r: j, v })));
+    const diff = f.total - full.total;
+    const when = preview
+      ? `Previewing the week of ${fmtDate(parseDate(dyn.dates[s.hoverT!])!)} · click to pick it`
+      : s.window === "t"
+        ? `Week of ${fmtDate(parseDate(dyn.dates[s.t])!)} · the ${dyn.window} weeks up to it`
+        : f.label;
+    const el = $("readout");
+    el.classList.toggle("preview", preview);
+    el.innerHTML = `
+      <p class="readout-when">${when}</p>
+      <div class="kpis">
+        <div class="kpi"><span class="k">Spillover index <code>total</code></span><span class="v num">${f.total.toFixed(1)}<small>%</small></span>
+          <span class="d ${diff >= 0 ? "up" : "down"}">${f.key === "full" ? "the long-run level" : `<span class="num">${fmtSigned(diff)}</span> pp vs full sample`}</span></div>
+        <div class="kpi"><span class="k">Top net transmitter <code>net</code></span><span class="v send">${top.n}</span><span class="d"><span class="num">${fmtSigned(top.v)}</span> pp</span></div>
+        <div class="kpi"><span class="k">Top net receiver <code>net</code></span><span class="v recv">${bottom.n}</span><span class="d"><span class="num">${fmtSigned(bottom.v)}</span> pp</span></div>
+        <div class="kpi"><span class="k">Strongest link <code>pairwise_net</code></span><span class="v small">${names[link.s]} → ${names[link.r]}</span><span class="d"><span class="num">${link.v.toFixed(2)}</span> pp</span></div>
+      </div>`;
+    tightenDecimals(el, ".num");
   }
 
   function renderPair(s: State, frame: ReturnType<Model["frame"]>, p: ReturnType<typeof readPalette>) {
@@ -425,9 +455,18 @@ async function main() {
   }
 
   let raf = 0;
-  store.subscribe((s) => {
+  let pendingFull = false;
+  store.subscribe((s, prev) => {
+    // a timeline hover only changes the first graph, so skip redrawing everything else
+    const keys = Object.keys(s) as (keyof State)[];
+    if (keys.some((k) => k !== "hoverT" && s[k] !== prev[k])) pendingFull = true;
     cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(() => render(s));
+    raf = requestAnimationFrame(() => {
+      const st = store.get();
+      if (pendingFull) render(st);
+      else renderTimeline(st, readPalette());
+      pendingFull = false;
+    });
   });
   render(store.get());
 

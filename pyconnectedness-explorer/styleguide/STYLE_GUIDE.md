@@ -44,6 +44,17 @@ The explorer adds a fifth view, not from a library plot: **speed bars** for the 
 (`frequency_connectedness`). They use an ordinal one-hue ramp, darker = faster, which is also
 kept away from red/blue (see Palette).
 
+## Naming: use the library's words
+
+Graph titles and labels follow the PyConnectedness code and notebook, with a plain explanation
+next to them:
+- "Rolling return spillover index" (notebook cell 14), the `total` of `dynamic_connectedness`.
+- "Net transmitter" and "net receiver" (`viz/network.py`'s docstring), not "sender".
+- "Net pairwise" for `pairwise_net`.
+
+Where it helps the team map a number back to code, show the field name small, in the number
+font (e.g. `total`, `net`, `pairwise_net`).
+
 ## Layout rule: controls above what they control
 
 Anything that changes in response to a control sits **below** that control, so the reader looks
@@ -51,8 +62,11 @@ at the cause first and sees the effect right under it. In the explorer:
 
 - The Returns / Volatility toggle sits in the top bar, because it changes everything.
 - The timeline (pick a week or period) comes next.
-- The summary sentence and the four key numbers sit directly under the timeline, because they
-  describe the picked week.
+- The numbers a graph produces belong **inside that graph**, as its readout, not in a separate
+  summary. The rolling spillover index carries a readout strip directly above its line: the
+  index, the top net transmitter and receiver, and the strongest pairwise link for the picked
+  week. Hovering previews another week there (dashed, "Previewing …"); clicking picks it for the
+  whole page.
 - The charts come after.
 - The page title above the timeline is fixed text; it never changes with a selection.
 
