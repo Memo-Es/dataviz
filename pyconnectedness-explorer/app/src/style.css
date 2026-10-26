@@ -1388,11 +1388,11 @@ svg {
   cursor: crosshair;
 }
 
-.beads-item {
+.beads-item text {
   font-size: 11.5px;
 }
 
-.beads-item.on {
+.beads-item text.on {
   font-weight: 700;
 }
 
@@ -1438,4 +1438,50 @@ svg {
   width: 14px;
   background: linear-gradient(90deg, transparent 0 30%, var(--bead-ink) 30% 70%, transparent 70%);
   box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.beads-regions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 2px;
+}
+
+.beads-regions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--secondary);
+  font: 600 12.5px/1.2 var(--f-sans);
+  cursor: pointer;
+}
+
+.beads-regions button:hover {
+  border-color: var(--axis);
+  color: var(--fg);
+}
+
+.beads-regions button[aria-pressed="true"] {
+  border-color: var(--fg);
+  color: var(--fg);
+}
+
+.beads-regions i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+.beads-region text:first-child {
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.beads-count {
+  font-size: 11px;
 }

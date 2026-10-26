@@ -3,8 +3,9 @@
  * the line chart, all from the library's dynamic_connectedness:
  *   - each vertical string is one step in time (sampled to fit the width);
  *   - the top row is the rolling spillover index itself (`total`);
- *   - every other row is one item, grouped as in the network. Its coloured bead widens with what
- *     the item passes to the others (`directional_to`); its dark core, with what it takes from them
+ *   - below it, one row per region in the region's colour (the average of its items), or, with a
+ *     region picked, one row per item of that region. A bead's colour widens with what the row
+ *     passes to the others (`directional_to`); its dark core, with what it takes from them
  *     (`directional_from`). Each starts at its measure's usual level (the median), so a quiet
  *     stretch is bare string and the beads gather where shocks spread.
  * Beads are painted on a canvas (thousands of them); the cursor, labels and axis are SVG on top,
@@ -28,8 +29,20 @@ export function readBeadColors(): BeadColors {
 
 const TOP = 34; // room for the cursor's pill
 const HEADER = 30; // the spillover-index row
-const GAP = 14; // between the header and the first group, and between groups
+const GAP = 14; // between the header and the rows, and between region rows
 const BOTTOM = 26;
+
+interface Row {
+  label: string;
+  /** an item's name, when the row is one item */
+  item: string | null;
+  /** the region the row belongs to (or is) */
+  group: string;
+  /** column indices of the items averaged in this row (one, for an item row) */
+  members: number[];
+  y: number;
+  h: number;
+}
 
 export class BeadsChart {
   private canvas: HTMLCanvasElement;
@@ -39,8 +52,7 @@ export class BeadsChart {
   private T = 0;
   private last: Parameters<BeadsChart["render"]> | null = null;
   private paintedKey = "";
-  private rows: { name: string; y: number; group: string }[] = [];
-  private rowH = 14;
+  private rows: Row[] = [];
 
   constructor(
     private host: HTMLElement,
@@ -49,7 +61,8 @@ export class BeadsChart {
     private groupOrder: string[],
     private onPick: (t: number) => void,
     private onHoverWeek: (t: number | null) => void,
-    private onHoverItem: (name: string | null) => void
+    private onHoverItem: (name: string | null) => void,
+    private onPickRegion: (group: string | null) => void
   ) {
     host.classList.add("beads-host");
     this.canvas = document.createElement("canvas");
@@ -67,26 +80,31 @@ export class BeadsChart {
     let dragging = false;
     const at = (ev: PointerEvent) => {
       const [mx, my] = d3.pointer(ev, this.svg.node());
-      const t = this.tAt(mx);
-      const row = this.rows.find((r) => my >= r.y && my < r.y + this.rowH);
-      return { t, item: row?.name ?? null };
+      const row = this.rows.find((r) => my >= r.y && my < r.y + r.h) ?? null;
+      return { t: this.tAt(mx), row, onLabel: mx < this.left - 4 };
     };
     this.svg
       .on("pointerdown", (ev: PointerEvent) => {
+        const { t, row, onLabel } = at(ev);
+        // a region's name opens it up into its items
+        if (onLabel) {
+          if (row && !row.item) this.onPickRegion(row.group);
+          return;
+        }
         dragging = true;
         (ev.target as Element).setPointerCapture?.(ev.pointerId);
-        const { t } = at(ev);
         if (t !== null) this.onPick(t);
       })
       .on("pointermove", (ev: PointerEvent) => {
-        const { t, item } = at(ev);
+        const { t, row, onLabel } = at(ev);
         if (dragging) {
           if (t !== null) this.onPick(t);
           return;
         }
         if (ev.pointerType !== "mouse") return;
-        this.onHoverWeek(t);
-        this.onHoverItem(item);
+        this.svg.style("cursor", onLabel ? (row && !row.item ? "pointer" : "default") : "crosshair");
+        this.onHoverWeek(onLabel ? null : t);
+        this.onHoverItem(row?.item ?? null);
       })
       .on("pointerleave", () => {
         this.onHoverWeek(null);
@@ -122,6 +140,11 @@ export class BeadsChart {
     return Math.max(0, Math.min(this.T - 1, Math.round(f * (this.T - 1))));
   }
 
+  private get groups() {
+    return this.groupOrder.filter((g) => this.names.some((n) => this.groupOf[n] === g));
+  }
+
+  /** `region`: null shows every region as one row (or every item, when there's only one region) */
   render(
     dyn: DynamicBlock,
     periods: PeriodBand[],
@@ -131,35 +154,42 @@ export class BeadsChart {
     c: BeadColors,
     hoverT: number | null,
     hoveredItem: string | null,
+    region: string | null,
     paintKey: string
   ) {
-    this.last = [dyn, periods, t, activePeriod, p, c, hoverT, hoveredItem, paintKey];
+    this.last = [dyn, periods, t, activePeriod, p, c, hoverT, hoveredItem, region, paintKey];
     this.T = dyn.dates.length;
-    const k = this.names.length;
-    const groups = this.groupOrder.filter((g) => this.names.some((n) => this.groupOf[n] === g));
-    // rows: as tall as fits a ~340 px band, between 12 px (labels stay legible) and 16 px each
-    this.rowH = Math.max(12, Math.min(16, Math.floor((340 - GAP * (groups.length - 1)) / k)));
+    const groups = this.groups;
+    const idx = (g: string) => this.names.flatMap((n, i) => (this.groupOf[n] === g ? [i] : []));
     let y = TOP + HEADER + GAP;
     this.rows = [];
-    for (const g of groups) {
-      for (const n of this.names.filter((m) => this.groupOf[m] === g)) {
-        this.rows.push({ name: n, y, group: g });
-        y += this.rowH;
+    if (!region && groups.length > 1) {
+      // one row per region, tall, in its own colour
+      for (const g of groups) {
+        this.rows.push({ label: g, item: null, group: g, members: idx(g), y, h: 34 });
+        y += 34 + GAP;
+      }
+    } else {
+      const shown = region ? idx(region) : this.names.map((_, i) => i);
+      const h = Math.max(12, Math.min(22, Math.floor(300 / shown.length)));
+      for (const i of shown) {
+        this.rows.push({ label: this.names[i], item: this.names[i], group: this.groupOf[this.names[i]], members: [i], y, h });
+        y += h;
       }
       y += GAP;
     }
     this.height = y - GAP + BOTTOM;
 
-    const key = `${paintKey}|${this.width}|${activePeriod}|${this.T}`;
+    const key = `${paintKey}|${this.width}|${activePeriod}|${this.T}|${region}`;
     if (key !== this.paintedKey) {
-      this.paint(dyn, periods, activePeriod, p, c, groups);
+      this.paint(dyn, periods, activePeriod, c, groups);
       this.paintedKey = key;
     }
-    this.overlay(dyn, t, p, hoverT, hoveredItem, groups);
+    this.overlay(dyn, t, p, hoverT, hoveredItem);
   }
 
-  /** the beads themselves: only when the data, size, theme or picked period changes */
-  private paint(dyn: DynamicBlock, periods: PeriodBand[], activePeriod: string | null, p: Palette, c: BeadColors, groups: string[]) {
+  /** the beads themselves: only when the data, size, theme, period or region changes */
+  private paint(dyn: DynamicBlock, periods: PeriodBand[], activePeriod: string | null, c: BeadColors, groups: string[]) {
     const dpr = window.devicePixelRatio || 1;
     const W = this.width;
     const H = this.height;
@@ -175,15 +205,16 @@ export class BeadsChart {
     const nCols = Math.round(this.plotW / pitch);
     const cols = d3.range(nCols).map((j) => Math.round((j * (this.T - 1)) / Math.max(1, nCols - 1)));
     const maxW = pitch * 0.86;
-    // Each measure's beads start at its usual level (the median over every step and item) and
-    // reach full width at its highest: below the usual level there's only the string. Fixed
-    // across every step, so a bead means the same width everywhere.
+    const mean = (row: Row, m: number[][], ti: number) => d3.mean(row.members, (i) => m[ti][i])!;
+    // Each measure's beads start at its usual level on the rows shown (the median over every step
+    // and row) and reach full width at its highest: below the usual level there's only the
+    // string. Fixed across every step, so a bead means the same width everywhere.
     const allTo: number[] = [];
     const allFrom: number[] = [];
     for (let ti = 0; ti < this.T; ti++)
-      for (let i = 0; i < this.names.length; i++) {
-        allTo.push(dyn.to[ti][i]);
-        allFrom.push(dyn.from[ti][i]);
+      for (const r of this.rows) {
+        allTo.push(mean(r, dyn.to, ti));
+        allFrom.push(mean(r, dyn.from, ti));
       }
     const ramp = (vals: number[], width: number) => {
       const lo = d3.quantile(vals, 0.5)!;
@@ -194,14 +225,14 @@ export class BeadsChart {
     const wFrom = ramp(allFrom, maxW * 0.5);
     const wTotal = ramp(dyn.total, maxW);
 
+    // a region keeps its colour whether it's one row or opened up into its items
     const multi = groups.length > 1;
-    const hueOf = (row: number, name: string) => {
-      const i = multi ? groups.indexOf(this.groupOf[name]) : row;
+    const hueOf = (r: Row, row: number) => {
+      const i = multi ? groups.indexOf(r.group) : row;
       return [c.hues[i % c.hues.length], c.hues[(i + 1) % c.hues.length]];
     };
     const active = periods.find((b) => b.key === activePeriod) ?? null;
     const dates = dyn.dates.map((d) => parseDate(d)!);
-    const top = TOP;
     const bottom = H - BOTTOM;
 
     cols.forEach((ti) => {
@@ -210,25 +241,24 @@ export class BeadsChart {
       ctx.globalAlpha = inside ? 1 : 0.16;
       // the string
       ctx.fillStyle = c.ink;
-      ctx.fillRect(x - 0.6, top, 1.2, bottom - top);
+      ctx.fillRect(x - 0.6, TOP, 1.2, bottom - TOP);
       // the spillover index row
       const wt = Math.max(1.2, wTotal(dyn.total[ti]));
-      ctx.fillRect(x - wt / 2, top + 4, wt, HEADER - 8);
-      // the items: a colour bead (sends), a hairline of the next hue offset beside it, the core (takes)
+      ctx.fillRect(x - wt / 2, TOP + 4, wt, HEADER - 8);
+      // the rows: a colour bead (passes on), a sliver of the next hue offset beside it, the core (takes in)
       this.rows.forEach((r, row) => {
-        const i = this.names.indexOf(r.name);
-        const [hue, fringe] = hueOf(row, r.name);
-        const a = wTo(dyn.to[ti][i]);
-        const b = wFrom(dyn.from[ti][i]);
+        const [hue, fringe] = hueOf(r, row);
+        const a = wTo(mean(r, dyn.to, ti));
+        const b = wFrom(mean(r, dyn.from, ti));
         if (a > 1.5) {
           ctx.fillStyle = fringe;
-          ctx.fillRect(x - a / 2 + 1.5, r.y, a, this.rowH);
+          ctx.fillRect(x - a / 2 + 1.5, r.y, a, r.h);
           ctx.fillStyle = hue;
-          ctx.fillRect(x - a / 2, r.y, a, this.rowH);
+          ctx.fillRect(x - a / 2, r.y, a, r.h);
         }
         if (b > 1.5) {
           ctx.fillStyle = c.ink;
-          ctx.fillRect(x - b / 2, r.y, b, this.rowH);
+          ctx.fillRect(x - b / 2, r.y, b, r.h);
         }
       });
     });
@@ -236,7 +266,7 @@ export class BeadsChart {
   }
 
   /** labels, axis, episodes, the picked step and the hover: cheap, redrawn every time */
-  private overlay(dyn: DynamicBlock, t: number | null, p: Palette, hoverT: number | null, hoveredItem: string | null, groups: string[]) {
+  private overlay(dyn: DynamicBlock, t: number | null, p: Palette, hoverT: number | null, hoveredItem: string | null) {
     const W = this.width;
     const H = this.height;
     const svg = this.svg.attr("width", W).attr("height", H).attr("viewBox", `0 0 ${W} ${H}`);
@@ -245,7 +275,7 @@ export class BeadsChart {
     const bottom = H - BOTTOM;
     const small = W < 600;
 
-    // left labels: the index row, the groups and the items
+    // left labels: the index row, then the regions (clickable) or the items
     const lab = svg.append("g").attr("class", "beads-labels");
     lab
       .append("text")
@@ -256,38 +286,39 @@ export class BeadsChart {
       .attr("class", "beads-index")
       .attr("fill", p.fg)
       .text(small ? "Index" : "Spillover index");
-    if (groups.length > 1)
-      for (const g of groups) {
-        const first = this.rows.find((r) => r.group === g)!;
-        lab
-          .append("text")
-          .attr("x", 0)
-          .attr("y", first.y - 4)
-          .attr("class", "beads-group")
-          .attr("fill", p.muted)
-          .text(g);
-      }
+    const max = small ? 11 : 18;
     for (const r of this.rows) {
-      lab
-        .append("text")
+      const on = r.item !== null && r.item === hoveredItem;
+      const g = lab.append("g").attr("class", r.item ? "beads-item" : "beads-region");
+      g.append("text")
         .attr("x", this.left - 12)
-        .attr("y", r.y + this.rowH / 2)
+        .attr("y", r.y + r.h / 2)
         .attr("dy", "0.35em")
         .attr("text-anchor", "end")
-        .attr("class", r.name === hoveredItem ? "beads-item on" : "beads-item")
-        .attr("fill", r.name === hoveredItem ? p.fg : p.secondary)
-        .text(r.name.length > (small ? 9 : 18) ? `${r.name.slice(0, small ? 8 : 17)}…` : r.name);
+        .attr("class", on ? "on" : null)
+        .attr("fill", on || !r.item ? p.fg : p.secondary)
+        .text(r.label.length > max ? `${r.label.slice(0, max - 1)}…` : r.label);
+      if (!r.item) {
+        g.append("text")
+          .attr("x", this.left - 12)
+          .attr("y", r.y + r.h / 2 + 14)
+          .attr("dy", "0.35em")
+          .attr("text-anchor", "end")
+          .attr("class", "beads-count")
+          .attr("fill", p.muted)
+          .text(`${r.members.length} · open ›`);
+      }
     }
 
-    // a hovered item: a quiet band across its row
-    const hr = this.rows.find((r) => r.name === hoveredItem);
+    // a hovered item: a quiet ring around its row
+    const hr = this.rows.find((r) => r.item !== null && r.item === hoveredItem);
     if (hr)
       svg
         .append("rect")
         .attr("x", this.left - 4)
         .attr("y", hr.y - 1)
         .attr("width", this.plotW + 8)
-        .attr("height", this.rowH + 2)
+        .attr("height", hr.h + 2)
         .attr("rx", 3)
         .attr("fill", "none")
         .attr("stroke", p.fg)

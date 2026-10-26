@@ -49,6 +49,7 @@ app.innerHTML = `
     <!-- the chart's own readout: what the picked (or hovered) week says -->
     <div class="readout" id="readout" aria-live="polite"></div>
     <div id="timeline" class="chart-host"></div>
+    <div class="beads-regions" id="beads-regions" role="group" aria-label="Region shown"></div>
     <div id="beads" class="chart-host"></div>
     <p class="beads-legend" id="beads-legend"></p>
     <div class="windows" id="windows" role="group" aria-label="Window shown on every chart"></div>
@@ -166,6 +167,13 @@ async function main() {
 
   // the first graph as beads on strings (default) or as the line chart; remembered per browser
   let g1Style: "beads" | "line" = "beads";
+  // beads: every region as one row in its colour, or one region opened up into its items
+  let beadRegion: string | null = null;
+  const pickRegion = (g: string | null) => {
+    beadRegion = g === beadRegion ? null : g;
+    store.set({ hovered: null });
+    renderTimeline(store.get(), readPalette());
+  };
   try {
     if (localStorage.getItem("pc-g1") === "line") g1Style = "line";
   } catch {
@@ -180,8 +188,13 @@ async function main() {
     (hoverT) => {
       if (hoverT !== store.get().hoverT) store.set({ hoverT });
     },
-    hover
+    hover,
+    pickRegion
   );
+  $("beads-regions").addEventListener("click", (ev) => {
+    const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-region]");
+    if (b) pickRegion(b.dataset.region || null);
+  });
   $("g1-style").addEventListener("click", (ev) => {
     const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-style]");
     if (!b) return;
@@ -306,12 +319,19 @@ async function main() {
     $("timeline").hidden = asBeads;
     $("beads").hidden = !asBeads;
     $("beads-legend").hidden = !asBeads;
+    const regions = REGION_ORDER.filter((g) => names.some((n) => REGION_OF[n] === g));
+    $("beads-regions").hidden = !asBeads || regions.length < 2;
     if (asBeads) {
       $("timeline-sub").textContent = `How much of each ${ds.item}'s moves came from shocks elsewhere, over rolling ${dyn.window}-${ds.step} windows.`;
       $("beads-legend").innerHTML = `<span title="PyConnectedness: total"><i class="bk-index"></i>Spillover index</span>
         <span title="PyConnectedness: directional_to"><i class="bk-to"></i>Passes on</span>
         <span title="PyConnectedness: directional_from"><i class="bk-from"></i>Takes in</span>
         <span class="muted" title="Each bead starts at its measure's median and is widest at its highest.">Bare string = calmer than usual${events ? " · ▲ events" : ""}</span>`;
+      $("beads-regions").innerHTML = [null, ...regions]
+        .map((g, i) => `<button type="button" data-region="${g ?? ""}" aria-pressed="${g === beadRegion}">${
+          g ? `<i style="background:var(--bead-${i})"></i>${g}` : "All regions"
+        }</button>`)
+        .join("");
       beads.render(
         dyn,
         periods,
@@ -321,6 +341,7 @@ async function main() {
         readBeadColors(),
         s.hoverT,
         s.hovered,
+        beadRegion,
         `${m}|${s.theme}`
       );
       renderReadout(s);
