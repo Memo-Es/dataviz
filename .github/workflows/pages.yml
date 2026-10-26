@@ -5,6 +5,8 @@ on:
     branches: [main, claude/pensive-pascal-sz4532]
     paths:
       - "pyconnectedness-explorer/app/**"
+      - "pyconnectedness-explorer/pipeline/compute.py"
+      - "pyconnectedness-explorer/vendor/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -24,14 +26,18 @@ jobs:
       run:
         working-directory: pyconnectedness-explorer/app
     steps:
+      # the library itself: an uploaded file runs through it in the browser (scripts/copy-py.mjs)
       - uses: actions/checkout@v4
+        with:
+          submodules: true
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: pyconnectedness-explorer/app/package-lock.json
       - run: npm ci
-      # no network calls to Yahoo here: public/data/ is committed, the build only reads it
+      # no network calls to Yahoo here: public/data/ is committed, the build only reads it;
+      # it also copies the pinned library and pipeline/compute.py into public/py/
       - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

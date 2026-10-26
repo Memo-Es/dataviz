@@ -8,6 +8,7 @@ import { RankingChart } from "./charts/ranking";
 import { HeatmapChart } from "./charts/heatmap";
 import { sparkline } from "./charts/sparkline";
 import { bandCopy } from "./charts/frequency";
+import { loadUpload, runUpload, saveUpload } from "./upload/upload";
 
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
@@ -24,8 +25,8 @@ app.innerHTML = `
 </header>
 
 <main>
-  <!-- the dataset selector comes first; the title and everything below belong to the pick -->
-  <section class="top" id="top" aria-label="Dataset"></section>
+  <!-- the data choice comes first: a public dataset, or your own file; everything below follows it -->
+  <section class="top" id="top" aria-label="Data"></section>
 
   <section class="card span-12" id="g1">
     <div class="card-head">
@@ -105,11 +106,12 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 async function main() {
   const datasets = await loadDatasets();
   const wanted = new URLSearchParams(location.search).get("d");
-  const ds: Dataset = datasets.find((d) => d.id === wanted) ?? datasets[0];
+  const own = wanted === "upload" ? await loadUpload() : null;
+  const ds: Dataset = own?.ds ?? datasets.find((d) => d.id === wanted) ?? datasets[0];
   setDatasetEncoding(ds.groups, ds.group_order, ds.episodes, ds.step, ds.steps);
   const measures = Object.keys(ds.measures) as Measure[];
   const mName = (m: Measure) => ds.measures[m] ?? m;
-  const data = await loadExplorerData(ds);
+  const data = own?.data ?? (await loadExplorerData(ds));
   const model = new Model(data);
   const names = model.names;
   const meta = data.meta;
@@ -175,7 +177,12 @@ async function main() {
   const dm = meta.dynamic.returns;
   $("footer").innerHTML = `
     <p><b>Where the numbers come from.</b> ${
-      ds.id === "stocks"
+      own
+        ? `Every value on this page was computed in your browser from <b>${own.rec.name}</b>, which never left this
+          computer: PyConnectedness's own functions (commit <code>${own.rec.commit}</code>, run with Pyodide) called by
+          <a href="https://github.com/Memo-Es/dataviz/blob/claude/serene-shannon-v6pfgc/pyconnectedness-explorer/pipeline/compute.py">compute.py</a>,
+          the same file that builds the public datasets, with the authors' demo settings.`
+        : ds.id === "stocks"
         ? `Every value on this page was produced by running PyConnectedness's own
           <a href="https://github.com/zstoi/PyConnectedness/blob/main/examples/Demo.ipynb">examples/Demo.ipynb</a>
           unchanged (commit <code>4cc953f</code>) on Yahoo Finance data, with one extra cell at the end that only
@@ -227,7 +234,7 @@ async function main() {
 
     $("network-sub").innerHTML = `${mName(m)}, ${frame.label.replace(/^Full/, "full")}: an arrow from each net
       transmitter to each net receiver, for the strongest 10% of pairs ("net pairwise connectedness").
-      ${ds.items.charAt(0).toUpperCase() + ds.items.slice(1)} are grouped (${REGION_ORDER.join(" · ")}); sizes use one scale across all ${ds.steps}.`;
+      ${REGION_ORDER.length > 1 ? `${ds.items.charAt(0).toUpperCase() + ds.items.slice(1)} are grouped (${REGION_ORDER.join(" · ")}); ` : ""}Sizes use one scale across all ${ds.steps}.`;
     renderNetReadout(s, frame);
     network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion, s.pair);
     ranking.render(frame, p, model.maxNet[m], focus, s.selected, motion);
@@ -311,40 +318,98 @@ async function main() {
 
   /** The top of the page: the dataset selector, and under it the picked dataset's own panel,
    * its title, where it comes from and what's in it. */
+  /** The data choice: a public dataset from the list, or your own file run through the library
+   * in this browser. One line of facts says what's loaded; the charts below follow it. */
   function renderTop() {
     const [from, to] = meta.sample.map((d) => fmtDate(parseDate(d)!));
-    const tabs = datasets
-      .map(
-        (d) => `<a class="ds-tab" href="?d=${d.id}" aria-current="${d.id === ds.id}">
-          <b>${d.title}</b><span>${d.source.split(",")[0]}</span></a>`
-      )
+    const facts = `<b class="num">${names.length}</b> ${ds.items} · <b class="num">${meta.weeks}</b> ${ds.steps}, ${from} to ${to}`;
+    const options = datasets
+      .map((d) => `<option value="${d.id}"${d.id === ds.id ? " selected" : ""}>${d.title}</option>`)
       .join("");
-    const groups = REGION_ORDER.map((r) => {
-      const chips = names
-        .filter((n) => REGION_OF[n] === r)
-        .map((n) => `<li title="${ds.labels[n] ?? n}"><b>${n}</b>${ds.labels[n] && ds.labels[n] !== n ? ` ${ds.labels[n]}` : ""}</li>`)
-        .join("");
-      return chips ? `<div class="ds-region"><p class="ds-k">${r}</p><ul>${chips}</ul></div>` : "";
-    }).join("");
+    const sample = `${import.meta.env.BASE_URL}sample_currencies.csv`;
+    const ownHint = `Dates in the first column, one column per series (2 to 25).
+      <a href="${sample}" download>Sample file</a>`;
     $("top").innerHTML = `
-      <div class="ds-pick">
-        <p class="q">Pick a dataset · ${datasets.length} public sources</p>
-        <nav class="ds-tabs" aria-label="Datasets">${tabs}</nav>
-      </div>
-      <div class="ds-panel">
-        <p class="ds-source">${ds.title} · from the <a href="${ds.api_url}" target="_blank" rel="noopener">${ds.api}</a></p>
-        <h1>${ds.headline}</h1>
-        <p class="lede">Spillover is the share of each ${ds.item}'s ups and downs explained by shocks that started at
-          <em>other</em> ${ds.items}. The higher it is, the faster trouble in one place becomes trouble everywhere.</p>
-        <dl class="ds-facts">
-          <div><dt>Period</dt><dd>${from} to ${to}</dd></div>
-          <div><dt>Rows</dt><dd><span class="num">${meta.weeks}</span> ${ds.steps}, only those where all ${names.length} ${ds.items} have data</dd></div>
-          <div><dt>Columns</dt><dd>${names.length} ${ds.items}: ${ds.series}</dd></div>
-          <div><dt>Computed by</dt><dd>${ds.built_by}</dd></div>
-        </dl>
-        <div class="ds-regions" style="--groups:${REGION_ORDER.length}">${groups}</div>
+      <div class="data-bar">
+        <div class="segmented" id="src" role="group" aria-label="Data source">
+          <button type="button" data-src="public" aria-pressed="${!own}">Public dataset</button>
+          <button type="button" data-src="own" aria-pressed="${!!own}">Your own file</button>
+        </div>
+        <div class="data-row" id="src-public"${own ? " hidden" : ""}>
+          <label class="select">
+            <span class="sr">Dataset</span>
+            <select id="ds-select">${own ? `<option value="" selected disabled>Choose a dataset</option>` : ""}${options}</select>
+          </label>
+          <p class="data-meta">${own ? "" : `${facts} · from the <a href="${ds.api_url}" target="_blank" rel="noopener">${ds.api}</a>`}</p>
+        </div>
+        <div class="data-row" id="src-own"${own ? "" : " hidden"}>
+          <label class="file-btn">
+            <input type="file" id="file" accept=".csv,text/csv" />
+            <span>${own ? "Choose another CSV" : "Choose a CSV"}</span>
+          </label>
+          <div class="segmented small" id="kind" role="group" aria-label="What the numbers are"
+            title="Levels (prices, index values, counts) are turned into % changes, as the demo does with prices. Changes are used as they are.">
+            <button type="button" data-kind="levels" aria-pressed="${own?.rec.kind !== "changes"}">Levels</button>
+            <button type="button" data-kind="changes" aria-pressed="${own?.rec.kind === "changes"}">Changes</button>
+          </div>
+          <p class="data-meta" id="own-status">${own ? `<b>${own.rec.name}</b> · ${facts}` : ownHint}</p>
+        </div>
       </div>`;
     tightenDecimals($("top"), ".num");
+
+    const show = (src: string) => {
+      $("src").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.src === src)));
+      $("src-public").hidden = src !== "public";
+      $("src-own").hidden = src !== "own";
+    };
+    $("src").addEventListener("click", (ev) => {
+      const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-src]");
+      if (b) show(b.dataset.src!);
+    });
+    $<HTMLSelectElement>("ds-select").addEventListener("change", (ev) => {
+      location.search = `?d=${(ev.target as HTMLSelectElement).value}`;
+    });
+
+    let kind: "levels" | "changes" = own?.rec.kind ?? "levels";
+    let file: File | null = null;
+    let busy = false;
+    const status = $("own-status");
+    const run = async () => {
+      if (!file || busy) return;
+      busy = true;
+      $("src-own").classList.add("busy");
+      const t0 = performance.now();
+      let stage = "";
+      const tick = () => {
+        status.innerHTML = `<span class="spin" aria-hidden="true"></span>${stage}… <span class="num">${Math.round((performance.now() - t0) / 1000)}</span> s`;
+      };
+      const timer = window.setInterval(tick, 500);
+      try {
+        const rec = await runUpload(await file.text(), file.name, kind, (text) => {
+          stage = text;
+          tick();
+        });
+        await saveUpload(rec);
+        location.search = "?d=upload";
+      } catch (err) {
+        status.innerHTML = `<span class="err">${(err as Error).message}</span> ${ownHint}`;
+      } finally {
+        window.clearInterval(timer);
+        busy = false;
+        $("src-own").classList.remove("busy");
+      }
+    };
+    $<HTMLInputElement>("file").addEventListener("change", (ev) => {
+      file = (ev.target as HTMLInputElement).files?.[0] ?? null;
+      run();
+    });
+    $("kind").addEventListener("click", (ev) => {
+      const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-kind]");
+      if (!b || busy) return;
+      kind = b.dataset.kind as typeof kind;
+      $("kind").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      run(); // a file already picked is run again the other way
+    });
   }
 
   /** "Short vs long term": the library's frequency_connectedness (export_cell.py), which exists per

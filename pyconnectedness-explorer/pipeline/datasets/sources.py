@@ -4,7 +4,7 @@ Public datasets for the explorer's dataset selector, one function per API.
 Each `fetch_*` returns a DataFrame of observed values: a DatetimeIndex and one column per
 variable. `prepare_*` turns that into the series PyConnectedness models (changes or anomalies).
 The connectedness numbers themselves are always computed by the library's own functions, in
-run_datasets.py; nothing here estimates anything.
+compute.py; nothing here estimates anything.
 
 The stock-market dataset is not here: it's built by the authors' demo, examples/Demo.ipynb
 (run_demo.py). Its descriptor lives in DESCRIPTORS below so the app can list it alongside.
@@ -287,7 +287,6 @@ def prepare_climate(daily: pd.DataFrame) -> pd.DataFrame:
 # What the app shows for each dataset. `model` follows the authors' demo (generalized, VAR(2),
 # 10-step horizon) with a rolling window sized to the data.
 # ---------------------------------------------------------------------------------------------
-DEMO_MODEL = {"horizon": 10, "method": "generalized", "lags": 2}
 
 DESCRIPTORS = {
     "stocks": {
