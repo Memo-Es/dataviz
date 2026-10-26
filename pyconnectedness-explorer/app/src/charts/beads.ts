@@ -1,15 +1,15 @@
 /**
  * The first graph drawn as beads on strings (after Yaacov Agam's kinetic prints). Same numbers as
- * the line chart, all from the library's dynamic_connectedness:
+ * the line chart, all from the library's dynamic_connectedness, on one % scale:
  *   - each vertical string is one step in time (sampled to fit the width);
- *   - the top row is the rolling spillover index itself (`total`);
- *   - below it, one row per region in the region's colour (the average of its items), or, with a
- *     region picked, one row per item of that region. A bead's colour widens with what the row
- *     passes to the others (`directional_to`); its dark core, with what it takes from them
- *     (`directional_from`). Each starts at its measure's usual level (the median), so a quiet
- *     stretch is bare string and the beads gather where shocks spread.
- * Beads are painted on a canvas (thousands of them); the cursor, labels and axis are SVG on top,
- * so a hover redraws only the overlay.
+ *   - the dark beads are the rolling spillover index (`total`);
+ *   - the coloured beads are the regions (the average of their items), or, with one region
+ *     picked, its items. A bead's height on the string is how much of its moves came from shocks
+ *     elsewhere (`directional_from`, the same % as the index: the index is its average over every
+ *     item); its width, how much it passes to the others (`directional_to`).
+ * So each region rises and falls along the strings, overlaid on the others and told apart by
+ * colour. Beads are painted on a canvas; the cursor, labels and axis are SVG on top, so a hover
+ * redraws only the overlay.
  */
 import * as d3 from "d3";
 import type { DynamicBlock } from "../data";
@@ -27,32 +27,31 @@ export function readBeadColors(): BeadColors {
   return { ink: v("--bead-ink"), hues: [1, 2, 3, 4, 5, 6].map((i) => v(`--bead-${i}`)) };
 }
 
-const TOP = 34; // room for the cursor's pill
-const HEADER = 30; // the spillover-index row
-const GAP = 14; // between the header and the rows, and between region rows
-const BOTTOM = 26;
+const H = 360;
+const M = { top: 40, bottom: 28, left: 44 };
+const BEAD_H = 9; // a bead's length along its string
 
-interface Row {
+interface Series {
   label: string;
-  /** an item's name, when the row is one item */
+  /** an item's name, when the series is one item */
   item: string | null;
-  /** the region the row belongs to (or is) */
   group: string;
-  /** column indices of the items averaged in this row (one, for an item row) */
+  /** column indices of the items averaged in this series (one, for an item) */
   members: number[];
-  y: number;
-  h: number;
+  hue: string;
+  fringe: string;
 }
 
 export class BeadsChart {
   private canvas: HTMLCanvasElement;
   private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
   private width = 900;
-  private height = 400;
   private T = 0;
   private last: Parameters<BeadsChart["render"]> | null = null;
   private paintedKey = "";
-  private rows: Row[] = [];
+  private series: Series[] = [];
+  private y = d3.scaleLinear();
+  private dyn: DynamicBlock | null = null;
 
   constructor(
     private host: HTMLElement,
@@ -78,33 +77,25 @@ export class BeadsChart {
     }).observe(host);
 
     let dragging = false;
-    const at = (ev: PointerEvent) => {
-      const [mx, my] = d3.pointer(ev, this.svg.node());
-      const row = this.rows.find((r) => my >= r.y && my < r.y + r.h) ?? null;
-      return { t: this.tAt(mx), row, onLabel: mx < this.left - 4 };
-    };
     this.svg
       .on("pointerdown", (ev: PointerEvent) => {
-        const { t, row, onLabel } = at(ev);
-        // a region's name opens it up into its items
-        if (onLabel) {
-          if (row && !row.item) this.onPickRegion(row.group);
-          return;
-        }
+        const label = (ev.target as Element).closest<SVGGElement>("[data-region]");
+        if (label) return this.onPickRegion(label.dataset.region!);
         dragging = true;
         (ev.target as Element).setPointerCapture?.(ev.pointerId);
+        const t = this.tAt(d3.pointer(ev, this.svg.node())[0]);
         if (t !== null) this.onPick(t);
       })
       .on("pointermove", (ev: PointerEvent) => {
-        const { t, row, onLabel } = at(ev);
+        const [mx, my] = d3.pointer(ev, this.svg.node());
+        const t = this.tAt(mx);
         if (dragging) {
           if (t !== null) this.onPick(t);
           return;
         }
         if (ev.pointerType !== "mouse") return;
-        this.svg.style("cursor", onLabel ? (row && !row.item ? "pointer" : "default") : "crosshair");
-        this.onHoverWeek(onLabel ? null : t);
-        this.onHoverItem(row?.item ?? null);
+        this.onHoverWeek(t);
+        this.onHoverItem(t === null ? null : this.itemNear(t, my));
       })
       .on("pointerleave", () => {
         this.onHoverWeek(null);
@@ -113,12 +104,12 @@ export class BeadsChart {
       .on("pointerup pointercancel", () => (dragging = false));
   }
 
-  private get left() {
-    return this.width < 600 ? 92 : 132;
+  private get right() {
+    return this.width < 600 ? 84 : 120; // the end labels
   }
 
   private get plotW() {
-    return this.width - this.left - 12;
+    return this.width - M.left - this.right;
   }
 
   /** column spacing: about one string every 20 px (12 on a phone), so there's air between them */
@@ -130,21 +121,37 @@ export class BeadsChart {
 
   private xOf(t: number) {
     const p = this.pitch;
-    return this.left + p / 2 + (this.T > 1 ? (t / (this.T - 1)) * (this.plotW - p) : 0);
+    return M.left + p / 2 + (this.T > 1 ? (t / (this.T - 1)) * (this.plotW - p) : 0);
   }
 
   private tAt(mx: number): number | null {
     const p = this.pitch;
-    if (mx < this.left - p || mx > this.left + this.plotW + p) return null;
-    const f = (mx - this.left - p / 2) / (this.plotW - p);
+    if (mx < M.left - p || mx > M.left + this.plotW + p) return null;
+    const f = (mx - M.left - p / 2) / (this.plotW - p);
     return Math.max(0, Math.min(this.T - 1, Math.round(f * (this.T - 1))));
+  }
+
+  private value(s: Series, m: number[][], t: number) {
+    return d3.mean(s.members, (i) => m[t][i])!;
+  }
+
+  /** the item whose bead is nearest the pointer on this step, when an item is on show */
+  private itemNear(t: number, my: number): string | null {
+    if (!this.dyn) return null;
+    let best: { item: string; d: number } | null = null;
+    for (const s of this.series) {
+      if (!s.item) continue;
+      const d = Math.abs(this.y(this.value(s, this.dyn.from, t)) - my);
+      if (d < 10 && (!best || d < best.d)) best = { item: s.item, d };
+    }
+    return best?.item ?? null;
   }
 
   private get groups() {
     return this.groupOrder.filter((g) => this.names.some((n) => this.groupOf[n] === g));
   }
 
-  /** `region`: null shows every region as one row (or every item, when there's only one region) */
+  /** `region`: null shows every region (or every item, when there's only one region) */
   render(
     dyn: DynamicBlock,
     periods: PeriodBand[],
@@ -158,41 +165,52 @@ export class BeadsChart {
     paintKey: string
   ) {
     this.last = [dyn, periods, t, activePeriod, p, c, hoverT, hoveredItem, region, paintKey];
+    this.dyn = dyn;
     this.T = dyn.dates.length;
     const groups = this.groups;
+    const multi = groups.length > 1;
+    const hue = (i: number) => [c.hues[i % c.hues.length], c.hues[(i + 1) % c.hues.length]];
     const idx = (g: string) => this.names.flatMap((n, i) => (this.groupOf[n] === g ? [i] : []));
-    let y = TOP + HEADER + GAP;
-    this.rows = [];
-    if (!region && groups.length > 1) {
-      // one row per region, tall, in its own colour
-      for (const g of groups) {
-        this.rows.push({ label: g, item: null, group: g, members: idx(g), y, h: 34 });
-        y += 34 + GAP;
-      }
+    if (multi && !region) {
+      this.series = groups.map((g, gi) => {
+        const [h, f] = hue(gi);
+        return { label: g, item: null, group: g, members: idx(g), hue: h, fringe: f };
+      });
     } else {
       const shown = region ? idx(region) : this.names.map((_, i) => i);
-      const h = Math.max(12, Math.min(22, Math.floor(300 / shown.length)));
-      for (const i of shown) {
-        this.rows.push({ label: this.names[i], item: this.names[i], group: this.groupOf[this.names[i]], members: [i], y, h });
-        y += h;
-      }
-      y += GAP;
+      this.series = shown.map((i, k) => {
+        // one colour per item: the picked region is already named by its chip
+        const [h, f] = hue(k);
+        return { label: this.names[i], item: this.names[i], group: this.groupOf[this.names[i]], members: [i], hue: h, fringe: f };
+      });
     }
-    this.height = y - GAP + BOTTOM;
+
+    // one % scale for the index and every series' directional_from, fixed across every step
+    let lo = d3.min(dyn.total)!;
+    let hi = d3.max(dyn.total)!;
+    for (const s of this.series)
+      for (let ti = 0; ti < this.T; ti++) {
+        const v = this.value(s, dyn.from, ti);
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+    this.y = d3
+      .scaleLinear()
+      .domain([Math.floor((lo - 1) / 5) * 5, Math.ceil((hi + 1) / 5) * 5])
+      .range([H - M.bottom - BEAD_H / 2, M.top + BEAD_H / 2]);
 
     const key = `${paintKey}|${this.width}|${activePeriod}|${this.T}|${region}`;
     if (key !== this.paintedKey) {
-      this.paint(dyn, periods, activePeriod, c, groups);
+      this.paint(dyn, periods, activePeriod, c);
       this.paintedKey = key;
     }
-    this.overlay(dyn, t, p, hoverT, hoveredItem);
+    this.overlay(dyn, t, p, hoverT, hoveredItem, multi && !region);
   }
 
   /** the beads themselves: only when the data, size, theme, period or region changes */
-  private paint(dyn: DynamicBlock, periods: PeriodBand[], activePeriod: string | null, c: BeadColors, groups: string[]) {
+  private paint(dyn: DynamicBlock, periods: PeriodBand[], activePeriod: string | null, c: BeadColors) {
     const dpr = window.devicePixelRatio || 1;
     const W = this.width;
-    const H = this.height;
     this.canvas.width = Math.round(W * dpr);
     this.canvas.height = Math.round(H * dpr);
     this.canvas.style.width = `${W}px`;
@@ -204,36 +222,14 @@ export class BeadsChart {
     const pitch = this.pitch;
     const nCols = Math.round(this.plotW / pitch);
     const cols = d3.range(nCols).map((j) => Math.round((j * (this.T - 1)) / Math.max(1, nCols - 1)));
-    const maxW = pitch * 0.86;
-    const mean = (row: Row, m: number[][], ti: number) => d3.mean(row.members, (i) => m[ti][i])!;
-    // Each measure's beads start at its usual level on the rows shown (the median over every step
-    // and row) and reach full width at its highest: below the usual level there's only the
-    // string. Fixed across every step, so a bead means the same width everywhere.
-    const allTo: number[] = [];
-    const allFrom: number[] = [];
-    for (let ti = 0; ti < this.T; ti++)
-      for (const r of this.rows) {
-        allTo.push(mean(r, dyn.to, ti));
-        allFrom.push(mean(r, dyn.from, ti));
-      }
-    const ramp = (vals: number[], width: number) => {
-      const lo = d3.quantile(vals, 0.5)!;
-      const hi = d3.max(vals)!;
-      return (v: number) => width * Math.max(0, Math.min(1, (v - lo) / Math.max(1e-9, hi - lo)));
-    };
-    const wTo = ramp(allTo, maxW);
-    const wFrom = ramp(allFrom, maxW * 0.5);
-    const wTotal = ramp(dyn.total, maxW);
-
-    // a region keeps its colour whether it's one row or opened up into its items
-    const multi = groups.length > 1;
-    const hueOf = (r: Row, row: number) => {
-      const i = multi ? groups.indexOf(r.group) : row;
-      return [c.hues[i % c.hues.length], c.hues[(i + 1) % c.hues.length]];
-    };
+    const maxW = pitch * 0.9;
+    // width: what the series passes on, from its lowest to its highest over the series on show
+    const tos = this.series.flatMap((s) => d3.range(this.T).map((ti) => this.value(s, dyn.to, ti)));
+    const [toLo, toHi] = d3.extent(tos) as [number, number];
+    const wTo = (v: number) => 3 + (maxW - 3) * ((v - toLo) / Math.max(1e-9, toHi - toLo));
     const active = periods.find((b) => b.key === activePeriod) ?? null;
     const dates = dyn.dates.map((d) => parseDate(d)!);
-    const bottom = H - BOTTOM;
+    const y = this.y;
 
     cols.forEach((ti) => {
       const x = this.xOf(ti);
@@ -241,88 +237,47 @@ export class BeadsChart {
       ctx.globalAlpha = inside ? 1 : 0.16;
       // the string
       ctx.fillStyle = c.ink;
-      ctx.fillRect(x - 0.6, TOP, 1.2, bottom - TOP);
-      // the spillover index row
-      const wt = Math.max(1.2, wTotal(dyn.total[ti]));
-      ctx.fillRect(x - wt / 2, TOP + 4, wt, HEADER - 8);
-      // the rows: a colour bead (passes on), a sliver of the next hue offset beside it, the core (takes in)
-      this.rows.forEach((r, row) => {
-        const [hue, fringe] = hueOf(r, row);
-        const a = wTo(mean(r, dyn.to, ti));
-        const b = wFrom(mean(r, dyn.from, ti));
-        if (a > 1.5) {
-          ctx.fillStyle = fringe;
-          ctx.fillRect(x - a / 2 + 1.5, r.y, a, r.h);
-          ctx.fillStyle = hue;
-          ctx.fillRect(x - a / 2, r.y, a, r.h);
-        }
-        if (b > 1.5) {
-          ctx.fillStyle = c.ink;
-          ctx.fillRect(x - b / 2, r.y, b, r.h);
-        }
-      });
+      ctx.fillRect(x - 0.6, M.top, 1.2, H - M.bottom - M.top);
+      // the series: a colour bead with a sliver of the next hue offset beside it, like a misprint
+      for (const s of this.series) {
+        const cy = y(this.value(s, dyn.from, ti));
+        const w = wTo(this.value(s, dyn.to, ti));
+        ctx.fillStyle = s.fringe;
+        ctx.fillRect(x - w / 2 + 1.5, cy - BEAD_H / 2, w, BEAD_H);
+        ctx.fillStyle = s.hue;
+        ctx.fillRect(x - w / 2, cy - BEAD_H / 2, w, BEAD_H);
+      }
+      // the index, on top: a dark bead
+      const cy = y(dyn.total[ti]);
+      ctx.fillStyle = c.ink;
+      ctx.fillRect(x - maxW * 0.28, cy - BEAD_H / 2, maxW * 0.56, BEAD_H);
     });
     ctx.globalAlpha = 1;
   }
 
-  /** labels, axis, episodes, the picked step and the hover: cheap, redrawn every time */
-  private overlay(dyn: DynamicBlock, t: number | null, p: Palette, hoverT: number | null, hoveredItem: string | null) {
+  /** axis, end labels, episodes, the picked step and the hover: cheap, redrawn every time */
+  private overlay(dyn: DynamicBlock, t: number | null, p: Palette, hoverT: number | null, hoveredItem: string | null, regionsShown: boolean) {
     const W = this.width;
-    const H = this.height;
     const svg = this.svg.attr("width", W).attr("height", H).attr("viewBox", `0 0 ${W} ${H}`);
     svg.selectAll("*").remove();
     const dates = dyn.dates.map((d) => parseDate(d)!);
-    const bottom = H - BOTTOM;
+    const bottom = H - M.bottom;
     const small = W < 600;
+    const y = this.y;
 
-    // left labels: the index row, then the regions (clickable) or the items
-    const lab = svg.append("g").attr("class", "beads-labels");
-    lab
-      .append("text")
-      .attr("x", this.left - 12)
-      .attr("y", TOP + HEADER / 2)
+    // a few % ticks, quiet
+    svg
+      .append("g")
+      .attr("class", "axis-label")
+      .selectAll("text")
+      .data(y.ticks(4))
+      .join("text")
+      .attr("x", M.left - 10)
+      .attr("y", (d) => y(d))
       .attr("dy", "0.35em")
       .attr("text-anchor", "end")
-      .attr("class", "beads-index")
-      .attr("fill", p.fg)
-      .text(small ? "Index" : "Spillover index");
-    const max = small ? 11 : 18;
-    for (const r of this.rows) {
-      const on = r.item !== null && r.item === hoveredItem;
-      const g = lab.append("g").attr("class", r.item ? "beads-item" : "beads-region");
-      g.append("text")
-        .attr("x", this.left - 12)
-        .attr("y", r.y + r.h / 2)
-        .attr("dy", "0.35em")
-        .attr("text-anchor", "end")
-        .attr("class", on ? "on" : null)
-        .attr("fill", on || !r.item ? p.fg : p.secondary)
-        .text(r.label.length > max ? `${r.label.slice(0, max - 1)}…` : r.label);
-      if (!r.item) {
-        g.append("text")
-          .attr("x", this.left - 12)
-          .attr("y", r.y + r.h / 2 + 14)
-          .attr("dy", "0.35em")
-          .attr("text-anchor", "end")
-          .attr("class", "beads-count")
-          .attr("fill", p.muted)
-          .text(`${r.members.length} · open ›`);
-      }
-    }
-
-    // a hovered item: a quiet ring around its row
-    const hr = this.rows.find((r) => r.item !== null && r.item === hoveredItem);
-    if (hr)
-      svg
-        .append("rect")
-        .attr("x", this.left - 4)
-        .attr("y", hr.y - 1)
-        .attr("width", this.plotW + 8)
-        .attr("height", hr.h + 2)
-        .attr("rx", 3)
-        .attr("fill", "none")
-        .attr("stroke", p.fg)
-        .attr("stroke-opacity", 0.35);
+      .attr("fill", p.muted)
+      .text((d) => `${d}%`);
 
     // years along the bottom
     const years = d3.utcYear.range(dates[0], dates[dates.length - 1]);
@@ -335,7 +290,7 @@ export class BeadsChart {
       .data(years.filter((_, i) => i % every === 0))
       .join("text")
       .attr("x", (d) => this.xOf(tOf(d)))
-      .attr("y", bottom + 18)
+      .attr("y", bottom + 20)
       .attr("text-anchor", "middle")
       .attr("fill", p.muted)
       .text((d) => d.getUTCFullYear());
@@ -351,37 +306,81 @@ export class BeadsChart {
       g.append("title").text(`${EPISODE_LABELS[e]} · ${fmtDate(d)}`);
     }
 
+    // end labels at each series' value on the step shown (picked, or the last); regions open up
+    const at = t ?? this.T - 1;
+    const labels = [
+      { text: small ? "Index" : "Spillover index", v: dyn.total[at], color: p.fg, region: null as string | null, item: null as string | null, bold: true },
+      ...this.series.map((s) => ({ text: s.label, v: this.value(s, dyn.from, at), color: s.hue, region: s.item ? null : s.group, item: s.item, bold: !s.item })),
+    ].map((l) => ({ ...l, y: y(l.v) }));
+    // nudge apart so no two overlap
+    labels.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < labels.length; i++) labels[i].y = Math.max(labels[i].y, labels[i - 1].y + 13);
+    const over = labels.length ? labels[labels.length - 1].y - (H - M.bottom) : 0;
+    if (over > 0) for (const l of labels) l.y -= over;
+    const ends = svg.append("g").attr("class", "beads-ends");
+    const xEnd = M.left + this.plotW + 8;
+    const max = small ? 10 : 16;
+    for (const l of labels) {
+      const g = ends.append("g");
+      if (l.region) g.attr("data-region", l.region).attr("class", "beads-region");
+      const on = l.item !== null && l.item === hoveredItem;
+      g.append("rect").attr("x", xEnd).attr("y", l.y - 4).attr("width", 8).attr("height", 8).attr("rx", 1.5).attr("fill", l.color);
+      g.append("text")
+        .attr("x", xEnd + 13)
+        .attr("y", l.y)
+        .attr("dy", "0.35em")
+        .attr("class", l.bold || on ? "on" : null)
+        .attr("fill", p.fg)
+        .text(l.text.length > max ? `${l.text.slice(0, max - 1)}…` : l.text);
+      if (l.region) g.append("title").text(`Open ${l.region}`);
+    }
+    if (regionsShown && !small)
+      svg
+        .append("text")
+        .attr("class", "beads-hint")
+        .attr("x", xEnd)
+        .attr("y", M.top - 18)
+        .attr("fill", p.muted)
+        .text("Click a region to open it");
+
+    // a hovered item: a ring around its bead on every string
+    const hs = this.series.find((s) => s.item !== null && s.item === hoveredItem);
+    if (hs) {
+      const pts = d3.range(0, this.T, Math.max(1, Math.round(this.T / 160))).map((ti) => [this.xOf(ti), y(this.value(hs, dyn.from, ti))] as [number, number]);
+      svg.append("path").attr("d", d3.line()(pts)).attr("fill", "none").attr("stroke", p.fg).attr("stroke-width", 1.2).attr("stroke-opacity", 0.55);
+    }
+
     // the hovered step: a thin ring around its string
     if (hoverT !== null && hoverT !== t) {
       const x = this.xOf(hoverT);
       svg
         .append("rect")
         .attr("x", x - this.pitch / 2)
-        .attr("y", TOP)
+        .attr("y", M.top - 4)
         .attr("width", this.pitch)
-        .attr("height", bottom - TOP)
+        .attr("height", bottom - M.top + 4)
         .attr("rx", 3)
         .attr("fill", "none")
         .attr("stroke", p.fg)
         .attr("stroke-opacity", 0.45);
     }
 
-    // the picked step: an accent string and its value
+    // the picked step: an accent ring and its value
     if (t !== null) {
       const x = this.xOf(t);
       svg
         .append("rect")
         .attr("x", x - this.pitch / 2)
-        .attr("y", TOP)
+        .attr("y", M.top - 4)
         .attr("width", this.pitch)
-        .attr("height", bottom - TOP)
+        .attr("height", bottom - M.top + 4)
         .attr("rx", 3)
         .attr("fill", "none")
         .attr("stroke", p.accent)
         .attr("stroke-width", 2);
       const label = `${dyn.total[t].toFixed(1)}% · ${fmtDate(dates[t])}`;
       const lw = label.length * 7.8 + 18;
-      const lx = Math.min(Math.max(x - lw / 2, this.left), W - 12 - lw);
+      const lx = Math.min(Math.max(x - lw / 2, M.left), M.left + this.plotW - lw);
       svg.append("rect").attr("x", lx).attr("y", 4).attr("width", lw).attr("height", 22).attr("rx", 11).attr("fill", p.accent);
       svg
         .append("text")

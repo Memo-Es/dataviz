@@ -324,9 +324,10 @@ async function main() {
     if (asBeads) {
       $("timeline-sub").textContent = `How much of each ${ds.item}'s moves came from shocks elsewhere, over rolling ${dyn.window}-${ds.step} windows.`;
       $("beads-legend").innerHTML = `<span title="PyConnectedness: total"><i class="bk-index"></i>Spillover index</span>
-        <span title="PyConnectedness: directional_to"><i class="bk-to"></i>Passes on</span>
-        <span title="PyConnectedness: directional_from"><i class="bk-from"></i>Takes in</span>
-        <span class="muted" title="Each bead starts at its measure's median and is widest at its highest.">Bare string = calmer than usual${events ? " · ▲ events" : ""}</span>`;
+        <span title="PyConnectedness: directional_from"><i class="bk-height"></i>Height: share of moves from shocks elsewhere</span>
+        <span title="PyConnectedness: directional_to"><i class="bk-to"></i>Width: how much it passes on</span>${
+          events ? `<span class="muted">▲ events</span>` : ""
+        }`;
       $("beads-regions").innerHTML = [null, ...regions]
         .map((g, i) => `<button type="button" data-region="${g ?? ""}" aria-pressed="${g === beadRegion}">${
           g ? `<i style="background:var(--bead-${i})"></i>${g}` : "All regions"
