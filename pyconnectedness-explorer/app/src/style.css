@@ -26,6 +26,14 @@
   --band-fast-ink: #ffffff;
   --band-mid-ink: #ffffff;
   --band-slow-ink: #2f2a78;
+  /* graph 1 as beads on strings (after Agam): six flat print hues and a green-black ink */
+  --bead-ink: #1d2a22;
+  --bead-1: #d43d27;
+  --bead-2: #f4d200;
+  --bead-3: #1a8fd2;
+  --bead-4: #2f9a4c;
+  --bead-5: #5a3c9f;
+  --bead-6: #d0237a;
   --f-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
   --f-serif: "Source Serif 4", Georgia, serif;
   --f-num: "B612 Mono", ui-monospace, SFMono-Regular, monospace; /* every number on the page */
@@ -54,6 +62,13 @@
   --band-mid-ink: #12112a;
   --band-slow-ink: #f3f1ff;
   --accent-wash: rgba(255, 122, 51, 0.14);
+  --bead-ink: #ecebe3;
+  --bead-1: #ef5a43;
+  --bead-2: #f6d838;
+  --bead-3: #3ea6e6;
+  --bead-4: #43b764;
+  --bead-5: #8b6ad6;
+  --bead-6: #e84c97;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
   color-scheme: dark;
 }
@@ -1354,4 +1369,73 @@ svg {
   * {
     transition: none !important;
   }
+}
+
+/* ---- graph 1 as beads on strings ---- */
+.beads-host {
+  position: relative;
+  touch-action: pan-y;
+}
+
+.beads-host canvas,
+.beads-host svg {
+  display: block;
+}
+
+.beads-host svg {
+  position: absolute;
+  inset: 0;
+  cursor: crosshair;
+}
+
+.beads-item {
+  font-size: 11.5px;
+}
+
+.beads-item.on {
+  font-weight: 700;
+}
+
+.beads-index {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.beads-group {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.beads-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--secondary);
+}
+
+.beads-legend i {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-right: 6px;
+  height: 12px;
+}
+
+.beads-legend .bk-index {
+  width: 6px;
+  background: var(--bead-ink);
+}
+
+.beads-legend .bk-to {
+  width: 14px;
+  background: linear-gradient(90deg, var(--bead-1) 0 33%, var(--bead-2) 33% 66%, var(--bead-3) 66%);
+}
+
+.beads-legend .bk-from {
+  width: 14px;
+  background: linear-gradient(90deg, transparent 0 30%, var(--bead-ink) 30% 70%, transparent 70%);
+  box-shadow: inset 0 0 0 1px var(--line);
 }

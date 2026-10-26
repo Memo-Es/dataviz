@@ -4,6 +4,7 @@ import { Model, type State, Store, type WindowKey, windowOptions } from "./model
 import { REGION_OF, REGION_ORDER, STEP, fmtDate, fmtSigned, fmtStep, parseDate, readPalette, setDatasetEncoding, tightenDecimals } from "./encoding";
 import { NetworkChart } from "./charts/network";
 import { TimelineChart, type PeriodBand } from "./charts/timeline";
+import { BeadsChart, readBeadColors } from "./charts/beads";
 import { RankingChart } from "./charts/ranking";
 import { HeatmapChart } from "./charts/heatmap";
 import { sparkline } from "./charts/sparkline";
@@ -36,6 +37,10 @@ app.innerHTML = `
         <p class="sub" id="timeline-sub"></p>
       </div>
       <div class="player">
+        <div class="segmented small" id="g1-style" role="group" aria-label="How the first graph is drawn">
+          <button type="button" data-style="beads">Beads</button>
+          <button type="button" data-style="line">Line</button>
+        </div>
         <button class="icon-btn" id="prev" aria-label="Previous step">‹</button>
         <button class="play" id="play" aria-label="Play"></button>
         <button class="icon-btn" id="next" aria-label="Next step">›</button>
@@ -44,6 +49,8 @@ app.innerHTML = `
     <!-- the chart's own readout: what the picked (or hovered) week says -->
     <div class="readout" id="readout" aria-live="polite"></div>
     <div id="timeline" class="chart-host"></div>
+    <div id="beads" class="chart-host"></div>
+    <p class="beads-legend" id="beads-legend"></p>
     <div class="windows" id="windows" role="group" aria-label="Window shown on every chart"></div>
   </section>
 
@@ -139,7 +146,9 @@ async function main() {
     theme,
   });
 
-  const hover = (n: string | null) => store.set({ hovered: n });
+  const hover = (n: string | null) => {
+    if (n !== store.get().hovered) store.set({ hovered: n });
+  };
   // shared by the top bar's toggle and the timeline's end labels
   const setMeasure = (measure: Measure) => {
     const w = store.get().window;
@@ -154,6 +163,36 @@ async function main() {
     const same = cur && ((cur[0] === row && cur[1] === col) || (cur[0] === col && cur[1] === row));
     store.set({ pair: same ? null : [row, col], selected: null, hovered: null });
   };
+
+  // the first graph as beads on strings (default) or as the line chart; remembered per browser
+  let g1Style: "beads" | "line" = "beads";
+  try {
+    if (localStorage.getItem("pc-g1") === "line") g1Style = "line";
+  } catch {
+    /* storage unavailable: beads */
+  }
+  const beads = new BeadsChart(
+    $("beads"),
+    names,
+    REGION_OF,
+    REGION_ORDER,
+    (t) => store.set({ t, window: "t", hoverT: null }),
+    (hoverT) => {
+      if (hoverT !== store.get().hoverT) store.set({ hoverT });
+    },
+    hover
+  );
+  $("g1-style").addEventListener("click", (ev) => {
+    const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-style]");
+    if (!b) return;
+    g1Style = b.dataset.style as typeof g1Style;
+    try {
+      localStorage.setItem("pc-g1", g1Style);
+    } catch {
+      /* ignore */
+    }
+    renderTimeline(store.get(), readPalette());
+  });
 
   const network = new NetworkChart($("network"), names, { onHover: hover, onSelect: select, onPair: pickPair });
   const ranking = new RankingChart($("ranking"), names, hover, (n) => select(n));
@@ -262,6 +301,35 @@ async function main() {
     });
     const dyn = meta.dynamic[m];
     const events = Object.keys(ds.episodes).length;
+    const asBeads = g1Style === "beads";
+    $("g1-style").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.style === g1Style)));
+    $("timeline").hidden = asBeads;
+    $("beads").hidden = !asBeads;
+    $("beads-legend").hidden = !asBeads;
+    if (asBeads) {
+      const Items = ds.items.charAt(0).toUpperCase() + ds.items.slice(1);
+      $("timeline-sub").innerHTML = `${mName(m)}: the share of each ${ds.item}'s ups and downs caused by shocks at other
+        ${ds.items}, each ${ds.step} measured over the ${dyn.window} ${ds.steps} before it. Each string is a ${ds.step}.
+        <b>Hover to preview a ${ds.step}; click or drag to pick it.</b>`;
+      $("beads-legend").innerHTML = `<span><i class="bk-index"></i>Top row: the spillover index <code>total</code></span>
+        <span><i class="bk-to"></i>Colour: what ${/^[aeiou]/i.test(ds.item) ? "an" : "a"} ${ds.item} passes to the others <code>directional_to</code></span>
+        <span><i class="bk-from"></i>Dark core: what it takes from them <code>directional_from</code></span>
+        <span>Each bead starts at its measure's usual level (the median) and is widest at its highest, so bare string = a quiet ${ds.step}.
+        ${Items} in rows${REGION_ORDER.length > 1 ? `, by ${REGION_ORDER.join(" · ")}` : ""}${events ? "; ▲ notable events" : ""}.</span>`;
+      beads.render(
+        dyn,
+        periods,
+        s.window === "t" ? s.t : null,
+        s.window.startsWith("p") ? s.window : null,
+        p,
+        readBeadColors(),
+        s.hoverT,
+        s.hovered,
+        `${m}|${s.theme}`
+      );
+      renderReadout(s);
+      return;
+    }
     $("timeline-sub").innerHTML = `${mName(m)}: the share of each ${ds.item}'s ups and downs caused by shocks at other
       ${ds.items}, each ${ds.step} measured over the ${dyn.window} ${ds.steps} before it.${
         other ? ` Grey: ${mName(other).toLowerCase()}, to compare.` : ""
