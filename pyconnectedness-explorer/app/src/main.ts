@@ -98,6 +98,7 @@ app.innerHTML = `
           <p class="q">3 · How much does each pair pass on?</p>
           <h2>Spillover heatmap <code class="tag">spillover_heatmap</code></h2>
           <p class="sub" id="heatmap-sub"></p>
+          <p class="takeaway" id="hm-takeaway"></p>
         </div>
       </div>
       <div id="heatmap" class="chart-host"></div>
@@ -315,7 +316,7 @@ async function main() {
     wins.innerHTML = "";
     for (const o of windowOptions(data, m)) {
       const b = document.createElement("button");
-      b.textContent = o.key === "t" ? fmtStep(dyn.dates[s.t]) : o.label;
+      b.textContent = o.key === "t" ? `Picked ${ds.step}` : o.label;
       b.setAttribute("aria-pressed", String(o.key === s.window));
       b.onclick = () => store.set({ window: o.key, playing: false });
       wins.appendChild(b);
@@ -330,6 +331,7 @@ async function main() {
     ranking.render(frame, p, model.maxNet[m], focus, s.selected, motion);
     $("heatmap-sub").textContent = `Each pair once, in the row of the ${ds.item} that passes more to the other, ${frame.label.toLowerCase().startsWith("full") ? "over the " : "in the "}${frame.label.replace(/^Full/, "full")}.`;
     heatmap.render(frame, p, model.maxPair[m], focus, s.pair, (n) => hueOfNow(n), p.band);
+    renderHeatTakeaway(frame);
     $<HTMLSelectElement>("palette").value = s.palette;
     renderDetail(s, frame, p);
     tightenDecimals(document, ".num");
@@ -364,7 +366,7 @@ async function main() {
       $("timeline-sub").textContent = `How much of each ${ds.item}'s moves came from shocks elsewhere, over rolling ${dyn.window}-${ds.step} windows.`;
       $("beads-legend").innerHTML = `<span title="PyConnectedness: total"><i class="bk-index"></i>Spillover index: the average of all ${ds.items}</span>
         <span title="PyConnectedness: directional_from"><i class="bk-height"></i>Height: share of moves from shocks elsewhere</span>
-        <span title="PyConnectedness: directional_to"><i class="bk-to"></i>Width: how much it passes on</span>${
+${
           events ? `<span class="muted">▲ events</span>` : ""
         }<span class="muted" id="beads-floor"></span>`;
       $("beads-regions").innerHTML = [null, ...regions]
@@ -416,22 +418,30 @@ async function main() {
     const stat = (label: string, field: string, value: string, sub: string, cls = "", color = "") =>
       `<div class="ro-stat"><span class="ro-label"${field ? ` title="PyConnectedness: ${field}"` : ""}>${label}</span>
         <span class="ro-value ${cls}"${color ? ` style="color:${color}"` : ""}>${value}</span><span class="ro-sub">${sub}</span></div>`;
+    const nm = (n: string) => `<b style="color:${bigHue(n)}">${n}</b>`;
+    const pp = (v: number, signed = false) => `<span class="num">${signed ? fmtSigned(v) : v.toFixed(1)}</span>`;
     if (name) {
+      // a market hovered or picked: what it gives, takes and nets, in one sentence
       const i = names.indexOf(name);
-      const links = f.matrix[i].filter((v) => Math.abs(v) > f.threshold);
       const out = f.matrix[i].filter((v) => v > f.threshold).length;
-      el.innerHTML = `
-        <p class="ro-when">${s.hovered && s.hovered !== s.selected ? `<span class="ro-tag">Hover</span>` : ""}${name} <span class="ro-hint">· ${REGION_OF[name]} · ${f.label}</span></p>
-        <div class="ro-stats">
-          ${stat("Gives to others", "directional_to", `<span class="num">${f.to[i].toFixed(1)}</span>`, "pp of others' variance", "", bigHue(name))}
-          ${stat("Takes from others", "directional_from", `<span class="num">${f.from[i].toFixed(1)}</span>`, "pp of its own variance", "", bigHue(name))}
-          ${stat("Net position", "net", `<span class="num">${fmtSigned(f.net[i])}</span>`, f.net[i] >= 0 ? "a net transmitter" : "a net receiver", f.net[i] >= 0 ? "send" : "recv", bigHue(name))}
-          ${stat("Links drawn", "", `<span class="num">${links.length}</span>`, `${out} out, ${links.length - out} in`)}
-        </div>`;
+      const inn = f.matrix[i].filter((v) => -v > f.threshold).length;
+      const tag = s.hovered && s.hovered !== s.selected ? `<span class="ro-tag">Hover</span> ` : "";
+      el.innerHTML = `<p class="takeaway">${tag}${nm(name)} gives ${pp(f.to[i])} pp to the others and takes ${pp(f.from[i])} from them:
+        net ${pp(f.net[i], true)}, ${f.net[i] >= 0 ? "a net transmitter" : "a net receiver"}${
+          out && inn ? `, sending ${out} and receiving ${inn} of the strongest flows`
+          : out ? `, sending ${out} of the strongest flows`
+          : inn ? `, receiving ${inn} of the strongest flows`
+          : ", in none of the strongest flows"
+        }.</p>`;
     } else {
-      // nothing picked: one line, not a row of bookkeeping (the cut-off stays in the arrow tooltips)
-      el.innerHTML = `
-        <p class="ro-when">${f.label} <span class="ro-hint">· the ${f.edgeCount} strongest flows · hover or pick a ${ds.item} for what it gives, takes and nets</span></p>`;
+      // the answer to "who passes shocks to whom", for the window on show
+      const order = names.map((n, i) => ({ n, v: f.net[i] })).sort((a2, b2) => b2.v - a2.v);
+      let link = { s: 0, r: 0, v: -Infinity };
+      f.matrix.forEach((row, i) => row.forEach((v, j) => v > link.v && (link = { s: i, r: j, v })));
+      const top = order[0];
+      const bottom = order[order.length - 1];
+      el.innerHTML = `<p class="takeaway">${nm(top.n)} passes on the most (net ${pp(top.v, true)} pp), ${nm(bottom.n)} takes in the most
+        (${pp(bottom.v, true)}); the strongest flow is ${nm(names[link.s])} → ${nm(names[link.r])}, ${pp(link.v)} pp.</p>`;
     }
     el.classList.toggle("preview", !!s.hovered && s.hovered !== s.selected);
     tightenDecimals(el, ".num");
@@ -592,28 +602,52 @@ async function main() {
       : s.window === "t"
         ? `${week(s.t)} <span class="ro-hint">· the ${dyn.window} ${ds.steps} up to it</span>`
         : f.label;
-    const stat = (label: string, field: string, value: string, sub: string, cls = "", color = "") =>
-      `<div class="ro-stat"><span class="ro-label" title="PyConnectedness: ${field}">${label}</span>
-        <span class="ro-value ${cls}"${color ? ` style="color:${color}"` : ""}>${value}</span><span class="ro-sub">${sub}</span></div>`;
+    const big = `<b class="big-num" style="color:var(--bead-ink)"><span class="num">${f.total.toFixed(1)}%</span></b>`;
+    const vs = (d: number) => `${Math.abs(d) < 0.05 ? "level with" : `<span class="num">${Math.abs(d).toFixed(1)}</span> points ${d > 0 ? "above" : "below"}`} its long-run <span class="num">${full.total.toFixed(1)}%</span>`;
+    let sentence: string;
+    if (preview || s.window === "t") {
+      const t = preview ? s.hoverT! : s.t;
+      const share = dyn.total.filter((v) => v < dyn.total[t]).length / dyn.total.length;
+      sentence = `${preview ? `<span class="ro-tag">Preview</span> ` : ""}<b>${week(t)}</b>: spillover is ${big}, ${vs(diff)}, higher than
+        <span class="num">${Math.round(share * 100)}%</span> of all ${ds.steps}.`;
+    } else if (f.key === "full") {
+      sentence = `Over the full sample, spillover is ${big}: on average that share of each ${ds.item}'s moves came from shocks elsewhere.`;
+    } else {
+      sentence = `${f.key === "last200" ? `Over the last ${dyn.window} ${ds.steps}` : `In ${f.short}`}, spillover is ${big}, ${vs(diff)}.`;
+    }
+    void when;
     const el = $("readout");
     el.classList.toggle("preview", preview);
     el.innerHTML = `
-      <p class="ro-when">${when}</p>
-      <div class="ro-stats">
-        ${stat(
-          "Spillover index",
-          "total",
-          `<span class="num">${f.total.toFixed(1)}%</span>`,
-          f.key === "full" ? "the long-run level" : `<span class="num">${fmtSigned(diff)}</span> pp vs full sample`,
-          f.key === "full" ? "" : diff >= 0 ? "up" : "down", // nothing to compare the full sample with
-          "var(--bead-ink)" // the index's own colour, as its beads
-        )}
-        ${stat("Top net transmitter", "net", top.n, `<span class="num">${fmtSigned(top.v)}</span> pp`, "send", bigHue(top.n))}
-        ${stat("Top net receiver", "net", bottom.n, `<span class="num">${fmtSigned(bottom.v)}</span> pp`, "recv", bigHue(bottom.n))}
-        ${stat("Strongest link", "pairwise_net", `${names[link.s]} → ${names[link.r]}`, `<span class="num">${link.v.toFixed(2)}</span> pp`, "", bigHue(names[link.s]))}
-      </div>
+      <p class="takeaway">${sentence}</p>
       ${speedLine(s, preview)}`;
     tightenDecimals(el, ".num");
+  }
+
+  /** Graph 3's answer: where the strongest flows run, region to region */
+  function renderHeatTakeaway(f: ReturnType<Model["frame"]>) {
+    const flows: [number, number, number][] = [];
+    f.matrix.forEach((row, i) => row.forEach((v, j) => v > f.threshold && flows.push([i, j, v])));
+    const nm = (n: string, label = n) => `<b style="color:${bigHue(n)}">${label}</b>`;
+    let text: string;
+    if (presentRegions.length > 1 && flows.length) {
+      const count = new Map<string, number>();
+      for (const [i, j] of flows) {
+        const k = `${REGION_OF[names[i]]}|${REGION_OF[names[j]]}`;
+        count.set(k, (count.get(k) ?? 0) + 1);
+      }
+      const [k, c] = [...count].sort((a, b) => b[1] - a[1])[0];
+      const [r1, r2] = k.split("|");
+      const first = (r: string) => names.find((n) => REGION_OF[n] === r)!;
+      text = `Of the <span class="num">${flows.length}</span> strongest flows, <span class="num">${c}</span> run ${
+        r1 === r2 ? `within ${nm(first(r1), r1)}` : `from ${nm(first(r1), r1)} to ${nm(first(r2), r2)}`
+      }.`;
+    } else if (flows.length) {
+      const [i, j, v] = flows.sort((a, b) => b[2] - a[2])[0];
+      text = `The strongest flow is ${nm(names[i])} → ${nm(names[j])}, <span class="num">${v.toFixed(2)}</span> pp.`;
+    } else text = "No pair passes the cut-off in this window.";
+    $("hm-takeaway").innerHTML = text;
+    tightenDecimals($("hm-takeaway"), ".num");
   }
 
   function renderPair(s: State, frame: ReturnType<Model["frame"]>, p: ReturnType<typeof readPalette>) {

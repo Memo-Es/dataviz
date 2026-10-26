@@ -303,7 +303,7 @@ export class TimelineChart {
           .text(`${cmp.dyn.total[t].toFixed(1)}%`);
       }
       svg.append("circle").attr("cx", cx).attr("cy", cy).attr("r", 5.5).attr("fill", p.accent).attr("stroke", p.panel).attr("stroke-width", 2);
-      const label = `${dyn.total[t].toFixed(1)}% · ${fmtDate(this.dates[t])}`;
+      const label = `${dyn.total[t].toFixed(1)}%`; // the date is in the sentence above
       const lw = label.length * 7.8 + 18; // B612 Mono: ~0.65em per glyph at 12px bold
       const lx = Math.min(Math.max(cx - lw / 2, M.left), W - this.right - lw);
       const ly = cy - 34 < M.top ? cy + 12 : cy - 34;

@@ -167,7 +167,10 @@ export class NetworkChart {
     const k = this.names.length;
     const nodeR = d3.scaleSqrt().domain([0, maxNet]).range([NODE_MIN, NODE_MAX]).clamp(true);
     const weight = d3.scaleSqrt().domain([0, maxPair]).range([LINE_MIN, LINE_MAX]).clamp(true);
-    const strength = d3.scaleLinear().domain([frame.threshold, maxPair]).range([0.45, 1]).clamp(true);
+    // weaker arrows recede, further when there are many (the links drawn stay the library's
+    // strongest 10%; only their ink changes)
+    const many = d3.sum(frame.matrix, (row) => row.filter((v) => v > frame.threshold).length) > 30;
+    const strength = d3.scaleLinear().domain([frame.threshold, maxPair]).range([many ? 0.14 : 0.45, 1]).clamp(true);
     const focusIdx = focus ? this.names.indexOf(focus) : -1;
     const pairIdx = pair && focusIdx < 0 ? pair.map((n) => this.names.indexOf(n)) : null;
     const isPair = (e: Edge) =>

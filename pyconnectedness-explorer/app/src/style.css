@@ -1647,3 +1647,42 @@ svg {
   height: 3px;
   border-radius: 2px;
 }
+
+/* each graph's answer, in one sentence: stone text, the names that matter in their colour
+   (20px bold: large text, so 4.5:1 is the AAA bar for coloured words). The space is reserved for
+   two lines, so a hover never moves the chart under the pointer. */
+.takeaway {
+  max-width: 75ch;
+  min-height: 2.8em;
+  margin: 4px 0 12px;
+  font-size: 20px;
+  line-height: 1.4;
+  font-weight: 500;
+  color: var(--stone);
+}
+
+.takeaway b {
+  font-weight: 700;
+}
+
+.takeaway .ro-tag {
+  display: inline-block;
+  line-height: 1.5;
+  vertical-align: middle;
+}
+
+@media (max-width: 600px) {
+  .takeaway {
+    min-height: 7em; /* five lines on a phone */
+    font-size: 18px;
+  }
+  .takeaway b {
+    font-size: 19px;
+  }
+}
+
+/* the number font and bold names mustn't make a line taller than the stone text around them */
+.takeaway .num,
+.takeaway b {
+  line-height: 1;
+}

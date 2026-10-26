@@ -6,7 +6,7 @@
  *   - the coloured beads are the regions (the average of their items), or, with one region
  *     picked, its items. A bead's height on the string is how much of its moves came from shocks
  *     elsewhere (`directional_from`, the same % as the index: the index is its average over every
- *     item); its width, how much it passes to the others (`directional_to`).
+ *     item).
  * The strings are solid up to the index, so they draw its rise and fall, the point of the graph;
  * the regions sit around it, smaller, told apart by colour. Beads are painted on a canvas; the cursor, labels and axis are SVG on top, so a hover
  * redraws only the overlay.
@@ -254,7 +254,7 @@ export class BeadsChart {
       ctx.globalAlpha = alpha * 0.92;
       for (const s of this.series) {
         const cy = y(this.value(s, dyn.from, ti));
-        const w = wTo(this.value(s, dyn.to, ti));
+        const w = sideW; // one width: the width encoding couldn't be seen at this size
         ctx.fillStyle = s.fringe;
         ctx.fillRect(x - w / 2 + 1.2, cy - SIDE_H / 2, w, SIDE_H);
         ctx.fillStyle = s.hue;
@@ -410,7 +410,7 @@ export class BeadsChart {
         .attr("fill", "none")
         .attr("stroke", p.accent)
         .attr("stroke-width", 2);
-      const label = `${dyn.total[t].toFixed(1)}% · ${fmtDate(dates[t])}`;
+      const label = `${dyn.total[t].toFixed(1)}%`; // the date is in the sentence above
       const lw = label.length * 7.8 + 18;
       const lx = Math.min(Math.max(x - lw / 2, M.left), M.left + this.plotW - lw);
       svg.append("rect").attr("x", lx).attr("y", 4).attr("width", lw).attr("height", 22).attr("rx", 11).attr("fill", p.panel).attr("stroke", p.accent).attr("stroke-width", 2); // stone text on the card, ringed in the highlight
