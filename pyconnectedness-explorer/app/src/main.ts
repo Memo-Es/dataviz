@@ -86,8 +86,8 @@ app.innerHTML = `
       <div class="graph2-net">
         <div id="network" class="chart-host network-host"></div>
         <div class="legend">
-          <span title="PyConnectedness: net"><i class="dot solid"></i>Solid: passes on more</span>
-          <span title="PyConnectedness: net"><i class="dot ring"></i>Ring: takes in more · bigger = more</span>
+          <span title="PyConnectedness: net"><i class="dot solid"></i>Top half, solid: passes on more</span>
+          <span title="PyConnectedness: net"><i class="dot tint"></i>Bottom half, tinted: takes in more · bigger = more</span>
           <span title="PyConnectedness: pairwise_net"><i class="arrowkey"></i>Arrow: sender to receiver · thicker and darker = stronger</span>
           <span id="net-regions"></span>
         </div>
