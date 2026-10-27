@@ -9,6 +9,9 @@ import { BeadsChart, readBeadColors } from "./charts/beads";
 import { findInsights } from "./charts/insights";
 import { miniLine, miniMatrix, miniRing } from "./charts/minis";
 import { onSegment, segmented, setSegment } from "./ui/segmented";
+import "@awesome.me/webawesome/dist/components/dropdown/dropdown.js";
+import "@awesome.me/webawesome/dist/components/dropdown-item/dropdown-item.js";
+import { type Figure, downloadPng, downloadSvg } from "./export";
 import "@awesome.me/webawesome/dist/styles/themes/default.css";
 import { QuadrantChart } from "./charts/quadrants";
 import { RankingChart } from "./charts/ranking";
@@ -47,7 +50,14 @@ app.innerHTML = `
   <!-- an expanded graph: the way back to the overview, and what's on show -->
   <nav class="crumb" id="crumb" aria-label="Where you are" hidden>
     <a href="#" class="crumb-back">‹ All graphs</a><span class="crumb-here" id="crumb-here"></span>
-    <span class="crumb-tools" id="crumb-tools"></span>
+    <span class="crumb-tools">
+      <!-- the graph as a figure for a report, with whatever is picked still highlighted -->
+      <wa-dropdown id="export" placement="bottom-end">
+        <button slot="trigger" class="crumb-btn" type="button">Download ▾</button>
+        <wa-dropdown-item value="png">PNG image, for documents and slides</wa-dropdown-item>
+        <wa-dropdown-item value="svg">SVG, vector, for editing</wa-dropdown-item>
+      </wa-dropdown>
+    </span>
   </nav>
 
   <!-- time: the window every graph shows -- the one ending at the week picked on a chart, or a
@@ -120,7 +130,7 @@ app.innerHTML = `
       <div class="graph2-net">
         <div id="network" class="chart-host network-host"></div>
         <div id="quadrants" class="chart-host network-host"></div>
-        <div class="legend">
+        <div class="legend" id="net-legend">
           <span title="PyConnectedness: net" id="leg-solid"><i class="dot solid"></i>Top half, deeper: passes on more</span>
           <span title="PyConnectedness: net" id="leg-tint"><i class="dot tint"></i>Bottom half, paler: takes in more · bigger = more</span>
           <span title="PyConnectedness: pairwise_net" id="leg-arrow"><i class="arrowkey"></i></span>
@@ -1095,6 +1105,63 @@ ${
   };
   window.addEventListener("hashchange", applyView);
   applyView();
+
+  // the graph on show as a figure: its chart as drawn (picks included), framed for a report
+  const figureFor = (v: Exclude<View, "home">): Figure => {
+    const s = store.get();
+    const m = s.measure;
+    const frame = model.frame(s);
+    const when = (s.window === "t" ? meta.dynamic[m].dates[s.t] : s.window).toLowerCase();
+    const source = (fn: string) =>
+      `Source: PyConnectedness (commit 4cc953f), ${fn}, ${mName(m).toLowerCase()}. ${ds.title}, from ${ds.source}. ${frame.label}.${
+        // a pick is named only where it is drawn: on the network and the heatmap
+        v === "index" ? "" : s.selected ? ` Picked: ${s.selected}.` : s.pair ? ` Picked: ${s.pair[0]} → ${s.pair[1]}.` : ""
+      } Made with PyConnectedness Explorer.`;
+    const base = { file: `pyconnectedness-${v}-${ds.id}-${m}-${when}`, title: TITLES[v] };
+    if (v === "index") {
+      const beadsOn = g1Style === "beads";
+      const host = $(beadsOn ? "beads" : "timeline");
+      return {
+        ...base,
+        question: "1 · When did shocks spread most?",
+        tag: "dynamic_connectedness(…).total",
+        sentence: $("readout").innerText,
+        host,
+        layers: [...host.querySelectorAll<HTMLCanvasElement | SVGSVGElement>(":scope > canvas, :scope > svg")],
+        legends: [$(beadsOn ? "beads-legend" : "line-legend")],
+        source: source("dynamic_connectedness(…).total"),
+      };
+    }
+    if (v === "network") {
+      const host = $(g2Style === "quad" ? "quadrants" : "network");
+      return {
+        ...base,
+        question: "2 · Who passes shocks to whom?",
+        tag: "connectedness_graph",
+        sentence: $("net-readout").innerText,
+        host,
+        layers: [...host.querySelectorAll<SVGSVGElement>(":scope > svg")],
+        legends: [$("net-legend")],
+        source: source("connectedness_graph (strongest 10% of pairwise_net)"),
+      };
+    }
+    return {
+      ...base,
+      question: "3 · How much does each pair pass on?",
+      tag: "spillover_heatmap",
+      sentence: $("hm-takeaway").innerText,
+      host: $("heatmap"),
+      layers: [...$("heatmap").querySelectorAll<SVGSVGElement>(":scope > svg")],
+      legends: [$("heatmap-legend")],
+      source: source("spillover_heatmap (pairwise_net)"),
+    };
+  };
+  $("export").addEventListener("wa-select", (ev) => {
+    const kind = (ev as CustomEvent<{ item: HTMLElement & { value: string } }>).detail.item.value;
+    if (view === "home" || view === null) return;
+    const f = figureFor(view);
+    (kind === "svg" ? downloadSvg(f) : downloadPng(f)).catch((e) => console.error("export failed", e));
+  });
 
   // controls
   onSegment($("measure"), (v) => setMeasure(v as Measure));

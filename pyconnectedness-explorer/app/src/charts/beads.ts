@@ -217,7 +217,7 @@ export class BeadsChart {
   }
 
   private paint(dyn: DynamicBlock, periods: PeriodBand[], activePeriod: string | null, c: BeadColors, panel: string) {
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.max(2, window.devicePixelRatio || 1); // at least 2x: sharp in a downloaded figure too
     const W = this.width;
     this.canvas.width = Math.round(W * dpr);
     this.canvas.height = Math.round(H * dpr);
