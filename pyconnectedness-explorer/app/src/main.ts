@@ -63,7 +63,11 @@ app.innerHTML = `
     <div class="readout" id="readout" aria-live="polite"></div>
     <!-- insights on the left, read off the numbers, each pointing at a week; the chart on the right -->
     <div class="g1-body">
-      <ol class="insights" id="insights" tabindex="0" aria-label="What the chart shows"></ol>
+      <div class="insights-wrap" id="insights-wrap">
+        <ol class="insights" id="insights" tabindex="0" aria-label="What the chart shows"></ol>
+        <div class="ins-fade top" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <div class="ins-fade bottom" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+      </div>
       <div class="g1-chart">
         <div id="timeline" class="chart-host"></div>
         <div class="beads-regions" id="beads-regions" role="group" aria-label="Region shown"></div>
@@ -132,6 +136,14 @@ app.innerHTML = `
 `;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+
+function insightFades() {
+  const box = document.getElementById("insights");
+  const wrap = document.getElementById("insights-wrap");
+  if (!box || !wrap) return;
+  wrap.classList.toggle("more-above", box.scrollTop > 2);
+  wrap.classList.toggle("more-below", box.scrollTop + box.clientHeight < box.scrollHeight - 2);
+}
 
 async function main() {
   const datasets = await loadDatasets();
@@ -246,6 +258,9 @@ async function main() {
     const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-region]");
     if (b) pickRegion(b.dataset.region || null);
   });
+  // the insights scroll: a blur fades out what runs past either end, only when something does
+  $("insights").addEventListener("scroll", insightFades, { passive: true });
+  new ResizeObserver(insightFades).observe($("insights"));
   // an insight's date picks that week, like a click on its string
   $("insights").addEventListener("click", (ev) => {
     const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-t]");
@@ -486,9 +501,11 @@ async function main() {
     const box = $("insights");
     const on = box.querySelector<HTMLElement>(".insight.on");
     if (on) {
-      const top = on.offsetTop - box.offsetTop - 10;
-      if (top < box.scrollTop || top + on.offsetHeight + 20 > box.scrollTop + box.clientHeight) box.scrollTop = top;
+      const top = on.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 8;
+      // clear of the fades at either end
+      if (top < box.scrollTop + 40 || top + on.offsetHeight + 72 > box.scrollTop + box.clientHeight) box.scrollTop = top;
     }
+    insightFades();
     $("g1-style").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.style === g1Style)));
     $("timeline").hidden = asBeads;
     $("beads").hidden = !asBeads;
