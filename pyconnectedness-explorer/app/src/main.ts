@@ -654,13 +654,13 @@ async function main() {
       )
       .join("");
     tightenDecimals($("insights"), ".num");
-    // keep the picked card in view inside the scroll, without moving the page
+    // the list always starts at its first card: back to the top whenever its cards change (a new
+    // dataset or series), never scrolled for the reader
     const box = $("insights");
-    const on = box.querySelector<HTMLElement>(".insight.on");
-    if (on) {
-      const top = on.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 8;
-      // clear of the fades at either end
-      if (top < box.scrollTop + 40 || top + on.offsetHeight + 72 > box.scrollTop + box.clientHeight) box.scrollTop = top;
+    const cardsKey = insights.map((x) => `${x.t}:${x.title}`).join("|");
+    if (box.dataset.cards !== cardsKey) {
+      box.dataset.cards = cardsKey;
+      box.scrollTop = 0;
     }
     insightFades();
     setSegment($("g1-style"), g1Style);

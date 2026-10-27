@@ -1760,10 +1760,14 @@ svg {
   position: absolute;
   inset: 0;
   margin: 0;
-  padding: 8px;
+  /* the scrollbar's room is kept on both sides, so the cards sit evenly: 8 + 6 on each side,
+     the same 14 at the top and bottom */
+  padding: 14px 6px;
+  scrollbar-gutter: stable both-edges;
   list-style: none;
   display: grid;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr); /* the cards fit the room, never wider than it */
+  gap: 10px;
   align-content: start;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -1786,7 +1790,7 @@ svg {
 }
 
 .insights::-webkit-scrollbar {
-  width: 10px;
+  width: 8px;
 }
 
 .insights::-webkit-scrollbar-track {
@@ -1849,6 +1853,7 @@ svg {
 }
 
 .insight {
+  min-width: 0;
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr);
   gap: 12px;
