@@ -114,6 +114,72 @@ The explorer answers three questions in order, one graph each, named as in the l
 
 A fourth graph, the layered network for extreme risk, is designed but tabled, because the library's `causality` module has nothing to draw from yet.
 
+### Original and proposal, graph by graph
+
+Every proposal starts from what the library and the authors' demo (`examples/Demo.ipynb`, commit `4cc953f`) already draw. The numbers never change. What changes is how they are laid out, coloured and explained. Each table puts the original's attributes beside the proposal's, with the reason for each difference. Where both are worth keeping, the explorer offers a switch, so the original is always one click away.
+
+**Graph 1 · Rolling spillover index** · `dynamic_connectedness(…).total`. Original: the demo's own line (cell 14). Proposal: **Beads** (default), with **Line** as a switch.
+
+| Attribute | Original | Proposal | Why |
+|---|---|---|---|
+| What it shows | One line: the average over all items | One string per window, with a bead for the average and one per region (`directional_from` averaged by region) | The average hides who moved. A rise driven by one region and a rise everywhere look the same on a line |
+| Time | Every week | Strings sampled to fit the width, one about every 20 pixels (some 35 on a laptop screen); the Line view keeps every week | Fewer marks, so the big moves stand out. The line stays for exact timing |
+| Reference | Dashed grey line at the full-sample total | The same dashed line, named on the chart ("long-run 78.3%") | A level means little without "compared with what" |
+| Colour | Black line | Region colours on the beads; the average in ink | One colour rule: colour is region on every graph |
+| Scale | Matplotlib's automatic y-axis | A floor chosen from the data, stated in the legend ("Strings start at 55%, not 0") | Saves room without hiding the cut |
+| Explanation | A title with the settings ("200-week window, VAR(2), H=10") | A sentence above the chart for the picked week; numbered insight cards; a legend that warns about the window ("a cliff 198 weeks later is it leaving") | The reading, not just the settings. The commonest misreading gets its own warning |
+| Interaction | None (a static figure) | Pick a week on the chart, from an insight's date or with the arrow keys; pick a region; switch Beads or Line | Every other graph follows the picked week |
+
+**Inside graph 1 · Frequency-domain connectedness** · `frequency_connectedness`. Original: no figure in the demo or the library; the result is numbers per band. Proposal: **one bar** split into short, medium and long term.
+
+| Attribute | Original | Proposal | Why |
+|---|---|---|---|
+| What it shows | Spillover per frequency band, as numbers | One bar per period, split by band, each band's share in the legend | "How long do shocks last" answered at a glance |
+| Colour | n/a | One hue, darker for faster | The bands are ordered (short to long), so the colour is ordered too, and kept apart from the region colours |
+| Placement | n/a | Under graph 1, for the period the picked week falls in | It describes the same moment as the chart above it |
+
+**Graph 2 · Connectedness network** · `connectedness_graph` and `plot_connectedness_graph`. Original: demo cell 19. Proposal: an **ordered ring** (default), with **Quadrants** as a switch.
+
+| Attribute | Original | Proposal | Why |
+|---|---|---|---|
+| Which flows | Every pair above the 90th percentile of \|`pairwise_net`\| | The same cut-off; the ring draws the 10 strongest by default, all of a market's flows when it is picked, and all of them with the "All" switch | Twenty or more crossing arrows tangle; ten can be followed |
+| Position | `circular_layout`, in data order: position means nothing | Transmitters across the top, strongest at the left; receivers across the bottom, biggest at the left; the middle line labelled "↑ passes on more / ↓ takes in more" | Position becomes a ranking: "most central" is "top left" |
+| Node colour | Red for net transmitters, blue for net receivers (`tab:red`, `tab:blue`) | Region colour, a deeper wash for transmitters and a paler one for receivers, each edged in the full hue | Colour carries region, as on every graph. Transmitter or receiver is already said twice: by position and by depth |
+| Node size | Area from \|net\|, relative to the largest in the plot | Area from \|net\|, on one scale across every week | Sizes can be compared between weeks |
+| Arrows | Grey, width relative to the strongest in the plot, slightly curved | Ink, width from the cut-off to the strongest flow in any week, curved toward the centre | Wider means stronger, and means the same in every week |
+| Labels | The name on each node | The name and its net value beside each node, outside the ring | The number lives in the graph |
+| A second view | None | Quadrants: net across, its change over about a quarter up and down, with the corners named (rising transmitters, fading transmitters, deepening receivers, recovering receivers) | Answers what the ring can't: who is changing |
+
+**Beside graph 2 · Net position by market** · `net`. Original: twenty small line charts, one per market (demo cell 17). Proposal: **a bar per market**, beside the ring, sorted by net, plus one market's line in the detail panel.
+
+| Attribute | Original | Proposal | Why |
+|---|---|---|---|
+| What it shows | Each market's net over time, 20 small panels | Each market's net for the picked window, as bars, sorted; one market's net over time in the detail panel | Comparing markets needs one shared axis; one market's history needs one line, not twenty |
+| Colour | Black | Region washes, as on the ring | The same colour rule |
+
+**Graph 3 · Spillover heatmap** · `spillover_heatmap(pairwise_net, cmap="RdBu_r")`. Original: demo cells 18 and 21. Proposal: **Dots** (default), with **Original** as a switch that draws the library's own picture.
+
+| Attribute | Original | Proposal (Dots) | Why |
+|---|---|---|---|
+| Cells | Every pair twice, mirrored (`pairwise_net` is antisymmetric) | Each pair once, a dot in the sender's row; empty cells keep a pinpoint | Half the grid repeats the other half with the sign flipped |
+| Encoding | Colour, red to blue around zero | Dot area for the size of the flow; colour for the sender's region | Area makes the big flows stand out and the small ones recede; every coloured square looks equally important |
+| Order | Data order | Grouped by region, with region bars beside the rows and above the columns | Flows within and between regions show as blocks |
+| Strongest flows | Not marked | Ringed: the same flows the network draws | The two graphs visibly describe the same links |
+| Scale | Each matrix's own range (colours change meaning between periods) | One scale across every week | A dot size means the same in every week |
+| Axis titles | "shock source" (columns) and "affected variable" (rows): the defaults for the library's default matrix, but backwards for `pairwise_net`, where a positive cell means the row passes more to the column | "from" and "to", in the Original view too | So the original can be read right |
+
+In the **Original** view everything else is kept as the library draws it: the red-blue colours, the mirrored grid, the data order, the colour bar and the per-window scale. On the full sample it matches the demo's figure cell for cell.
+
+**Across every graph, the proposal adds what the originals leave to the reader:**
+
+- the library's name and call above each graph;
+- one sentence for the current selection;
+- a legend written against misreadings;
+- the same picked week everywhere;
+- a figure to download that keeps the pick and names its source.
+
+None of it is a new number.
+
 ### The rules behind every graph
 
 Each rule exists because breaking it made a real reader stumble during the redesign.
@@ -122,7 +188,7 @@ Each rule exists because breaking it made a real reader stumble during the redes
 - **Numbers live inside their graph.** The value of the picked week sits on the picked string, not in a summary box elsewhere. A number away from its picture forces the eye to travel and the reader to match things up.
 - **Values change only when you pick, never when you hover.** We tried previewing values on hover and dropped it: numbers that flicker as the pointer crosses the chart are hard to trust and impossible to quote. Hover may highlight; only a click changes what the page says.
 - **Nothing jumps.** Hovering or picking never moves the layout by a pixel. The sentence keeps a fixed height, the date control keeps the width of its longest date, and the Beads and Line drawings take the same space. Movement that isn't data reads as data. We checked this with a script on every change.
-- **One colour rule.** Colour means region, on every graph. A reader who learns "orange is Europe" on the first chart can carry it to the network and the heatmap without a legend.
+- **One colour rule.** Colour means region, on every graph. A reader who learns "sage is the Americas" on the first chart can carry it to the network and the heatmap without a legend.
 
 ### Graph 1: Rolling spillover index (the time series)
 
@@ -133,7 +199,7 @@ Each rule exists because breaking it made a real reader stumble during the redes
 | Shows | A string per window: the average plus one bead per region | The average only |
 | Who moved | Visible. In currencies, Europe stays near 83–85% while the Americas fall into the 60s after 2024; the average hides that split | Hidden |
 | The rolling window | Visible. Each string is one 200-week window, so a cliff is visibly the shock leaving it | Easy to misread: a fall looks like markets calming |
-| Exact timing | Coarser: about one window in fifty | Sharper: every week drawn |
+| Exact timing | Coarser: strings sampled to fit the width | Sharper: every week drawn |
 | Matches | Nothing in the library yet | The authors' notebook figure, useful for checking |
 
 The beads tell the story. The line is kept for checking exact dates and for continuity with the notebook. Both carry the same sentence, the same numbered insights and the same legend, and switching between them moves nothing on the page.
@@ -163,14 +229,14 @@ The cards sit in a scrolling list as tall as the chart, with a soft blur where t
 The library's default layout is a circle with the nodes in data order. On it, position means nothing, and the reader has to find the transmitters by reading every label. We keep the circle, because it is the library's picture and users know it, but give position a meaning:
 
 - **Ordered by net.** Net transmitters run across the top, strongest at the left; net receivers across the bottom, biggest at the left. A line across the middle is labelled "↑ passes on more / ↓ takes in more". "Who is most central" becomes "who is at the top left", answered without reading a number.
-- **Arrows show direction and strength in one mark:** a thin curved arrow, darker for a stronger flow, only the strongest 10% drawn, as in `connectedness_graph`. Fewer, clearer arrows beat a hairball.
+- **Arrows show direction and strength in one mark:** a curved arrow, wider for a stronger flow. Of the strongest 10% that `connectedness_graph` keeps, the 10 strongest are drawn until a market is picked, then all of its flows; an "All" switch draws the full set. Fewer, clearer arrows beat a hairball.
 - **Each node is labelled with its name and net value**, so the number lives in the graph.
 
 A second view, **Quadrants**, answers the question the circle can't: *who is changing?* Across is net (transmitter or receiver); up and down is how much that has changed recently. The four corners are named in plain words: rising transmitters, fading transmitters, deepening receivers, recovering receivers. It came straight out of review: once the ordered ring started to read like coordinates, a real plane was the honest next step.
 
 ### Graph 3: Spillover heatmap
 
-We redrew the full colour grid as a dot matrix. Each pair is drawn once, in the sender's row. The dot's size is how much more it passes on than it gets back, and its colour is the sender's region, the same colours as graph 1. A dark ring marks the strongest links, the same ones the network draws, so the two graphs visibly describe the same flows. A grid of coloured squares makes every cell look equally important. Dots let the big flows stand out and the small ones recede, which is what readers want from this view.
+We redrew the full colour grid as a dot matrix. Each pair is drawn once, in the sender's row. The dot's size is how much more it passes on than it gets back, and its colour is the sender's region, the same colours as graph 1. A dark ring marks the strongest links, the same ones the network draws, so the two graphs visibly describe the same flows. A grid of coloured squares makes every cell look equally important. Dots let the big flows stand out and the small ones recede, which is what readers want from this view. An **Original** switch draws the heatmap as the library does, so anyone checking against the demo sees the familiar picture.
 
 ### Changes over time and animation
 
