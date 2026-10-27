@@ -28,8 +28,8 @@ import { hueOf as hueOfNow } from "./encoding";
 
 /** the demo's two series of the stock data, in words that say what each asks */
 const MEASURE_COPY: Partial<Record<string, { label: string; term: string; line: string }>> = {
-  returns: { label: "Price moves", term: "returns", line: "Each market's weekly % change: when one moves, do the others follow?" },
-  volatility: { label: "Turbulence", term: "volatility", line: "How widely each market swung within the week: when one turns turbulent, does it spread?" },
+  returns: { label: "Price moves", term: "returns", line: "each market's weekly % change. When one moves, do the others follow?" },
+  volatility: { label: "Turbulence", term: "volatility", line: "how widely each market swung within the week. When one turns turbulent, does it spread?" },
 };
 
 /** the ring draws this many of the library's strongest flows until a market is picked */
@@ -508,7 +508,8 @@ async function main() {
     // controls
     if (twoSeries) {
       setSegment($("measure"), m);
-      $("measure-line").textContent = `${MEASURE_COPY[m]?.line ?? mName(m)} Both series as the authors' demo builds them (Demo.ipynb).`;
+      const c = MEASURE_COPY[m];
+      $("measure-line").textContent = c ? `${c.label}: the ${c.term} of the authors' demo (Demo.ipynb), ${c.line}` : mName(m);
     }
     $("theme").textContent = s.theme === "dark" ? "☀" : "☾";
     // the windows: a Web Awesome radio group, built once and updated in place, so arrow keys
@@ -782,39 +783,46 @@ ${
     const sample = `${import.meta.env.BASE_URL}sample_currencies.csv`;
     const ownHint = `Dates in the first column, one column per series (2 to 25).
       <a href="${sample}" download>Sample file</a>`;
+    // a small form: labels on the left, the controls beside them, quiet captions underneath.
+    // Parts that belong to one source carry data-src, so the source switch shows them wherever
+    // they sit
+    const pub = (x: string) => (own ? ` data-src="public" hidden` : ` data-src="public"`) + x;
+    const mine = (x: string) => (own ? ` data-src="own"` : ` data-src="own" hidden`) + x;
     $("top").innerHTML = `
       <div class="data-bar">
-        ${segmented("src", "Data source", [["public", "Public dataset"], ["own", "Your own file"]], own ? "own" : "public")}
-        <div class="data-row" id="src-public"${own ? " hidden" : ""}>
-          <wa-select id="ds-select" class="ds-select" label="Dataset" placeholder="Choose a dataset" value="${own ? "" : ds.id}">${options}</wa-select>
-          <p class="data-meta">${own ? "" : `${facts} · from the <a href="${ds.api_url}" target="_blank" rel="noopener">${ds.api}</a>`}</p>
-          ${
-            // two series of the same data (the demo's returns and volatility): which one the page shows
-            twoSeries
-              ? `<div class="measure-row">
-              <span class="measure-q">What spreads</span>
-              ${segmented("measure", "What spreads", measures.map((k) => [k, MEASURE_COPY[k] ? `${MEASURE_COPY[k].label} <small>${MEASURE_COPY[k].term}</small>` : mName(k)]), store.get().measure, true)}
-              <p class="data-meta" id="measure-line"></p>
-            </div>`
-              : ""
-          }
+        <span class="data-label">Data</span>
+        <div class="data-ctl">
+          ${segmented("src", "Data source", [["public", "Public dataset"], ["own", "Your own file"]], own ? "own" : "public")}
+          <div class="data-ctl-group" id="src-public"${pub("")}>
+            <wa-select id="ds-select" class="ds-select" label="Dataset" placeholder="Choose a dataset" value="${own ? "" : ds.id}">${options}</wa-select>
+          </div>
+          <div class="data-ctl-group" id="src-own"${mine("")}>
+            <label class="file-btn">
+              <input type="file" id="file" accept=".csv,text/csv" />
+              <span>${own ? "Choose another CSV" : "Choose a CSV"}</span>
+            </label>
+            ${segmented("kind", "What the numbers are", [["levels", "Levels"], ["changes", "Changes"]], own?.rec.kind === "changes" ? "changes" : "levels", true,
+              `title="Levels (prices, index values, counts) are turned into % changes, as the demo does with prices. Changes are used as they are."`)}
+          </div>
         </div>
-        <div class="data-row" id="src-own"${own ? "" : " hidden"}>
-          <label class="file-btn">
-            <input type="file" id="file" accept=".csv,text/csv" />
-            <span>${own ? "Choose another CSV" : "Choose a CSV"}</span>
-          </label>
-          ${segmented("kind", "What the numbers are", [["levels", "Levels"], ["changes", "Changes"]], own?.rec.kind === "changes" ? "changes" : "levels", true,
-            `title="Levels (prices, index values, counts) are turned into % changes, as the demo does with prices. Changes are used as they are."`)}
-          <p class="data-meta" id="own-status">${own ? `<b>${own.rec.name}</b> · ${facts}` : ownHint}</p>
+        ${
+          // two series of the same data (the demo's returns and volatility): which one the page shows
+          twoSeries
+            ? `<span class="data-label"${pub("")}>What spreads</span>
+        <div class="data-ctl"${pub("")}>${segmented("measure", "What spreads", measures.map((k) => [k, MEASURE_COPY[k]?.label ?? mName(k)]), store.get().measure)}</div>`
+            : ""
+        }
+        <div class="data-captions">
+          <p class="data-caption"${pub("")}>${own ? "" : `${facts} · from the <a href="${ds.api_url}" target="_blank" rel="noopener">${ds.api}</a>`}</p>
+          ${twoSeries ? `<p class="data-caption" id="measure-line"${pub("")}></p>` : ""}
+          <p class="data-caption" id="own-status"${mine("")}>${own ? `<b>${own.rec.name}</b> · ${facts}` : ownHint}</p>
         </div>
       </div>`;
     tightenDecimals($("top"), ".num");
 
     const show = (src: string) => {
       setSegment($("src"), src);
-      $("src-public").hidden = src !== "public";
-      $("src-own").hidden = src !== "own";
+      $("top").querySelectorAll<HTMLElement>("[data-src]").forEach((el) => (el.hidden = el.dataset.src !== src));
     };
     onSegment($("src"), show);
     $("ds-select").addEventListener("change", (ev) => {
