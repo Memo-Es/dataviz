@@ -34,8 +34,8 @@ const SPECS = [
   { id: "5.11b-2", c: "current", hash: "network", crop: "#g2", ls: { "pc-g2": "ring" }, pick: "Germany" },
   { id: "5.12a", c: "7639607", crop: "#g2" },
   { id: "5.12b", c: "current", hash: "network", crop: "#g2", ls: { "pc-g2": "quad" } },
-  { id: "5.13a", c: "e23c7e5", hash: "network", crop: "#g2", ls: { "pc-g2": "quad" }, pick: "Germany" },
-  { id: "5.13b", c: "current", hash: "network", crop: "#g2", ls: { "pc-g2": "quad" }, pick: "Germany" },
+  { id: "5.13a", c: "e23c7e5", hash: "network", crop: "#g2", ls: { "pc-g2": "ring" }, pick: "Germany", thenQuad: true },
+  { id: "5.13b", c: "current", hash: "network", crop: "#g2", ls: { "pc-g2": "ring" }, pick: "Germany", thenQuad: true },
   { id: "5.14b", c: "bdd65c5", hash: "network", crop: "#g2" },
   { id: "5.14c", c: "current", hash: "network", crop: "#g2", ls: { "pc-g2": "ring" } },
   { id: "5.15b", c: "current", hash: "heatmap", crop: "#g3", ls: { "pc-g3": "dots" } },
@@ -66,11 +66,21 @@ const browser = await chromium.launch();
 
 async function setWeek(page) {
   await page.evaluate(() => document.activeElement && document.activeElement.blur && document.activeElement.blur());
-  const has = () => page.evaluate((src) => new RegExp(src).test(document.body.innerText), WEEK.source);
-  if (await has()) return true;
-  for (let i = 0; i < 460; i++) {
-    await page.keyboard.press("ArrowLeft");
-    if (await has()) { await page.waitForTimeout(700); return true; }
+  const target = Date.parse("20 Mar 2020");
+  for (let i = 0; i < 700; i++) {
+    const txt = await page.evaluate(() => document.body.innerText);
+    if (WEEK.test(txt)) { await page.waitForTimeout(800); return true; }
+    const m = txt.match(/Week of (\d{1,2} [A-Z][a-z]{2} \d{4})/);
+    if (m) {
+      const weeks = Math.round((Date.parse(m[1]) - target) / (7 * 864e5));
+      if (weeks > 60) await page.keyboard.press("Shift+ArrowLeft");
+      else if (weeks > 0) await page.keyboard.press("ArrowLeft");
+      else await page.keyboard.press("ArrowRight");
+      await page.waitForTimeout(weeks > 60 ? 350 : 220);
+    } else {
+      await page.keyboard.press("ArrowLeft");
+      await page.waitForTimeout(150);
+    }
   }
   return false;
 }
@@ -102,6 +112,7 @@ for (const s of specs) {
         await page.waitForTimeout(900);
       } catch { notes.push("pick failed"); }
     }
+    if (s.thenQuad) { try { await page.locator("#g2").getByText("Quadrants", { exact: true }).first().click({ timeout: 5000 }); await page.waitForTimeout(1200); } catch { notes.push("quadrants switch failed"); } }
     if (s.insight) {
       try {
         const card = page.locator("#insights li").filter({ hasText: "2020" }).first();
