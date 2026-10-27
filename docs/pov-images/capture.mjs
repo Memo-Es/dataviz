@@ -5,7 +5,7 @@ import fs from "node:fs";
 
 const [, , which, port, out] = process.argv;
 const BASE = `http://localhost:${port}/`;
-const WEEK = "20 Mar 2020";
+const WEEK = /20 Mar(ch)? 2020|2020-03-20/;
 
 // every capture: id, commit ("current" = branch head), view hash, what to crop, and what to do first
 const SPECS = [
@@ -66,7 +66,7 @@ const browser = await chromium.launch();
 
 async function setWeek(page) {
   await page.evaluate(() => document.activeElement && document.activeElement.blur && document.activeElement.blur());
-  const has = () => page.evaluate((w) => document.body.innerText.includes(w), WEEK);
+  const has = () => page.evaluate((src) => new RegExp(src).test(document.body.innerText), WEEK.source);
   if (await has()) return true;
   for (let i = 0; i < 460; i++) {
     await page.keyboard.press("ArrowLeft");
@@ -83,11 +83,13 @@ for (const s of specs) {
   const page = await ctx.newPage();
   const notes = [];
   try {
-    await page.goto(BASE + (s.query || "") + (s.hash ? "#" + s.hash : ""), { waitUntil: "networkidle", timeout: 90000 });
-    await page.waitForTimeout(2500);
-    if (!s.noWeek) {
-      let ok = await setWeek(page);
-      if (!ok) { notes.push("week not found, default week"); await page.reload({ waitUntil: "networkidle" }); await page.waitForTimeout(2500); }
+    const go = async (h) => { await page.goto(BASE + (s.query || "") + (h ? "#" + h : ""), { waitUntil: "networkidle", timeout: 90000 }); await page.waitForTimeout(2500); };
+    if (s.noWeek) await go(s.hash);
+    else {
+      await go("index");
+      const ok = await setWeek(page);
+      if (!ok) { notes.push("week not found, default week"); await go(s.hash); }
+      else if (s.hash && s.hash !== "index") { await page.evaluate((h) => { location.hash = h; }, s.hash); await page.waitForTimeout(2000); }
     }
     if (s.fullSample) { try { await page.getByText("Full sample", { exact: false }).first().click({ timeout: 5000 }); await page.waitForTimeout(800); } catch { notes.push("full sample not found"); } }
     if (s.region) { try { await page.locator("#g1").getByText(s.region, { exact: true }).first().click({ timeout: 5000 }); await page.waitForTimeout(800); } catch { notes.push("region pick failed"); } }
@@ -110,6 +112,7 @@ for (const s of specs) {
     if (s.menu === "export") { try { await page.locator("#export [slot=trigger]").click({ timeout: 5000 }); await page.waitForTimeout(900); } catch { notes.push("export menu failed"); } }
 
     const file = `${out}/${s.id}.png`;
+    if (!["top", "viewport", "fullpage"].includes(s.crop)) await page.evaluate(() => { for (const el of document.querySelectorAll("*")) { const p = getComputedStyle(el).position; if (p === "sticky" || p === "fixed") el.style.position = "static"; } });
     if (s.download) {
       await page.locator("#export [slot=trigger]").click({ timeout: 5000 });
       const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 20000 }), page.locator('#export wa-dropdown-item[value="png"]').click()]);
