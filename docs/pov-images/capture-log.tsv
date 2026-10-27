@@ -1,56 +1,56 @@
 5.1a	645639d	ok
-5.1b	current	ok (week not found, default week)
+5.1b	current	ok
 5.2a	9473a4f	ok
-5.2b	current	ok
+5.2b	current	ok (week not found, default week)
 5.3a	4708b55	ok
-5.3b	current	ok
-5.4a	5e8508a	ok
+5.3b	current	ok (week not found, default week)
+5.4a	5e8508a	ok (week not found, default week)
 5.4b-1	3bfbe32	ok (week not found, default week)
 5.4b-2	837e1d1	ok (week not found, default week)
 5.4c	current	ok (week not found, default week)
 5.5a	Demo.ipynb cell 14	ok
 5.5b	current	ok
-5.5c	current	ok (week not found, default week)
+5.5c	current	ok
 5.6a	e2d012c	ok
 5.6b	current	ok (week not found, default week)
 5.7a	8becb4c	ok
-5.7b	current	ok
+5.7b	current	ok (week not found, default week)
 5.8a	2c7df58	ok
 5.8b	npm run check:insights at branch head	ok
 5.9a	connectedness.json frequency block	ok
 5.9b	current	ok
 5.9c	current	ok (week not found, default week)
 5.10a	Demo.ipynb cell 19	ok
-5.10b	current	ok (week not found, default week)
-5.11a	ab3b879	ok
+5.10b	current	ok
+5.11a	ab3b879	ok (week not found, default week)
 5.11b-1	current	ok (week not found, default week)
 5.11b-2	current	ok (week not found, default week)
-5.12a	7639607	ok
-5.12b	current	ok (week not found, default week)
-5.13a	e23c7e5	ok (week not found, default week)
-5.13b	current	ok
+5.12a	7639607	ok (week not found, default week)
+5.12b	current	ok
+5.13a	e23c7e5	ok (pick failed)
+5.13b	current	ok (pick failed)
 5.14a	Demo.ipynb cell 17	ok
 5.14b	bdd65c5	ok (week not found, default week)
 5.14c	current	ok (week not found, default week)
 5.15a-1	Demo.ipynb cell 18	ok
 5.15a-2	Demo.ipynb cell 21	ok
-5.15b	current	ok
+5.15b	current	ok (week not found, default week)
 5.16a	83f3b8f	ok (week not found, default week)
 5.16b	current	ok (week not found, default week)
 5.17a-1	521c472	ok
 5.17a-2	521c472	ok
 5.17b-1	current	ok (week not found, default week)
-5.17b-2	current	ok (week not found, default week)
+5.17b-2	current	ok
 5.18a	16a013d	ok
-5.18b	35326d3	ok (week not found, default week)
+5.18b	35326d3	ok
 5.18c	current	ok (week not found, default week)
-5.19a	78a101f	ok
+5.19a	78a101f	ok (week not found, default week)
 5.19b	current	ok (week not found, default week)
 5.20a	7762bef	ok
-5.20b	e8e9db0	ok (week not found, default week)
+5.20b	e8e9db0	ok
 5.20c-1	current	ok (week not found, default week)
 5.20c-2	current	ok (week not found, default week)
 5.21a	239097f	ok (week not found, default week)
-5.21b	current	ok
-5.22-1	current	ok
-5.22-2	current	ok
+5.21b	current	ok (week not found, default week)
+5.22-1	current	ok (week not found, default week)
+5.22-2	current	ok (week not found, default week)
