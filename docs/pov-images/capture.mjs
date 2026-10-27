@@ -125,6 +125,7 @@ for (const s of specs) {
     if (s.menu === "select") { try { await page.locator("#top wa-select, #top select, header wa-dropdown").first().click({ timeout: 5000 }); await page.waitForTimeout(900); } catch { notes.push("menu open failed"); } }
     if (s.menu === "export") { try { await page.locator("#export [slot=trigger]").click({ timeout: 5000 }); await page.waitForTimeout(900); } catch { notes.push("export menu failed"); } }
 
+    await page.mouse.move(2, 2); await page.waitForTimeout(500); // nothing hovered: show the picked state, not a hover preview
     const file = `${out}/${s.id}.png`;
     if (!["top", "viewport", "fullpage"].includes(s.crop)) await page.evaluate(() => { for (const el of document.querySelectorAll("*")) { const p = getComputedStyle(el).position; if (p === "sticky" || p === "fixed") el.style.position = "static"; } });
     if (s.download) {
