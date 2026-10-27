@@ -790,6 +790,8 @@ ${
     const mine = (x: string) => (own ? ` data-src="own"` : ` data-src="own" hidden`) + x;
     $("top").innerHTML = `
       <div class="data-bar">
+       <div class="data-line">
+        <div class="data-group">
         <span class="data-label">Data</span>
         <div class="data-ctl">
           ${segmented("src", "Data source", [["public", "Public dataset"], ["own", "Your own file"]], own ? "own" : "public")}
@@ -805,13 +807,15 @@ ${
               `title="Levels (prices, index values, counts) are turned into % changes, as the demo does with prices. Changes are used as they are."`)}
           </div>
         </div>
+        </div>
         ${
           // two series of the same data (the demo's returns and volatility): which one the page shows
           twoSeries
-            ? `<span class="data-label"${pub("")}>What spreads</span>
-        <div class="data-ctl"${pub("")}>${segmented("measure", "What spreads", measures.map((k) => [k, MEASURE_COPY[k]?.label ?? mName(k)]), store.get().measure)}</div>`
+            ? `<div class="data-group"${pub("")}><span class="data-label">What spreads</span>
+        <div class="data-ctl">${segmented("measure", "What spreads", measures.map((k) => [k, MEASURE_COPY[k]?.label ?? mName(k)]), store.get().measure)}</div></div>`
             : ""
         }
+       </div>
         <div class="data-captions">
           <p class="data-caption"${pub("")}>${own ? "" : `${facts} · from the <a href="${ds.api_url}" target="_blank" rel="noopener">${ds.api}</a>`}</p>
           ${twoSeries ? `<p class="data-caption" id="measure-line"${pub("")}></p>` : ""}
