@@ -2271,3 +2271,127 @@ svg {
   outline-offset: 2px;
   border-radius: 4px;
 }
+
+.crumb-btn.small {
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+#palette wa-dropdown-item {
+  color: var(--stone);
+  font-size: 14px;
+}
+
+/* the dataset menu: Web Awesome's select (keyboard, type-ahead, labelling), in our pill */
+.ds-select {
+  min-width: 260px;
+  --wa-focus-ring: 3px solid var(--stone);
+}
+
+.ds-select::part(form-control-label) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.ds-select::part(combobox) {
+  min-height: 44px;
+  padding: 0 16px 0 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--stone);
+  font: 500 15px var(--f-sans);
+}
+
+.ds-select::part(display-input) {
+  color: var(--stone);
+  font: 500 15px var(--f-sans);
+}
+
+.ds-select::part(listbox) {
+  font-family: var(--f-sans);
+}
+
+.ds-select wa-option {
+  color: var(--stone);
+  font-size: 14px;
+}
+
+/* chips: one choice among several (the windows, the regions), as a wrapping row of pills; the
+   same Web Awesome radio group as the switches. Picking never changes a chip's size (the weight
+   stays, the 2px edge is drawn inside), so nothing beside it moves */
+.chips {
+  display: block;
+  --wa-focus-ring: 3px solid var(--stone);
+  --wa-focus-ring-offset: 2px;
+}
+
+.chips::part(form-control-label) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.chips::part(form-control) {
+  margin: 0;
+}
+
+.chips::part(form-control-input) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chips wa-radio {
+  flex: none;
+  white-space: nowrap;
+  margin: 0;
+  min-height: 44px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--stone);
+  font: 700 13px/1 var(--f-sans);
+  justify-content: center;
+}
+
+.chips wa-radio:hover {
+  border-color: var(--axis);
+}
+
+.chips wa-radio:state(checked) {
+  background: var(--band);
+  border-color: var(--stone);
+  box-shadow: inset 0 0 0 1px var(--stone);
+}
+
+/* the window ending at the picked week: ringed in the highlight colour, like the picked string */
+.chips wa-radio.win-picked {
+  font-variant-numeric: tabular-nums;
+}
+
+.chips wa-radio.win-picked:state(checked) {
+  box-shadow: inset 0 0 0 1px var(--stone), 0 0 0 2px var(--panel), 0 0 0 4px var(--accent);
+}
+
+.chips.regions wa-radio {
+  padding: 0 12px;
+  font-size: 12.5px;
+}
+
+.chips.regions wa-radio i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 7px;
+  border-radius: 2px;
+  vertical-align: -1px;
+}

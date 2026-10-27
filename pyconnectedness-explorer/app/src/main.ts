@@ -8,8 +8,10 @@ import { TimelineChart, type PeriodBand } from "./charts/timeline";
 import { BeadsChart, readBeadColors } from "./charts/beads";
 import { findInsights } from "./charts/insights";
 import { miniLine, miniMatrix, miniRing } from "./charts/minis";
-import { onSegment, segmented, setSegment } from "./ui/segmented";
+import { chips, onSegment, segmented, setSegment } from "./ui/segmented";
 import "@awesome.me/webawesome/dist/components/dropdown/dropdown.js";
+import "@awesome.me/webawesome/dist/components/select/select.js";
+import "@awesome.me/webawesome/dist/components/option/option.js";
 import "@awesome.me/webawesome/dist/components/dropdown-item/dropdown-item.js";
 import { type Figure, downloadPng, downloadSvg } from "./export";
 import "@awesome.me/webawesome/dist/styles/themes/default.css";
@@ -34,12 +36,12 @@ app.innerHTML = `
     <span>PyConnectedness <b>Explorer</b></span>
   </div>
   <div class="topbar-right">
-    <label class="select small" title="Colour palette">
-      <span class="sr">Colour palette</span>
-      <select id="palette"></select>
-    </label>
     <div id="measure-host"></div>
     <button class="icon-btn" id="theme" type="button" aria-label="Toggle dark mode"></button>
+    <!-- the palette is a design-review choice, not something a reader needs: a small menu, last -->
+    <wa-dropdown id="palette" placement="bottom-end">
+      <button slot="trigger" class="crumb-btn small" type="button" aria-label="Colour palette">Colours ▾</button>
+    </wa-dropdown>
   </div>
 </header>
 
@@ -63,7 +65,7 @@ app.innerHTML = `
   <!-- time: the window every graph shows -- the one ending at the week picked on a chart, or a
        fixed period. Above the overview and above each graph, because it changes all of them -->
   <div class="time-row" id="context">
-    <div class="windows" id="windows" role="group" aria-label="Window shown on every chart"></div>
+    <div class="windows" id="windows"></div>
   </div>
 
   <!-- the overview: a small version of each graph; each card opens its graph -->
@@ -97,7 +99,7 @@ app.innerHTML = `
              section is the same height either way and switching between them moves nothing -->
         <div class="g1-views">
           <div class="g1-view" id="g1-beads">
-            <div class="beads-regions" id="beads-regions" role="group" aria-label="Region shown"></div>
+            <div class="beads-regions" id="beads-regions"></div>
             <div id="beads" class="chart-host"></div>
             <p class="beads-legend" id="beads-legend"></p>
           </div>
@@ -289,10 +291,6 @@ async function main() {
     hover,
     pickRegion
   );
-  $("beads-regions").addEventListener("click", (ev) => {
-    const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-region]");
-    if (b) pickRegion(b.dataset.region || null);
-  });
   // the insights scroll: a blur fades out what runs past either end, only when something does
   $("insights").addEventListener("scroll", insightFades, { passive: true });
   new ResizeObserver(insightFades).observe($("insights"));
@@ -442,21 +440,11 @@ async function main() {
     const key = `${dates[0]}|${dates.length}|${document.fonts.status}`;
     if (key === pickedKey) return;
     pickedKey = key;
-    const probe = document.createElement("button");
-    probe.className = "win-picked";
-    probe.setAttribute("aria-pressed", "true"); // bolder when pressed: measure it at its widest
-    probe.style.cssText = "position:absolute;visibility:hidden";
-    $("windows").appendChild(probe);
+    // the chips' type (style.css, .chips wa-radio): 700 13px, 13px padding and a 1px edge each side
     const ctx = document.createElement("canvas").getContext("2d")!;
-    ctx.font = getComputedStyle(probe).font;
-    let widest = "";
-    for (const d of dates) {
-      const l = fmtStep(d);
-      if (ctx.measureText(l).width > ctx.measureText(widest).width) widest = l;
-    }
-    probe.textContent = widest;
-    pickedWidth = Math.ceil(probe.getBoundingClientRect().width);
-    probe.remove();
+    ctx.font = `700 13px ${getComputedStyle(document.documentElement).getPropertyValue("--f-sans")}`;
+    const widest = Math.max(...dates.map((d) => ctx.measureText(fmtStep(d)).width));
+    pickedWidth = Math.ceil(widest + 2 * 13 + 2 + 2);
   };
   document.fonts.ready.then(() => render(store.get()));
 
@@ -475,22 +463,24 @@ async function main() {
     // controls
     setSegment($("measure"), m);
     $("theme").textContent = s.theme === "dark" ? "☀" : "☾";
+    // the windows: a Web Awesome radio group, built once and updated in place, so arrow keys
+    // move through it without losing focus as the page redraws
     const wins = $("windows");
-    wins.innerHTML = "";
     sizePicked(meta.dynamic[m].dates);
-    for (const o of windowOptions(data, m)) {
-      const b = document.createElement("button");
-      // the picked window is named by its date: the window ending at the step picked on the chart
-      if (o.key === "t") {
-        b.textContent = fmtStep(dyn.dates[s.t]);
-        b.className = "win-picked";
-        b.style.minWidth = `${pickedWidth}px`;
-        b.setAttribute("aria-label", `The ${dyn.window} ${ds.steps} up to ${fmtStep(dyn.dates[s.t], false)}`);
-      } else b.textContent = o.label;
-      b.setAttribute("aria-pressed", String(o.key === s.window));
-      b.onclick = () => store.set({ window: o.key });
-      wins.appendChild(b);
+    const opts = windowOptions(data, m);
+    const sig = opts.map((o) => `${o.key}:${o.label}`).join("|");
+    if (wins.dataset.sig !== sig) {
+      wins.dataset.sig = sig;
+      wins.innerHTML = chips("win-group", "Window shown on every graph", opts.map((o) => [o.key, o.label]), s.window);
+      onSegment($("win-group"), (v) => store.set({ window: v as WindowKey }));
     }
+    // the picked window is named by its date: the window ending at the step picked on a chart
+    const picked = $("win-group").querySelector<HTMLElement>('wa-radio[value="t"]')!;
+    picked.textContent = fmtStep(dyn.dates[s.t]);
+    picked.classList.add("win-picked");
+    picked.style.minWidth = `${pickedWidth}px`;
+    picked.setAttribute("aria-label", `The ${dyn.window} ${ds.steps} up to ${fmtStep(dyn.dates[s.t], false)}`);
+    setSegment($("win-group"), s.window);
 
     // charts
     renderTimeline(s, p);
@@ -558,7 +548,7 @@ async function main() {
     heatmap.render(frame, p, model.maxPair[m], focus, s.pair, (n) => hueOfNow(n), p.band);
     renderHeatTakeaway(frame);
     renderHome(s, frame, p);
-    $<HTMLSelectElement>("palette").value = s.palette;
+    $("palette").querySelectorAll<HTMLElement & { checked: boolean; value: string }>("wa-dropdown-item").forEach((it) => (it.checked = it.value === s.palette));
     renderDetail(s, frame, p);
     tightenDecimals(document, ".num");
   };
@@ -633,11 +623,20 @@ async function main() {
 ${
           events ? `<span class="muted">▲ events</span>` : ""
         }<span class="muted" id="beads-floor"></span>`;
-      $("beads-regions").innerHTML = [null, ...regions]
-        .map((g, i) => `<button type="button" data-region="${g ?? ""}" aria-pressed="${g === beadRegion}">${
-          g ? `<i style="background:var(--bead-${i})"></i>${g}` : "All regions"
-        }</button>`)
-        .join("");
+      // the regions: a radio group too, built once per dataset and updated in place
+      const host = $("beads-regions");
+      if (host.dataset.sig !== regions.join("|")) {
+        host.dataset.sig = regions.join("|");
+        host.innerHTML = chips(
+          "region-group",
+          "Region shown",
+          [["all", "All regions"], ...regions.map((g, i) => [g, `<i style="background:var(--bead-${i + 1})"></i>${g}`] as [string, string])],
+          beadRegion ?? "all",
+          "regions"
+        );
+        onSegment($("region-group"), (v) => pickRegion(v === "all" ? null : v));
+      }
+      setSegment($("region-group"), beadRegion ?? "all");
       beads.render(
         dyn,
         periods,
@@ -721,9 +720,7 @@ ${
   function renderTop() {
     const [from, to] = meta.sample.map((d) => fmtDate(parseDate(d)!));
     const facts = `<b class="num">${names.length}</b> ${ds.items} · <b class="num">${meta.weeks}</b> ${ds.steps}, ${from} to ${to}`;
-    const options = datasets
-      .map((d) => `<option value="${d.id}"${d.id === ds.id ? " selected" : ""}>${d.title}</option>`)
-      .join("");
+    const options = datasets.map((d) => `<wa-option value="${d.id}">${d.title}</wa-option>`).join("");
     const sample = `${import.meta.env.BASE_URL}sample_currencies.csv`;
     const ownHint = `Dates in the first column, one column per series (2 to 25).
       <a href="${sample}" download>Sample file</a>`;
@@ -731,10 +728,7 @@ ${
       <div class="data-bar">
         ${segmented("src", "Data source", [["public", "Public dataset"], ["own", "Your own file"]], own ? "own" : "public")}
         <div class="data-row" id="src-public"${own ? " hidden" : ""}>
-          <label class="select">
-            <span class="sr">Dataset</span>
-            <select id="ds-select">${own ? `<option value="" selected disabled>Choose a dataset</option>` : ""}${options}</select>
-          </label>
+          <wa-select id="ds-select" class="ds-select" label="Dataset" placeholder="Choose a dataset" value="${own ? "" : ds.id}">${options}</wa-select>
           <p class="data-meta">${own ? "" : `${facts} · from the <a href="${ds.api_url}" target="_blank" rel="noopener">${ds.api}</a>`}</p>
         </div>
         <div class="data-row" id="src-own"${own ? "" : " hidden"}>
@@ -755,8 +749,9 @@ ${
       $("src-own").hidden = src !== "own";
     };
     onSegment($("src"), show);
-    $<HTMLSelectElement>("ds-select").addEventListener("change", (ev) => {
-      location.search = `?d=${(ev.target as HTMLSelectElement).value}`;
+    $("ds-select").addEventListener("change", (ev) => {
+      const id = (ev.target as HTMLElement & { value: string }).value;
+      if (id && id !== ds.id) location.search = `?d=${id}`; // the view in the address is kept
     });
 
     let kind: "levels" | "changes" = own?.rec.kind ?? "levels";
@@ -1176,12 +1171,14 @@ ${
 
   // controls
   onSegment($("measure"), (v) => setMeasure(v as Measure));
-  $("palette").innerHTML =
-    PALETTES.map((x) => `<option value="${x.id}">${x.painter} · ${x.painting.split(" (")[0]}, ${x.year}</option>`).join("") +
-    `<option value="agam">Agam (the first look)</option>`;
-  $<HTMLSelectElement>("palette").value = store.get().palette;
-  $("palette").addEventListener("change", (ev) => {
-    const id = (ev.target as HTMLSelectElement).value;
+  $("palette").insertAdjacentHTML(
+    "beforeend",
+    PALETTES.map((x) => `<wa-dropdown-item type="checkbox" value="${x.id}">${x.painter} · ${x.painting.split(" (")[0]}<span slot="details">${x.year}</span></wa-dropdown-item>`).join("") +
+      `<wa-dropdown-item type="checkbox" value="agam">Agam (the first look)</wa-dropdown-item>`
+  );
+  $("palette").querySelectorAll<HTMLElement & { checked: boolean; value: string }>("wa-dropdown-item").forEach((it) => (it.checked = it.value === store.get().palette));
+  $("palette").addEventListener("wa-select", (ev) => {
+    const id = (ev as CustomEvent<{ item: HTMLElement & { value: string } }>).detail.item.value;
     try {
       localStorage.setItem("pc-palette-2", id);
     } catch {
@@ -1207,7 +1204,8 @@ ${
   };
 
   window.addEventListener("keydown", (ev) => {
-    if ((ev.target as HTMLElement).closest("input,select,textarea")) return;
+    // controls that use the arrow keys themselves (radio groups, menus, the dataset list) keep them
+    if ((ev.target as HTMLElement).closest("input,select,textarea,wa-radio-group,wa-dropdown,wa-select")) return;
     if (ev.key === "ArrowRight") step(ev.shiftKey ? 52 : 1);
     else if (ev.key === "ArrowLeft") step(ev.shiftKey ? -52 : -1);
     else if (ev.key === "Escape") store.set({ selected: null, pair: null });
