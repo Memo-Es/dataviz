@@ -414,7 +414,9 @@ ${
    * NET (the library's directional_to, directional_from, net) when one is hovered or picked. */
   function renderNetReadout(s: State, f: ReturnType<Model["frame"]>) {
     const el = $("net-readout");
-    const name = s.hovered ?? s.selected;
+    // the sentence follows the market you pick, not the one under the pointer (hovering only
+    // lights up its arrows)
+    const name = s.selected;
     const stat = (label: string, field: string, value: string, sub: string, cls = "", color = "") =>
       `<div class="ro-stat"><span class="ro-label"${field ? ` title="PyConnectedness: ${field}"` : ""}>${label}</span>
         <span class="ro-value ${cls}"${color ? ` style="color:${color}"` : ""}>${value}</span><span class="ro-sub">${sub}</span></div>`;
@@ -587,7 +589,9 @@ ${
   function renderReadout(s: State) {
     const m = s.measure;
     const dyn = meta.dynamic[m];
-    const preview = s.hoverT !== null && !(s.window === "t" && s.hoverT === s.t);
+    // the numbers change only when a week is picked (click or drag), never while the pointer
+    // sweeps the chart: hovering just rings the string under it
+    const preview = false;
     const f = model.frame(preview ? { ...s, window: "t", t: s.hoverT! } : s);
     const full = staticBlock(data, m, "full");
     const order = names.map((n, i) => ({ n, v: f.net[i] })).sort((a, b) => b.v - a.v);
