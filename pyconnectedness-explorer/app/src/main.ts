@@ -64,10 +64,19 @@ app.innerHTML = `
         <div class="ins-fade ins-fade-bottom" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
       </div>
       <div class="g1-chart">
-        <div id="timeline" class="chart-host"></div>
-        <div class="beads-regions" id="beads-regions" role="group" aria-label="Region shown"></div>
-        <div id="beads" class="chart-host"></div>
-        <p class="beads-legend" id="beads-legend"></p>
+        <!-- both drawings sit in one spot, the one not on show kept in place but invisible, so the
+             section is the same height either way and switching between them moves nothing -->
+        <div class="g1-views">
+          <div class="g1-view" id="g1-beads">
+            <div class="beads-regions" id="beads-regions" role="group" aria-label="Region shown"></div>
+            <div id="beads" class="chart-host"></div>
+            <p class="beads-legend" id="beads-legend"></p>
+          </div>
+          <div class="g1-view" id="g1-line">
+            <div id="timeline" class="chart-host"></div>
+            <p class="beads-legend" id="line-legend"></p>
+          </div>
+        </div>
         <div class="freq" id="freq" aria-live="polite"></div>
       </div>
     </div>
@@ -334,6 +343,12 @@ async function main() {
   };
   const ranking = new RankingChart($("ranking"), names, hover, (n) => select(n));
   const heatmap = new HeatmapChart($("heatmap"), names, hover, (n) => select(n), pickPair);
+  // the line takes whatever room the beads take, so graph 1 is one height in either view
+  const fitLine = () => {
+    const chrome = $("g1-line").offsetHeight - $("timeline").offsetHeight;
+    timeline.setHeight(Math.max(240, $("g1-beads").offsetHeight - chrome));
+  };
+  new ResizeObserver(() => fitLine()).observe($("g1-beads"));
   const timeline = new TimelineChart(
     $("timeline"),
     (t) => store.set({ t, window: "t", hoverT: null }),
@@ -530,13 +545,18 @@ async function main() {
     }
     insightFades();
     $("g1-style").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.style === g1Style)));
-    $("timeline").hidden = asBeads;
-    $("beads").hidden = !asBeads;
-    $("beads-legend").hidden = !asBeads;
+    // the view not on show stays laid out but invisible (and out of reach): see .g1-views
+    for (const [id, on] of [["g1-beads", asBeads], ["g1-line", !asBeads]] as const) {
+      const el = $(id);
+      el.classList.toggle("off", !on);
+      el.inert = !on;
+      el.setAttribute("aria-hidden", String(!on));
+    }
     const regions = REGION_ORDER.filter((g) => names.some((n) => REGION_OF[n] === g));
-    $("beads-regions").hidden = !asBeads || regions.length < 2;
-    if (asBeads) {
-      $("timeline-sub").textContent = `How much of each ${ds.item}'s moves came from shocks elsewhere, over rolling ${dyn.window}-${ds.step} windows.`;
+    $("beads-regions").hidden = regions.length < 2;
+    // one subtitle for both drawings, so switching changes only the chart
+    $("timeline-sub").textContent = `How much of each ${ds.item}'s moves came from shocks elsewhere, over rolling ${dyn.window}-${ds.step} windows.`;
+    {
       $("beads-legend").innerHTML = `<span title="PyConnectedness: total"><i class="bk-index"></i>Spillover index: the average of all ${ds.items}</span>
         <span>Each string looks back ${dyn.window} ${ds.steps}: a jump is a shock arriving, a cliff ${dyn.window - dyn.lags} ${ds.steps} later is it leaving. Click a string to pick its ${ds.step}.</span>
         <span title="PyConnectedness: directional_from"><i class="bk-height"></i>Height: share of moves from shocks elsewhere</span>
@@ -563,13 +583,10 @@ ${
         staticBlock(data, m, "full").total
       );
       $("beads-floor").textContent = `Strings start at ${beads.floor}%, not 0`;
-      renderReadout(s);
-      return;
     }
-    $("timeline-sub").innerHTML = `${mName(m)}: the share of each ${ds.item}'s ups and downs caused by shocks at other
-      ${ds.items}, each ${ds.step} measured over the ${dyn.window} ${ds.steps} before it.${
-        other ? ` Grey: ${mName(other).toLowerCase()}, to compare.` : ""
-      }${events ? " Dashed: notable events." : ""} <b>Hover to preview a ${ds.step}; click or drag to pick it.</b>`;
+    $("line-legend").innerHTML = `<span title="PyConnectedness: total"><i class="bk-index"></i>Spillover index: the average of all ${ds.items}</span>
+      <span>Each point looks back ${dyn.window} ${ds.steps}: a jump is a shock arriving, a cliff ${dyn.window - dyn.lags} ${ds.steps} later is it leaving. Click or drag to pick a ${ds.step}.</span>
+      <span class="muted">Dashed line: the full sample${events ? " · dotted: events" : ""}${other ? ` · grey: ${mName(other).toLowerCase()}, to compare` : ""}</span>`;
     timeline.render(
       dyn,
       staticBlock(data, m, "full"),
@@ -581,8 +598,10 @@ ${
       other ? { measure: other, dyn: meta.dynamic[other] } : null,
       m,
       s.hoverT,
-      ds.measures
+      ds.measures,
+      insightSteps
     );
+    fitLine();
     renderReadout(s);
   }
 

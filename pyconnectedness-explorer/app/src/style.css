@@ -1684,6 +1684,25 @@ svg {
   border-top: 0;
 }
 
+/* ---- graph 1: the beads and the line in one spot, one height ---- */
+.g1-views {
+  display: grid;
+}
+
+.g1-view {
+  grid-area: 1 / 1;
+  align-self: start; /* each its own height, so the line can be sized to the beads */
+  min-width: 0;
+}
+
+.g1-view.off {
+  visibility: hidden;
+}
+
+.line-mark-num {
+  font: 700 11px var(--f-num);
+}
+
 /* ---- graph 1: insights beside the chart ---- */
 .g1-body {
   display: grid;

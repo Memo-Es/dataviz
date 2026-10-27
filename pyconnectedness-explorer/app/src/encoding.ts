@@ -141,3 +141,15 @@ export function tightenDecimals(root: ParentNode, selector: string) {
     }
   });
 }
+
+/** Numbered marks that would touch are spread to `gap` apart (in order, kept inside [lo, hi]);
+ * each keeps a stem to the point it marks. */
+export function spreadMarks(xs: number[], gap: number, lo: number, hi: number): number[] {
+  const out = xs.map((x) => Math.min(Math.max(x, lo), hi));
+  for (let i = 1; i < out.length; i++) out[i] = Math.max(out[i], out[i - 1] + gap);
+  if (out.length && out[out.length - 1] > hi) {
+    out[out.length - 1] = hi;
+    for (let i = out.length - 2; i >= 0; i--) out[i] = Math.min(out[i], out[i + 1] - gap);
+  }
+  return out;
+}

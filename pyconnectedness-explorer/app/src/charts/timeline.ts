@@ -5,9 +5,8 @@
  */
 import * as d3 from "d3";
 import type { DynamicBlock, StaticBlock } from "../data";
-import { tightenDecimals, EPISODE_LABELS, type Palette, fmtDate, parseDate } from "../encoding";
+import { tightenDecimals, EPISODE_LABELS, type Palette, fmtDate, parseDate, spreadMarks } from "../encoding";
 
-const H = 276;
 const M = { top: 46, right: 18, bottom: 28, left: 44 };
 
 export interface PeriodBand {
@@ -21,6 +20,8 @@ export interface PeriodBand {
 export class TimelineChart {
   private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
   private width = 900;
+  /** set from graph 1's layout so the line takes the same room as the beads */
+  private h = 276;
   private dates: Date[] = [];
   private last: Parameters<TimelineChart["render"]> | null = null;
 
@@ -31,7 +32,7 @@ export class TimelineChart {
     private onPickMeasure: (measure: "returns" | "volatility") => void,
     private onHoverWeek: (t: number | null) => void = () => {}
   ) {
-    this.svg = d3.select(host).append("svg").attr("class", "timeline").attr("height", H);
+    this.svg = d3.select(host).append("svg").attr("class", "timeline").attr("height", this.h);
     new ResizeObserver(() => {
       const w = Math.round(host.clientWidth);
       if (w && w !== this.width) {
@@ -66,6 +67,14 @@ export class TimelineChart {
       .on("pointerup pointercancel", () => (dragging = false));
   }
 
+  /** the line's height in px: re-draws when it changes */
+  setHeight(h: number) {
+    h = Math.round(h);
+    if (h === this.h) return;
+    this.h = h;
+    if (this.last) this.render(...this.last);
+  }
+
   /** room on the right for the two series' end labels */
   private get right() {
     return this.width < 600 ? 74 : 112;
@@ -90,14 +99,17 @@ export class TimelineChart {
     other: { measure: "returns" | "volatility"; dyn: DynamicBlock } | null = null,
     measure: "returns" | "volatility" = "returns",
     hoverT: number | null = null,
-    names: Partial<Record<"returns" | "volatility", string>> = { returns: "Returns", volatility: "Volatility" }
+    names: Partial<Record<"returns" | "volatility", string>> = { returns: "Returns", volatility: "Volatility" },
+    /** steps the insights point at, numbered on the line as on the cards */
+    marks: number[] = []
   ) {
-    this.last = [dyn, full, episodes, periods, t, activePeriod, p, other, measure, hoverT, names];
+    this.last = [dyn, full, episodes, periods, t, activePeriod, p, other, measure, hoverT, names, marks];
+    const H = this.h;
     // both measures come from the same balanced panel, so their windows line up week for week
     const cmp = other && other.dyn.total.length === dyn.total.length ? other : null;
     this.dates = dyn.dates.map((d) => parseDate(d)!);
     const W = this.width;
-    this.svg.attr("width", W).attr("viewBox", `0 0 ${W} ${H}`);
+    this.svg.attr("width", W).attr("height", H).attr("viewBox", `0 0 ${W} ${H}`);
     const x = this.x();
     const all = cmp ? dyn.total.concat(cmp.dyn.total) : dyn.total;
     const lo = Math.min(d3.min(all)!, full.total);
@@ -163,9 +175,11 @@ export class TimelineChart {
       const ex = x(e.d);
       const text = W < 700 ? e.label.split(" ")[0] : e.label;
       const textW = text.length * 6.4 + 8;
-      let row = rowRight.findIndex((r) => ex - textW / 2 > r);
+      // the label is kept inside the plot at either end, and packed where it ends up
+      const lx = Math.min(Math.max(ex, M.left + textW / 2), W - this.right - textW / 2);
+      let row = rowRight.findIndex((r) => lx - textW / 2 > r);
       if (row < 0) row = 0;
-      rowRight[row] = ex + textW / 2;
+      rowRight[row] = lx + textW / 2;
       e.label = text;
       epi
         .append("line")
@@ -178,7 +192,7 @@ export class TimelineChart {
         .attr("stroke-dasharray", "2 3");
       epi
         .append("text")
-        .attr("x", ex)
+        .attr("x", lx)
         .attr("y", M.top - 10 - row * 15)
         .attr("text-anchor", "middle")
         .attr("class", "episode-label")
@@ -233,6 +247,23 @@ export class TimelineChart {
       .attr("stroke", p.fg)
       .attr("stroke-width", 1.6)
       .attr("stroke-linejoin", "round");
+
+    // the insights' numbers, on the line where each points, as on the cards; below the line, so
+    // the picked step's value tag above it stays clear (above, where the line runs low)
+    // (two that point at nearly the same step sit side by side, each stemmed to its point)
+    const shown = marks.filter((mt) => mt >= 0 && mt < dyn.total.length);
+    const markX = spreadMarks(shown.map((mt) => x(this.dates[mt])), 21, M.left + 10, W - this.right - 10);
+    shown.forEach((mt, i) => {
+      const mx = x(this.dates[mt]);
+      const my = y(dyn.total[mt]);
+      const cx = markX[i];
+      const below = my + 30 < H - M.bottom;
+      const cy = below ? my + 20 : my - 20;
+      const g = svg.append("g").attr("class", "line-mark").attr("aria-hidden", "true");
+      g.append("line").attr("x1", mx).attr("x2", cx).attr("y1", my).attr("y2", below ? cy - 9 : cy + 9).attr("stroke", p.fg).attr("stroke-width", 1);
+      g.append("circle").attr("cx", cx).attr("cy", cy).attr("r", 9).attr("fill", p.panel).attr("stroke", p.fg).attr("stroke-width", 1.5);
+      g.append("text").attr("x", cx).attr("y", cy).attr("dy", "0.35em").attr("text-anchor", "middle").attr("class", "line-mark-num").style("fill", "var(--stone)").text(i + 1);
+    });
 
     // direct labels at the right end instead of a legend; clicking one switches the page to it
     const NAME = { returns: names.returns ?? "Returns", volatility: names.volatility ?? "Volatility" };

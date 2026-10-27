@@ -13,7 +13,7 @@
  */
 import * as d3 from "d3";
 import type { DynamicBlock } from "../data";
-import { EPISODE_LABELS, type Palette, fmtDate, parseDate, tightenDecimals } from "../encoding";
+import { EPISODE_LABELS, type Palette, fmtDate, parseDate, spreadMarks, tightenDecimals } from "../encoding";
 import type { PeriodBand } from "./timeline";
 
 export interface BeadColors {
@@ -337,12 +337,15 @@ export class BeadsChart {
     }
 
     // the insights beside the chart, numbered where they point
+    // (two that point at nearly the same step sit side by side, each stemmed to its string)
+    const markX = spreadMarks(marks.map((mt) => this.xOf(mt)), 21, M.left + 10, this.xOf(this.T - 1)); // the hint sits right of the last string
     marks.forEach((mt, i) => {
       const x = this.xOf(mt);
+      const cx = markX[i];
       const g = svg.append("g").attr("class", "beads-mark");
-      g.append("line").attr("x1", x).attr("x2", x).attr("y1", M.top - 12).attr("y2", M.top - 2).attr("stroke", p.fg).attr("stroke-width", 1.2);
-      g.append("circle").attr("cx", x).attr("cy", M.top - 20).attr("r", 9).attr("fill", p.panel).attr("stroke", p.fg).attr("stroke-width", 1.5);
-      g.append("text").attr("x", x).attr("y", M.top - 20).attr("dy", "0.35em").attr("text-anchor", "middle").attr("fill", p.fg).text(String(i + 1));
+      g.append("line").attr("x1", x).attr("x2", cx).attr("y1", M.top - 2).attr("y2", M.top - 11).attr("stroke", p.fg).attr("stroke-width", 1.2);
+      g.append("circle").attr("cx", cx).attr("cy", M.top - 20).attr("r", 9).attr("fill", p.panel).attr("stroke", p.fg).attr("stroke-width", 1.5);
+      g.append("text").attr("x", cx).attr("y", M.top - 20).attr("dy", "0.35em").attr("text-anchor", "middle").attr("fill", p.fg).text(String(i + 1));
     });
 
     // notable events: a small mark under the strings, named on hover
