@@ -65,8 +65,8 @@ app.innerHTML = `
     <div class="g1-body">
       <div class="insights-wrap" id="insights-wrap">
         <ol class="insights" id="insights" tabindex="0" aria-label="What the chart shows"></ol>
-        <div class="ins-fade top" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
-        <div class="ins-fade bottom" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <div class="ins-fade ins-fade-top" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <div class="ins-fade ins-fade-bottom" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
       </div>
       <div class="g1-chart">
         <div id="timeline" class="chart-host"></div>
