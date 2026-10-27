@@ -19,7 +19,7 @@ This is a point of view on where PyConnectedness's design stands, and how design
 - **Considered.** The alternatives, and why we didn't choose them.
 - **Checked by.** How we know it works.
 
-The images are being added separately. Each placeholder names the state to capture and the commit to capture it from. The capture settings are in the image brief at the end.
+Every before and after image is a real capture: the library's own figures, the explorer as it is now, or the explorer rebuilt at the earlier commit named under the image. How they were made is in Appendix B.
 
 **The design state in short**
 
@@ -181,9 +181,13 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.1 An overview, and a page for each graph
 
-> **[Image 5.1a · Before]** The explorer as one long scroll, every graph stacked, the reader scrolling past three graphs to reach the fourth. *Capture:* commit `645639ddd`, the full page as a tall screenshot.
->
-> **[Image 5.1b · After]** The overview: four cards, each a small live version of its graph with its headline. *Capture:* current, `#home`.
+**Before.** The explorer as one long scroll, every graph stacked, the reader scrolling past three graphs to reach the fourth. *Source: commit `645639ddd`, the full page.*
+
+![Before: The explorer as one long scroll, every graph stacked, the reader scrolling past three graphs to reach the fourth](docs/pov-images/5.1a.png)
+
+**After.** The overview: four cards, each a small live version of its graph with its headline. *Source: current, `#home`.*
+
+![After: The overview: four cards, each a small live version of its graph with its headline](docs/pov-images/5.1b.png)
 
 - **What was added.** An overview page of cards, one per graph, each opening its graph on its own page with a way back. Frequency-domain connectedness got its own page, so every card leads somewhere different. The address names the view (`#network`, `#heatmap`), so the back button works and a link can go straight to a graph.
 - **Why.** The readers in section 2 arrive with different questions. A supervisor wants who passes risk to whom; a journalist wants when it peaked. One long scroll made each of them read past the others' answers.
@@ -192,9 +196,13 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.2 A sentence first, with its control right above it
 
-> **[Image 5.2a · Before]** Graph 1 with its week controls apart from the sentence they change. *Capture:* commit `9473a4f1c`, graph 1.
->
-> **[Image 5.2b · After]** The week chips above the sentence, the sentence above the chart: "Week of 20 Mar 2020: …". *Capture:* current, `#index`.
+**Before.** Graph 1 with its week controls apart from the sentence they change. *Source: commit `9473a4f1c`, graph 1.*
+
+![Before: Graph 1 with its week controls apart from the sentence they change](docs/pov-images/5.2a.png)
+
+**After.** The week chips above the sentence, the sentence above the chart: "Week of 20 Mar 2020: …". *Source: current, `#index`.*
+
+![After: The week chips above the sentence, the sentence above the chart: "Week of 20 Mar 2020: …"](docs/pov-images/5.2b.png)
 
 - **What was added.** One plain sentence above every graph that reads the picked moment out loud, date first. The controls that change it sit directly above it.
 - **Why.** Someone outside research can stop at the sentence and still leave with the answer. When the control sat apart from the sentence, readers changed the week and didn't see what it changed.
@@ -203,9 +211,13 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.3 Values change on pick, never on hover
 
-> **[Image 5.3a · Before]** Two frames: the pointer over two different weeks, and the sentence and numbers changing with it. *Capture:* commit `4708b55d8`, graph 1, a short screen recording or two frames.
->
-> **[Image 5.3b · After]** The same two pointer positions: a hover guide moves, the sentence stays on the picked week. *Capture:* current, `#index`.
+**Before.** The pointer crosses the chart without clicking, and the sentence and numbers change with it, marked "Preview". *Source: commit `4708b55d8`, graph 1.*
+
+![Before: The pointer crosses the chart without clicking, and the sentence and numbers change with it, marked "Preview"](docs/pov-images/5.3a.gif)
+
+**After.** The same pointer movement: the sentence stays on the picked week. *Source: current, `#index`.*
+
+![After: The same pointer movement: the sentence stays on the picked week](docs/pov-images/5.3b.gif)
 
 - **What was added.** Hover only highlights. Only a click, an insight's date or the arrow keys change what the page says. The detail panel follows the same rule.
 - **Why.** Numbers that flicker as the pointer crosses the chart are hard to trust and impossible to quote. A reader who wants to write down a value has to keep the mouse still.
@@ -214,11 +226,17 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.4 The data bar: "Data" and "What spreads"
 
-> **[Image 5.4a · Before]** The top bar with an unexplained Returns / Volatility toggle. *Capture:* commit `5e8508af5`, the top of the page.
->
-> **[Image 5.4b · Steps]** Two layouts that didn't work: the demo's terms crammed into the buttons with a long sentence between the controls (commit `3bfbe32f6`), then the groups stacked in rows (commit `837e1d1e3`).
->
-> **[Image 5.4c · After]** One row: **Data** (public dataset or your own file, then the dataset) and **What spreads** (Price moves / Turbulence) side by side, two quiet captions under them. *Capture:* current, any view.
+**Before.** The top bar with an unexplained Returns / Volatility toggle. *Source: commit `5e8508af5`, the top of the page.*
+
+![Before: The top bar with an unexplained Returns / Volatility toggle](docs/pov-images/5.4a.png)
+
+**Steps.** Two layouts that didn't work: the demo's terms crammed into the buttons with a long sentence between the controls (top, commit `3bfbe32f6`), then the groups stacked in rows (bottom, commit `837e1d1e3`).
+
+![Steps: Two layouts that didn't work: the demo's terms crammed into the buttons with a long sentence between the controls (top, commit `3bfbe32f6`), then the groups stacked in rows (bottom, commit `837e1d1e3`)](docs/pov-images/5.4b.png)
+
+**After.** One row: **Data** (public dataset or your own file, then the dataset) and **What spreads** (Price moves / Turbulence) side by side, two quiet captions under them. *Source: current.*
+
+![After: One row: Data (public dataset or your own file, then the dataset) and What spreads (Price moves / Turbulence) side by side, two quiet captions under them](docs/pov-images/5.4c.png)
 
 - **What was added.** The toggle moved beside the dataset it belongs to, renamed for the question each series answers. "Price moves" is the weekly returns, "Turbulence" the volatility, the two series the authors' demo builds from the stock data. The captions name the demo's term and credit it.
 - **Why.** The toggle is not a library option, so readers didn't know where it came from or what it switched. It sat in the top bar, far from the data it changes.
@@ -231,11 +249,17 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.5 Beads on strings, with the line one switch away
 
-> **[Image 5.5a · Before]** The authors' line: total spillover per 200-week window, a dashed full-sample level. *Capture:* `Demo.ipynb` cell 14, stock markets, returns.
->
-> **[Image 5.5b · After]** Beads: one string per window, a bead for the average and one per region, the long-run line named on the chart. *Capture:* current, `#index`, Beads.
->
-> **[Image 5.5c · After]** The Line view of the same data, the same height and place. *Capture:* current, `#index`, Line.
+**Before.** The authors' line: total spillover per 200-week window, a dashed full-sample level. *Source: `Demo.ipynb` cell 14, stock markets, returns.*
+
+![Before: The authors' line: total spillover per 200-week window, a dashed full-sample level](docs/pov-images/5.5a.png)
+
+**After.** Beads: one string per window, a bead for the average and one per region, the long-run line named on the chart. *Source: current, `#index`, Beads.*
+
+![After: Beads: one string per window, a bead for the average and one per region, the long-run line named on the chart](docs/pov-images/5.5b.png)
+
+**After.** The Line view of the same data, the same height and place. *Source: current, `#index`, Line.*
+
+![After: The Line view of the same data, the same height and place](docs/pov-images/5.5c.png)
 
 - **What was added.** Each window is a string with a bead for the average and one per region (`directional_from` averaged by region). Strings are sampled to fit the width, one about every 20 pixels. The long-run line is named ("long-run 78.3%"), and the floor is stated in the legend ("Strings start at 55%, not 0"). A switch keeps the demo's line.
 - **Why.** The average hides who moved. In currencies, Europe stays near 83–85% while the Americas fall into the 60s after 2024, and the line shows neither. Each string is one 200-week window, so the window's length is visible, and a cliff reads as the shock leaving it, not as markets calming.
@@ -244,9 +268,13 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.6 The week named by its date, the player removed
 
-> **[Image 5.6a · Before]** Play and step buttons beside a "Picked week" chip. *Capture:* commit `e2d012c21`, graph 1's controls.
->
-> **[Image 5.6b · After]** The chip reads "Week of 20 Mar 2020"; no player. *Capture:* current, `#index`.
+**Before.** Play and step buttons beside a "Picked week" chip. *Source: commit `e2d012c21`, graph 1's controls.*
+
+![Before: Play and step buttons beside a "Picked week" chip](docs/pov-images/5.6a.png)
+
+**After.** The chip reads "Week of 20 Mar 2020"; no player. *Source: current, `#index`.*
+
+![After: The chip reads "Week of 20 Mar 2020"; no player](docs/pov-images/5.6b.png)
 
 - **What was added.** The chip names the date every graph on the page is showing. You pick a week on the chart, from an insight's date, or with ← and → (shift moves a year).
 - **Why.** "Picked week" was abstract. The play button animated what the chart already showed, and readers couldn't stop on the moment they cared about.
@@ -255,9 +283,13 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.7 Insight cards that read the chart for you
 
-> **[Image 5.7a · Before]** Graph 1 with nothing beside it: the reader finds the moments that matter alone. *Capture:* commit `8becb4c53`, graph 1.
->
-> **[Image 5.7b · After]** Numbered cards beside the chart, ①–⑤ marked on the strings, one card picked with the same ink outline as its string, Details open on one card. *Capture:* current, `#index`, the COVID card picked.
+**Before.** Graph 1 with nothing beside it: the reader finds the moments that matter alone. *Source: commit `8becb4c53`, graph 1.*
+
+![Before: Graph 1 with nothing beside it: the reader finds the moments that matter alone](docs/pov-images/5.7a.png)
+
+**After.** Numbered cards beside the chart, ①–⑤ marked on the strings, one card picked with the same ink outline as its string, Details open on one card. *Source: current, `#index`, the COVID card picked.*
+
+![After: Numbered cards beside the chart, ①–⑤ marked on the strings, one card picked with the same ink outline as its string, Details open on one card](docs/pov-images/5.7b.png)
 
 - **What was added.** Numbered cards for the moments worth knowing: the biggest rises and falls, the peak, and where the latest week ranks. The same numbers mark the moments on the chart. Each card shows one line, with the rest folded under "Details". They sit in a list as tall as the chart, always starting at the top, with a soft fade where they run off the edge.
 - **Why.** Most readers never find the moments that matter on their own. "Spillover jumped 11.7 points; +9.7 of it in the 4 weeks to Mar 2020" turns a shape into a finding. The cards also take on the commonest misreading: a sharp fall about four years after a crisis. A week stops counting 198 weeks after it enters a 200-week window, because VAR(2) spends a window's first two weeks as lags. When the weeks leaving are the ones that pushed the index up on the way in, the card says "the window moving on, not the markets calming".
@@ -266,9 +298,13 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.8 Every card checked against the library's numbers
 
-> **[Image 5.8a · Before]** A card from the first version, written against the stock data only. *Capture:* commit `2c7df58c0`, graph 1 on an upload or a non-stock dataset.
->
-> **[Image 5.8b · After]** The output of `npm run check:insights`: every dataset and synthetic upload, "all cases pass". *Capture:* a terminal screenshot from `app/`.
+**Before.** A card from the first version, written against the stock data only. *Source: commit `2c7df58c0`, graph 1's cards.*
+
+![Before: A card from the first version, written against the stock data only](docs/pov-images/5.8a.png)
+
+**After.** The output of `npm run check:insights`: every dataset and synthetic upload, "all 16 cases pass". *Source: run from `app/` on the current code.*
+
+![After: The output of `npm run check:insights`: every dataset and synthetic upload, "all 16 cases pass"](docs/pov-images/5.8b.png)
 
 - **What was added.** The cards only compare numbers the library returned: a rise, a fall, how many items moved, where the latest week ranks. Nothing is re-estimated. An automated check recomputes every number a card prints, on all seven datasets and on synthetic uploads built to tell a known story (one shock, a slow shift, unrelated series). The synthetic files go through the same code as a real upload. The site does not deploy if a check fails.
 - **Why.** The team's one principle is correctness. An explanation that is wrong is worse than none, and a card that held for stocks could mislead on rivers or on a user's file.
@@ -277,11 +313,17 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.9 Frequency-domain connectedness: under the chart, and a page of its own
 
-> **[Image 5.9a · Before]** The library's result as numbers per band, no figure. *Capture:* the printed result of `frequency_connectedness` in the notebook, or the table in the explorer's JSON.
->
-> **[Image 5.9b · After]** Under graph 1: one bar for the picked period, split into short, medium and long term. *Capture:* current, `#index`, under the chart.
->
-> **[Image 5.9c · After]** Its own page: one bar per period, the period on show outlined. *Capture:* current, `#frequency`.
+**Before.** What the library gives: numbers per band, no figure. *Source: `frequency_connectedness` on the stock data, full sample; the values as the explorer stores them, printed the way the library's result prints.*
+
+![Before: What the library gives: numbers per band, no figure](docs/pov-images/5.9a.png)
+
+**After.** Under graph 1: one bar for the picked period, split into short, medium and long term. *Source: current, `#index`, under the chart.*
+
+![After: Under graph 1: one bar for the picked period, split into short, medium and long term](docs/pov-images/5.9b.png)
+
+**After.** Its own page: one bar per period, the period on show outlined. *Source: current, `#frequency`.*
+
+![After: Its own page: one bar per period, the period on show outlined](docs/pov-images/5.9c.png)
 
 - **What was added.** One bar per period, split by band (Baruník–Křehlík, periods 5 and 20), each band's share in the legend, under its library name. Graph 1 shows the bar for the period the picked week falls in. The frequency page shows all of them, and clicking a row picks that period.
 - **Why.** "How long do shocks last" answered at a glance. The bar describes the same moment as the chart above it, in space that was otherwise empty.
@@ -294,9 +336,13 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.10 The ordered ring
 
-> **[Image 5.10a · Before]** The library's circle in data order, red and blue nodes, grey arrows. *Capture:* `Demo.ipynb` cell 19.
->
-> **[Image 5.10b · After]** The ring ordered by net: transmitters across the top, strongest at the left; receivers across the bottom; "↑ passes on more / ↓ takes in more" across the middle. *Capture:* current, `#network`, Ring.
+**Before.** The library's circle in data order, red and blue nodes, grey arrows. *Source: `Demo.ipynb` cell 19.*
+
+![Before: The library's circle in data order, red and blue nodes, grey arrows](docs/pov-images/5.10a.png)
+
+**After.** The ring ordered by net: transmitters across the top, strongest at the left; receivers across the bottom; "↑ passes on more / ↓ takes in more" across the middle. *Source: current, `#network`, Ring.*
+
+![After: The ring ordered by net: transmitters across the top, strongest at the left; receivers across the bottom; "↑ passes on more / ↓ takes in more" across the middle](docs/pov-images/5.10b.png)
 
 - **What was added.** The library's circle, kept, with position given a meaning. Nodes are coloured by region, a deeper wash for transmitters and a paler one for receivers. Area comes from |net| and arrow width from the flow, both on one scale across every week. Each node is labelled with its name and net value.
 - **Why.** On the library's circle, position means nothing, and the reader finds the transmitters by reading every label. Ordered, "who is most central" becomes "who is at the top left". One scale means a size can be compared between weeks.
@@ -305,9 +351,13 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.11 The 10 strongest flows, all on request
 
-> **[Image 5.11a · Before]** Every flow above the cut-off drawn at once: twenty or more crossing arrows. *Capture:* commit `ab3b8791a`, graph 2.
->
-> **[Image 5.11b · After]** The 10 strongest by default; a second frame with one market picked, showing all of its flows. *Capture:* current, `#network`, then Germany picked.
+**Before.** Every flow above the cut-off drawn at once: twenty or more crossing arrows. *Source: commit `ab3b8791a`, graph 2.*
+
+![Before: Every flow above the cut-off drawn at once: twenty or more crossing arrows](docs/pov-images/5.11a.png)
+
+**After.** The 10 strongest by default (left); with Germany picked, all of its flows (right). *Source: current, `#network`.*
+
+![After: The 10 strongest by default (left); with Germany picked, all of its flows (right)](docs/pov-images/5.11b.png)
 
 - **What was added.** Of the flows `connectedness_graph` keeps (the strongest 10% of |`pairwise_net`|), the ring draws the 10 strongest until a market is picked, then all of that market's flows. An "All" switch draws the library's full set.
 - **Why.** Twenty or more crossing arrows were a hairball. Ten can be followed.
@@ -316,9 +366,13 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.12 Quadrants: who is changing
 
-> **[Image 5.12a · Before]** The ring alone: it shows who transmits, not who is changing. *Capture:* commit `763960715`, graph 2.
->
-> **[Image 5.12b · After]** Quadrants: net across, its change over about a quarter up and down, the four corners named. *Capture:* current, `#network`, Quadrants.
+**Before.** The ring alone: it shows who transmits, not who is changing. *Source: commit `763960715`, graph 2.*
+
+![Before: The ring alone: it shows who transmits, not who is changing](docs/pov-images/5.12a.png)
+
+**After.** Quadrants: net across, its change over about a quarter up and down, the four corners named. *Source: current, `#network`, Quadrants.*
+
+![After: Quadrants: net across, its change over about a quarter up and down, the four corners named](docs/pov-images/5.12b.png)
 
 - **What was added.** A second view behind a switch. Across is net; up and down is how much it changed over about a quarter, both centred on zero. The corners are named in plain words: rising transmitters, fading transmitters, deepening receivers, recovering receivers.
 - **Why.** In review, once the ordered ring started to read like coordinates, a real plane was the honest next step.
@@ -327,9 +381,13 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.13 A market's trail as a path in time
 
-> **[Image 5.13a · Before]** A picked market's trail as a thick smoothed curve that loops like a connection. *Capture:* commit `e23c7e5e9`, `#network`, Quadrants, a market picked.
->
-> **[Image 5.13b · After]** The same trail straight, thin and dotted, a dot per sample fading toward now, the "13 weeks ago" note above the names. *Capture:* current, same pick.
+**Before.** A picked market's trail as a thick smoothed curve that loops like a connection. *Source: commit `e23c7e5e9`, `#network`, Quadrants, Germany picked.*
+
+![Before: A picked market's trail as a thick smoothed curve that loops like a connection](docs/pov-images/5.13a.png)
+
+**After.** The same trail straight, thin and dotted, a dot per sample fading toward now, the "13 weeks ago" note above the names. *Source: current, same pick.*
+
+![After: The same trail straight, thin and dotted, a dot per sample fading toward now, the "13 weeks ago" note above the names](docs/pov-images/5.13b.png)
 
 - **What was added.** Straight segments between the fortnightly positions, thin and dotted, with a dot per sample that fades toward the present.
 - **Why.** The smoothing curve overshot between samples, inventing loops the data doesn't have. At arrow width it read as a flow.
@@ -338,11 +396,17 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.14 Net by market, and the detail panel
 
-> **[Image 5.14a · Before]** The demo's twenty small line charts, one per market. *Capture:* `Demo.ipynb` cell 17.
->
-> **[Image 5.14b · Before]** The detail panel empty until something is hovered, its numbers changing under the pointer. *Capture:* commit `bdd65c552`, graph 2.
->
-> **[Image 5.14c · After]** Bars beside the ring, sorted by net for the picked week, and the detail panel open on the top transmitter with its net over time. *Capture:* current, `#network`.
+**Before.** The demo's twenty small line charts, one per market. *Source: `Demo.ipynb` cell 17.*
+
+![Before: The demo's twenty small line charts, one per market](docs/pov-images/5.14a.png)
+
+**Before.** The detail panel with nothing in it until a market is hovered or picked. *Source: commit `bdd65c552`, graph 2.*
+
+![Before: The detail panel with nothing in it until a market is hovered or picked](docs/pov-images/5.14b.png)
+
+**After.** Bars beside the ring, sorted by net for the picked week, and the detail panel open on the top transmitter with its net over time. *Source: current, `#network`.*
+
+![After: Bars beside the ring, sorted by net for the picked week, and the detail panel open on the top transmitter with its net over time](docs/pov-images/5.14c.png)
 
 - **What was added.** A bar per market for the picked week, sorted, in the ring's region washes. The detail panel opens on the biggest transmitter and follows only what is picked, with that market's net over time as one line.
 - **Why.** Comparing markets needs one shared axis; one market's history needs one line, not twenty. A panel that said "pick something" gave nothing to new readers, and one that followed the pointer broke the pick-not-hover rule.
@@ -355,9 +419,13 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.15 Dots instead of coloured squares
 
-> **[Image 5.15a · Before]** The library's heatmap: every pair twice, red to blue, data order. *Capture:* `Demo.ipynb` cells 18 and 21.
->
-> **[Image 5.15b · After]** Dots: each pair once in the sender's row, area for the flow, colour for the sender's region, grouped by region, the strongest flows ringed. *Capture:* current, `#heatmap`, Dots.
+**Before.** The library's heatmap: every pair twice, red to blue, data order. *Source: `Demo.ipynb` cells 18 and 21.*
+
+![Before: The library's heatmap: every pair twice, red to blue, data order](docs/pov-images/5.15a.png)
+
+**After.** Dots: each pair once in the sender's row, area for the flow, colour for the sender's region, grouped by region, the strongest flows ringed. *Source: current, `#heatmap`, Dots.*
+
+![After: Dots: each pair once in the sender's row, area for the flow, colour for the sender's region, grouped by region, the strongest flows ringed](docs/pov-images/5.15b.png)
 
 - **What was added.** Each pair drawn once, as a dot in the sender's row. Area shows the size of the flow and colour the sender's region. Rows and columns are grouped by region, with region marks beside them. The strongest flows are ringed, the same ones the network draws. One scale across every week. Empty cells keep a pinpoint.
 - **Why.** In the colour grid, every square looks equally important, and half the grid repeats the other half with the sign flipped (`pairwise_net` is antisymmetric). Dots let the big flows stand out and the small ones recede. Grouping shows flows within and between regions as blocks.
@@ -366,9 +434,13 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.16 The library's original, one switch away
 
-> **[Image 5.16a · Before]** Dots only: no way to check against the demo's figure. *Capture:* commit `83f3b8f93`, `#heatmap`.
->
-> **[Image 5.16b · After]** The Original view: red-blue, mirrored, data order, colour bar, axes titled "from ↓" and "to →". *Capture:* current, `#heatmap`, Original, full sample.
+**Before.** Dots only: no way to check against the demo's figure. *Source: commit `83f3b8f93`, `#heatmap`.*
+
+![Before: Dots only: no way to check against the demo's figure](docs/pov-images/5.16a.png)
+
+**After.** The Original view: red-blue, mirrored, data order, colour bar, axes titled "from ↓" and "to →". *Source: current, `#heatmap`, Original, full sample.*
+
+![After: The Original view: red-blue, mirrored, data order, colour bar, axes titled "from ↓" and "to →"](docs/pov-images/5.16b.png)
 
 - **What was added.** An Original switch that draws `spillover_heatmap(pairwise_net, cmap="RdBu_r")` as the library does: the same colours, the mirrored grid, the data order, the colour bar and the per-window scale.
 - **Why.** Anyone checking against the demo sees the familiar picture. One departure, so it reads correctly: the library's default axis titles ("shock source", "affected variable") describe its default matrix and are backwards for `pairwise_net`, so both views say "from" and "to".
@@ -381,9 +453,13 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.17 One colour rule, AAA, one stone grey
 
-> **[Image 5.17a · Before]** The first look: red for transmitters and blue for receivers, as the library draws them, with colour meaning something different on each graph. *Capture:* commit `521c47260`, graphs 1 and 2.
->
-> **[Image 5.17b · After]** Colour only for region and the few big numbers; all text in one stone grey. *Capture:* current, `#index` and `#network`.
+**Before.** The first look: red for transmitters and blue for receivers, as the library draws them, with colour meaning something different on each graph. *Source: commit `521c47260`, graphs 1 and 2.*
+
+![Before: The first look: red for transmitters and blue for receivers, as the library draws them, with colour meaning something different on each graph](docs/pov-images/5.17a.png)
+
+**After.** Colour only for region and the few big numbers; all text in one stone grey. *Source: current, `#index` (top) and `#network` (bottom).*
+
+![After: Colour only for region and the few big numbers; all text in one stone grey](docs/pov-images/5.17b.png)
 
 - **What was added.** Colour means region on every graph. All text is one stone grey at 7:1 or more (WCAG AAA), never set on a colour. Controls are at least 44 pixels. Plus Jakarta Sans for words, B612 Mono for numbers.
 - **Why.** A reader who learns "sage is the Americas" on the first chart can carry it to the network and the heatmap without a legend. Supervisors, newsrooms and universities increasingly require accessible publications.
@@ -392,11 +468,19 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.18 From bright to calm: Monet's *Nymphéas*
 
-> **[Image 5.18a · Before]** Seurat at full saturation, a vermilion highlight. *Capture:* commit `16a013d8f`, graph 2.
->
-> **[Image 5.18b · Before]** Seurat toned down: still a sienna orange in the largest shapes. *Capture:* commit `35326d3f4`, graph 2.
->
-> **[Image 5.18c · After]** *Nymphéas*: sage, misty blue, mauve and lavender, pale washes with a thin full-hue edge. *Capture:* current, `#network`; optionally the same in dark mode.
+**Before.** Seurat at full saturation, a vermilion highlight. *Source: commit `16a013d8f`, graph 2.*
+
+![Before: Seurat at full saturation, a vermilion highlight](docs/pov-images/5.18a.png)
+
+**Before.** Seurat toned down: still a sienna orange in the largest shapes. *Source: commit `35326d3f4`, graph 2.*
+
+![Before: Seurat toned down: still a sienna orange in the largest shapes](docs/pov-images/5.18b.png)
+
+**After.** *Nymphéas*: sage, misty blue, mauve and lavender, pale washes with a thin full-hue edge. *Source: current, `#network`, light and dark mode.*
+
+![After: Nymphéas: sage, misty blue, mauve and lavender, pale washes with a thin full-hue edge](docs/pov-images/5.18c.png)
+
+![The same in dark mode](docs/pov-images/5.18d.png)
 
 - **What was added.** Palettes after French and Dutch Impressionists, with Monet's *Nymphéas* as the default and no orange. Big shapes are pale washes of their colour with a thin edge in the full hue. Seurat, *Impression, soleil levant*, Renoir, Van Gogh and Breitner stay in a Colours menu.
 - **Why.** The first palette read as bright and jarring. Toning it down kept Europe in sienna, and that orange filled the largest shapes: the transmitters, the net bars, the heatmap dots. Impressionist softness comes from harmony, not low saturation: related cool hues, light broken fills, strong colour only in thin strokes. The edge carries the contrast accessibility needs, so the fill can be soft.
@@ -405,9 +489,13 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.19 A monochrome selected state
 
-> **[Image 5.19a · Before]** A picked chip and string in the palette's highlight colour, orange in several palettes. *Capture:* commit `78a101f07`, `#index`, a region picked.
->
-> **[Image 5.19b · After]** The same pick in the palette's ink. *Capture:* current, same pick.
+**Before.** A picked chip and string in the palette's highlight colour, orange in several palettes. *Source: commit `78a101f07`, `#index`, Europe picked.*
+
+![Before: A picked chip and string in the palette's highlight colour, orange in several palettes](docs/pov-images/5.19a.png)
+
+**After.** The same pick in the palette's ink. *Source: current, same pick.*
+
+![After: The same pick in the palette's ink](docs/pov-images/5.19b.png)
 
 - **What was added.** "Picked" is always the palette's ink, in every palette and both modes: a dark outline on strings, rows and cards, and a dark chip.
 - **Why.** A coloured highlight competed with the region colours and changed with every palette. Now colour means one thing only.
@@ -420,11 +508,17 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.20 Controls on Web Awesome, themed at the source
 
-> **[Image 5.20a · Before]** Hand-made switches and a native dataset menu. *Capture:* commit `7762bef41`, the top bar.
->
-> **[Image 5.20b · Before]** Web Awesome with its own look showing through: a blue focus glow, bright blue options, two stacked focus rings. *Capture:* commit `e8e9db019`, a menu open.
->
-> **[Image 5.20c · After]** The same controls themed to the page: stone, one focus ring, one row marked at a time in a pale band. *Capture:* current, the dataset menu and the Download menu open.
+**Before.** Hand-made switches and a native dataset select. *Source: commit `7762bef41`, the top bar.*
+
+![Before: Hand-made switches and a native dataset select](docs/pov-images/5.20a.png)
+
+**Before.** Web Awesome with its own look showing through: a blue focus glow, bright blue options, two stacked focus rings. *Source: commit `e8e9db019`, a menu open.*
+
+![Before: Web Awesome with its own look showing through: a blue focus glow, bright blue options, two stacked focus rings](docs/pov-images/5.20b.png)
+
+**After.** The same controls themed to the page: stone, one focus ring, one row marked at a time in a pale band. *Source: current, the dataset menu (left) and the Download menu (right) open.*
+
+![After: The same controls themed to the page: stone, one focus ring, one row marked at a time in a pale band](docs/pov-images/5.20c.png)
 
 - **What was added.** Switches, chips and menus on Web Awesome (web components), with its colour, surface, focus and font settings pointed at ours once, so every component matches in both modes.
 - **Why.** A UI library gives tested keyboard and screen-reader behaviour, and the team gets less code to maintain.
@@ -444,9 +538,13 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.21 Figures for reports
 
-> **[Image 5.21a · Before]** No way to take a graph out of the page, except a screenshot that loses its source. *Capture:* commit `239097f8e`, graph 2.
->
-> **[Image 5.21b · After]** A downloaded PNG of the network with Germany picked: question, title and call, sentence, legend and source line. *Capture:* current, `#network`, Germany picked, Download → PNG.
+**Before.** No way to take a graph out of the page, except a screenshot that loses its source. *Source: commit `239097f8e`, graph 2.*
+
+![Before: No way to take a graph out of the page, except a screenshot that loses its source](docs/pov-images/5.21a.png)
+
+**After.** A downloaded PNG of the network with Germany picked: question, title and call, sentence, legend and source line. *Source: current, `#network`, Germany picked, Download → PNG.*
+
+![After: A downloaded PNG of the network with Germany picked: question, title and call, sentence, legend and source line](docs/pov-images/5.21b.png)
 
 - **What was added.** A Download menu on each graph, PNG (twice the size, for print) or SVG (editable, the two fonts embedded). The figure is the graph as set up, with the pick still highlighted, framed by the question, the title and its call, the sentence, the legend and a source line: library commit, function, dataset, window and pick.
 - **Why.** The readers in section 2 put graphs into reports, slides and papers. A screenshot loses the source; the library's plots lose the pick.
@@ -459,7 +557,9 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 #### 5.22 Picking a moment before playing a sequence
 
-> **[Image 5.22 · Now]** A short recording: stepping weeks with ← and →, the network, ranking and quadrants gliding between weeks. *Capture:* current, `#network`, about five seconds.
+**Now.** Stepping the weeks with →, from March 2019: the ring and the ranking glide between weeks instead of jumping. *Source: current, `#network`.*
+
+![Now: Stepping the weeks with →, from March 2019: the ring and the ranking glide between weeks instead of jumping](docs/pov-images/5.22.gif)
 
 - **What is there.** Every graph follows the picked week. Network, ranking and quadrants glide for 180 ms between weeks instead of jumping. Dragging across the line view scrubs the weeks. ← and → step a week, shift a year. Quadrants trails show the last 13 weeks.
 - **Why this order.** A play button added little the chart didn't already show, and readers couldn't stop on the moment they cared about. Picking comes first; animation must serve it.
@@ -642,31 +742,16 @@ In the **Original** view everything else is kept as the library draws it: the re
 
 None of it is a new number.
 
-## Appendix B · Image brief
+## Appendix B · How the images were made
 
-For whoever adds the images. Every placeholder in section 5 looks like this:
+The images are in `docs/pov-images/`, named by block (`5.1a.png` is block 5.1's first image). None is a mock-up.
 
-> **[Image 5.n·x · Before / After / Steps / Now]** what the image shows. *Capture:* where to take it from.
+- **Library figures** (5.5a, 5.10a, 5.14a, 5.15a) are the reference renders in `pipeline/out/reference/`, made by running the authors' `Demo.ipynb` at commit `4cc953f`.
+- **Earlier states** were rebuilt at the commit named under each image, from its own code and its own data, and captured in a headless browser. Each one shows the palette that commit shipped with.
+- **Current states** are the head of `claude/serene-shannon-v6pfgc`.
+- **Settings for every capture:** 1440 px wide, light mode unless marked dark, Stock markets, Price moves, the week of 20 Mar 2020 picked (the COVID jump), cropped to the graph's card and taken at twice the screen resolution.
+- **Interactions** (5.3, 5.22) are short GIFs. 5.3 moves the pointer across the chart without clicking. 5.22 steps the weeks with the → key.
+- **5.8b** is the actual output of `npm run check:insights`. **5.9a** prints the values `frequency_connectedness` returned for the stock data, as the explorer stores them, in the form the library's result prints.
+- **5.21b** is a PNG downloaded from the explorer's own Download menu, unedited.
 
-**Default settings**, unless a placeholder says otherwise:
-
-- Viewport 1440 × 900, light mode.
-- Dataset: Stock markets. What spreads: Price moves.
-- Week of 20 Mar 2020 picked: the COVID jump, where every graph has something to show.
-- The palette that commit shipped with, since the palette is part of the state.
-- Crop to the graph's card, with its title and sentence. Keep a before and its after at the same crop, so they compare side by side.
-
-**Library figures** ("`Demo.ipynb` cell n"): run `vendor/PyConnectedness/examples/Demo.ipynb` at commit `4cc953f` and take the figure that cell draws.
-
-**Earlier explorer states** ("commit `…`"):
-
-```
-git checkout <commit>
-cd pyconnectedness-explorer/app && npm install && npm run dev
-```
-
-Before commit `239097f8e` there is no overview: the whole explorer is one page, so scroll to the graph. From that commit on, each graph has its own address: `#home`, `#index`, `#network`, `#heatmap`, `#frequency`.
-
-**Current state** ("current"): the head of `claude/serene-shannon-v6pfgc`, or the live site.
-
-**Interactions** (5.3, 5.22): two frames side by side, or a short screen recording of up to five seconds.
+To use them in another document, each image is also at `https://raw.githubusercontent.com/Memo-Es/dataviz/claude/serene-shannon-v6pfgc/pyconnectedness-explorer/docs/pov-images/<name>`.
