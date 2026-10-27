@@ -7,6 +7,8 @@ import { NetworkChart } from "./charts/network";
 import { TimelineChart, type PeriodBand } from "./charts/timeline";
 import { BeadsChart, readBeadColors } from "./charts/beads";
 import { findInsights } from "./charts/insights";
+import { onSegment, segmented, setSegment } from "./ui/segmented";
+import "@awesome.me/webawesome/dist/styles/themes/default.css";
 import { QuadrantChart } from "./charts/quadrants";
 import { RankingChart } from "./charts/ranking";
 import { HeatmapChart } from "./charts/heatmap";
@@ -32,7 +34,7 @@ app.innerHTML = `
       <span class="sr">Colour palette</span>
       <select id="palette"></select>
     </label>
-    <div class="segmented" id="measure" role="group" aria-label="Measure"></div>
+    <div id="measure-host"></div>
     <button class="icon-btn" id="theme" type="button" aria-label="Toggle dark mode"></button>
   </div>
 </header>
@@ -48,10 +50,7 @@ app.innerHTML = `
         <h2>Rolling spillover index <code class="tag">dynamic_connectedness(…).total</code></h2>
         <p class="sub" id="timeline-sub"></p>
       </div>
-      <div class="segmented small" id="g1-style" role="group" aria-label="How the first graph is drawn">
-        <button type="button" data-style="beads">Beads</button>
-        <button type="button" data-style="line">Line</button>
-      </div>
+      ${segmented("g1-style", "How the first graph is drawn", [["beads", "Beads"], ["line", "Line"]], "beads", true)}
     </div>
     <!-- time: the window every graph shows -- the one ending at the week picked on the chart, or
          a fixed period; the sentence right under it says what's picked, date first -->
@@ -95,14 +94,8 @@ app.innerHTML = `
       </div>
       <div class="head-controls">
         <!-- the ring draws the strongest flows until a market is picked; "all" is the library's set -->
-        <div class="segmented small" id="g2-flows" role="group" aria-label="Flows drawn on the ring">
-          <button type="button" data-flows="top">Strongest ${TOP_FLOWS}</button>
-          <button type="button" data-flows="all" id="g2-flows-all">All</button>
-        </div>
-        <div class="segmented small" id="g2-style" role="group" aria-label="How the second graph is drawn">
-          <button type="button" data-style="ring">Ring</button>
-          <button type="button" data-style="quad">Quadrants</button>
-        </div>
+        ${segmented("g2-flows", "Flows drawn on the ring", [["top", `Strongest ${TOP_FLOWS}`], ["all", "All"]], "top", true)}
+        ${segmented("g2-style", "How the second graph is drawn", [["ring", "Ring"], ["quad", "Quadrants"]], "ring", true)}
       </div>
     </div>
     <div class="readout" id="net-readout" aria-live="polite"></div>
@@ -280,10 +273,8 @@ async function main() {
     const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-t]");
     if (b) store.set({ t: +b.dataset.t!, window: "t" });
   });
-  $("g1-style").addEventListener("click", (ev) => {
-    const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-style]");
-    if (!b) return;
-    g1Style = b.dataset.style as typeof g1Style;
+  onSegment($("g1-style"), (v) => {
+    g1Style = v as typeof g1Style;
     try {
       localStorage.setItem("pc-g1", g1Style);
     } catch {
@@ -315,10 +306,8 @@ async function main() {
   } catch {
     /* storage unavailable: the strongest few */
   }
-  $("g2-flows").addEventListener("click", (ev) => {
-    const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-flows]");
-    if (!b) return;
-    g2Flows = b.dataset.flows as typeof g2Flows;
+  onSegment($("g2-flows"), (v) => {
+    g2Flows = v as typeof g2Flows;
     try {
       localStorage.setItem("pc-g2-flows", g2Flows);
     } catch {
@@ -326,10 +315,8 @@ async function main() {
     }
     render(store.get());
   });
-  $("g2-style").addEventListener("click", (ev) => {
-    const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-style]");
-    if (!b) return;
-    g2Style = b.dataset.style as typeof g2Style;
+  onSegment($("g2-style"), (v) => {
+    g2Style = v as typeof g2Style;
     try {
       localStorage.setItem("pc-g2", g2Style);
     } catch {
@@ -388,8 +375,8 @@ async function main() {
   );
 
   renderTop();
-  $("measure").innerHTML = measures.map((k) => `<button data-measure="${k}">${mName(k)}</button>`).join("");
-  $("measure").hidden = measures.length < 2;
+  $("measure-host").innerHTML = segmented("measure", "Measure", measures.map((k) => [k, mName(k)]), store.get().measure);
+  $("measure-host").hidden = measures.length < 2;
   $("side-title").innerHTML = `Net connectedness by ${ds.item} <code>net</code>`;
   $("side-sub").textContent = `What each ${ds.item} gives minus what it takes, in pp: the circles' sizes, as bars.`;
 
@@ -458,7 +445,7 @@ async function main() {
     const word = m === "returns" ? "return" : "volatility";
 
     // controls
-    $("measure").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.measure === m)));
+    setSegment($("measure"), m);
     $("theme").textContent = s.theme === "dark" ? "☀" : "☾";
     const wins = $("windows");
     wins.innerHTML = "";
@@ -498,13 +485,13 @@ async function main() {
             : g2Flows === "top" && nFlows > TOP_FLOWS
               ? `The ${TOP_FLOWS} strongest of ${nFlows} flows ${span} (the library's strongest 10%): ${how}. Pick a ${ds.item} for all its flows.`
               : `All ${nFlows} flows in the library's strongest 10% ${span}: ${how}.`;
-    $("g2-flows-all").textContent = `All ${nFlows}`;
-    $("g2-flows").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.flows === g2Flows)));
+    $("g2-flows").querySelector('[value="all"]')!.textContent = `All ${nFlows}`;
+    setSegment($("g2-flows"), g2Flows);
     // only the ring has arrows to thin out; kept in place (invisible) so the header never shifts
     $("g2-flows").style.visibility = g2Style === "ring" && nFlows > TOP_FLOWS ? "" : "hidden";
     renderNetReadout(s, frame);
     const quad = g2Style === "quad";
-    $("g2-style").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.style === g2Style)));
+    setSegment($("g2-style"), g2Style);
     $("network").hidden = quad;
     $("quadrants").hidden = !quad;
     $("leg-solid").innerHTML = quad
@@ -593,7 +580,7 @@ async function main() {
       if (top < box.scrollTop + 40 || top + on.offsetHeight + 72 > box.scrollTop + box.clientHeight) box.scrollTop = top;
     }
     insightFades();
-    $("g1-style").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.style === g1Style)));
+    setSegment($("g1-style"), g1Style);
     // the view not on show stays laid out but invisible (and out of reach): see .g1-views
     for (const [id, on] of [["g1-beads", asBeads], ["g1-line", !asBeads]] as const) {
       const el = $(id);
@@ -708,10 +695,7 @@ ${
       <a href="${sample}" download>Sample file</a>`;
     $("top").innerHTML = `
       <div class="data-bar">
-        <div class="segmented" id="src" role="group" aria-label="Data source">
-          <button type="button" data-src="public" aria-pressed="${!own}">Public dataset</button>
-          <button type="button" data-src="own" aria-pressed="${!!own}">Your own file</button>
-        </div>
+        ${segmented("src", "Data source", [["public", "Public dataset"], ["own", "Your own file"]], own ? "own" : "public")}
         <div class="data-row" id="src-public"${own ? " hidden" : ""}>
           <label class="select">
             <span class="sr">Dataset</span>
@@ -724,25 +708,19 @@ ${
             <input type="file" id="file" accept=".csv,text/csv" />
             <span>${own ? "Choose another CSV" : "Choose a CSV"}</span>
           </label>
-          <div class="segmented small" id="kind" role="group" aria-label="What the numbers are"
-            title="Levels (prices, index values, counts) are turned into % changes, as the demo does with prices. Changes are used as they are.">
-            <button type="button" data-kind="levels" aria-pressed="${own?.rec.kind !== "changes"}">Levels</button>
-            <button type="button" data-kind="changes" aria-pressed="${own?.rec.kind === "changes"}">Changes</button>
-          </div>
+          ${segmented("kind", "What the numbers are", [["levels", "Levels"], ["changes", "Changes"]], own?.rec.kind === "changes" ? "changes" : "levels", true,
+            `title="Levels (prices, index values, counts) are turned into % changes, as the demo does with prices. Changes are used as they are."`)}
           <p class="data-meta" id="own-status">${own ? `<b>${own.rec.name}</b> · ${facts}` : ownHint}</p>
         </div>
       </div>`;
     tightenDecimals($("top"), ".num");
 
     const show = (src: string) => {
-      $("src").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.src === src)));
+      setSegment($("src"), src);
       $("src-public").hidden = src !== "public";
       $("src-own").hidden = src !== "own";
     };
-    $("src").addEventListener("click", (ev) => {
-      const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-src]");
-      if (b) show(b.dataset.src!);
-    });
+    onSegment($("src"), show);
     $<HTMLSelectElement>("ds-select").addEventListener("change", (ev) => {
       location.search = `?d=${(ev.target as HTMLSelectElement).value}`;
     });
@@ -780,11 +758,9 @@ ${
       file = (ev.target as HTMLInputElement).files?.[0] ?? null;
       run();
     });
-    $("kind").addEventListener("click", (ev) => {
-      const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-kind]");
-      if (!b || busy) return;
-      kind = b.dataset.kind as typeof kind;
-      $("kind").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    onSegment($("kind"), (v) => {
+      if (busy) return setSegment($("kind"), kind); // a run is going: keep the one it uses
+      kind = v as typeof kind;
       run(); // a file already picked is run again the other way
     });
   }
@@ -1007,11 +983,7 @@ ${
   render(store.get());
 
   // controls
-  $("measure").addEventListener("click", (ev) => {
-    const b = (ev.target as HTMLElement).closest("button");
-    if (!b) return;
-    setMeasure(b.dataset.measure as Measure);
-  });
+  onSegment($("measure"), (v) => setMeasure(v as Measure));
   $("palette").innerHTML =
     PALETTES.map((x) => `<option value="${x.id}">${x.painter} · ${x.painting.split(" (")[0]}, ${x.year}</option>`).join("") +
     `<option value="agam">Agam (the first look)</option>`;

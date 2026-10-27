@@ -204,28 +204,63 @@ svg .dp {
   gap: 10px;
 }
 
-.segmented {
+/* switches: Web Awesome's radio group (src/ui/segmented.ts; ".seg" is the frequency bar's) in our look -- a pale track, the
+   picked option on a panel-coloured pill; the library brings the keyboard and the labelling */
+.switch {
+  --wa-focus-ring: 3px solid var(--stone);
+  --wa-focus-ring-offset: 2px;
+  display: inline-block;
+  flex: none; /* never squeezed by its neighbours: options don't wrap or overlap */
+  width: max-content;
+}
+
+/* the group's name is for screen readers; the options say what they are */
+.switch::part(form-control-label) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.switch::part(form-control) {
+  margin: 0;
+}
+
+.switch::part(form-control-input) {
   display: inline-flex;
+  width: max-content;
+  flex-wrap: nowrap;
+  gap: 0;
   padding: 3px;
   background: var(--band);
   border-radius: 999px;
 }
 
-.segmented button {
+.switch wa-radio {
+  flex: none;
+  white-space: nowrap;
+  margin: 0;
+  min-height: 44px;
+  padding: 0 14px;
   border: 0;
-  background: transparent;
-  padding: 6px 14px;
   border-radius: 999px;
-  font-size: 13.5px;
-  font-weight: 600;
+  background: transparent;
   color: var(--secondary);
+  font: 600 13.5px/1 var(--f-sans);
   transition: background 0.15s, color 0.15s;
 }
 
-.segmented button[aria-pressed="true"] {
+.switch wa-radio:state(checked) {
   background: var(--panel);
   color: var(--fg);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.switch.small wa-radio {
+  padding: 0 11px;
+  font-size: 12.5px;
 }
 
 .icon-btn {
@@ -353,11 +388,6 @@ main {
 .busy #kind {
   opacity: 0.45;
   pointer-events: none;
-}
-
-.segmented.small button {
-  padding: 4px 11px;
-  font-size: 12.5px;
 }
 
 .data-meta {
@@ -1597,7 +1627,6 @@ svg {
 }
 
 /* 2.5.5 target size: every control is at least 44 x 44 px */
-.segmented button,
 .windows button,
 .beads-regions button,
 .file-btn,
@@ -1972,7 +2001,7 @@ svg {
   font-size: 11.5px;
 }
 
-#g2 .card-head .segmented {
+#g2 .card-head .switch {
   flex: none;
 }
 
