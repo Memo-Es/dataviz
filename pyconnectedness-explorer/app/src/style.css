@@ -2019,3 +2019,188 @@ svg {
   min-width: 7ch; /* "All 38" or "All 120": the header doesn't move as the weeks change */
   font-variant-numeric: tabular-nums;
 }
+
+/* ---- the overview: a small version of each graph; each card opens its graph ---- */
+.home {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 20px;
+  margin: 8px 0 20px;
+}
+
+.span-4 {
+  grid-column: span 4;
+}
+
+.span-3 {
+  grid-column: span 3;
+}
+
+.mini-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 20px 22px 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  color: var(--stone);
+  text-decoration: none;
+  /* a link: hover deepens the edge and the shadow, nothing moves */
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.mini-card:hover {
+  border-color: var(--axis);
+  box-shadow: 0 6px 22px rgba(20, 30, 40, 0.08);
+}
+
+.mini-card:focus-visible {
+  outline: 3px solid var(--stone);
+  outline-offset: 3px;
+}
+
+.mini-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mini-head .q {
+  margin: 0;
+}
+
+.mini-open {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  font-size: 13px;
+  color: var(--stone);
+}
+
+.mini-card:hover .mini-open {
+  border-color: var(--axis);
+}
+
+.mini-card h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--stone);
+}
+
+.mini-card h3 .tag {
+  font-weight: 400;
+}
+
+.mini-num {
+  margin: 2px 0 6px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--stone);
+}
+
+.mini-num > .mini-big {
+  font: 700 26px/1.1 var(--f-num);
+  margin-right: 6px;
+}
+
+.mini-chart {
+  margin-top: auto;
+  min-height: 0;
+}
+
+.mini-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+
+
+.mini-ring svg,
+.mini-matrix svg {
+  max-width: 230px;
+  max-height: 230px;
+  margin: 0 auto;
+}
+
+/* the frequency bar as under graph 1, without its own title (the card has it) */
+.mini-card .ro-speed {
+  margin-top: auto;
+}
+
+.mini-card .ro-speed-head {
+  display: none;
+}
+
+.mini-body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--stone);
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mini-body .mono {
+  font: 700 12.5px var(--f-num);
+}
+
+/* an expanded graph: the way back, what's on show, its tools */
+.crumb {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 18px 0 2px;
+}
+
+.crumb-back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--stone);
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.crumb-back:hover {
+  border-color: var(--axis);
+}
+
+.crumb-here {
+  font-weight: 700;
+  color: var(--stone);
+}
+
+.crumb-tools {
+  margin-left: auto;
+}
+
+#context {
+  margin-top: 6px;
+}
+
+/* the network on its own: its detail panel takes the full row under it */
+.grid.detail-only > .detail {
+  grid-column: span 12;
+}
+
+@media (max-width: 960px) {
+  .home > .mini-card {
+    grid-column: span 12;
+  }
+}

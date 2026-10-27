@@ -2,11 +2,12 @@ import * as d3 from "d3";
 import "./style.css";
 import { type Dataset, type Measure, loadDatasets, loadExplorerData, pairSeriesAt, staticBlock } from "./data";
 import { Model, type State, Store, type WindowKey, windowOptions } from "./model";
-import { REGION_OF, REGION_ORDER, STEP, setHueOf, fmtDate, fmtSigned, fmtStep, parseDate, readPalette, setDatasetEncoding, tightenDecimals } from "./encoding";
+import { REGION_OF, REGION_ORDER, STEP, WASH, setHueOf, fmtDate, fmtSigned, fmtStep, parseDate, readPalette, regionOrder, setDatasetEncoding, tightenDecimals, wash } from "./encoding";
 import { NetworkChart } from "./charts/network";
 import { TimelineChart, type PeriodBand } from "./charts/timeline";
 import { BeadsChart, readBeadColors } from "./charts/beads";
 import { findInsights } from "./charts/insights";
+import { miniLine, miniMatrix, miniRing } from "./charts/minis";
 import { onSegment, segmented, setSegment } from "./ui/segmented";
 import "@awesome.me/webawesome/dist/styles/themes/default.css";
 import { QuadrantChart } from "./charts/quadrants";
@@ -43,6 +44,27 @@ app.innerHTML = `
   <!-- the data choice comes first: a public dataset, or your own file; everything below follows it -->
   <section class="top" id="top" aria-label="Data"></section>
 
+  <!-- an expanded graph: the way back to the overview, and what's on show -->
+  <nav class="crumb" id="crumb" aria-label="Where you are" hidden>
+    <a href="#" class="crumb-back">‹ All graphs</a><span class="crumb-here" id="crumb-here"></span>
+    <span class="crumb-tools" id="crumb-tools"></span>
+  </nav>
+
+  <!-- time: the window every graph shows -- the one ending at the week picked on a chart, or a
+       fixed period. Above the overview and above each graph, because it changes all of them -->
+  <div class="time-row" id="context">
+    <div class="windows" id="windows" role="group" aria-label="Window shown on every chart"></div>
+  </div>
+
+  <!-- the overview: a small version of each graph; each card opens its graph -->
+  <section class="home" id="home" aria-label="Overview">
+    <a class="mini-card span-7" href="#index" id="mini-index"></a>
+    <a class="mini-card span-5" href="#network" id="mini-network"></a>
+    <a class="mini-card span-5" href="#heatmap" id="mini-heatmap"></a>
+    <a class="mini-card span-4" href="#index" id="mini-freq"></a>
+    <a class="mini-card span-3" href="#index" id="mini-insight"></a>
+  </section>
+
   <section class="card span-12" id="g1">
     <div class="card-head">
       <div>
@@ -51,11 +73,6 @@ app.innerHTML = `
         <p class="sub" id="timeline-sub"></p>
       </div>
       ${segmented("g1-style", "How the first graph is drawn", [["beads", "Beads"], ["line", "Line"]], "beads", true)}
-    </div>
-    <!-- time: the window every graph shows -- the one ending at the week picked on the chart, or
-         a fixed period; the sentence right under it says what's picked, date first -->
-    <div class="time-row">
-      <div class="windows" id="windows" role="group" aria-label="Window shown on every chart"></div>
     </div>
     <div class="readout" id="readout" aria-live="polite"></div>
     <!-- insights on the left, read off the numbers, each pointing at a week; the chart on the right -->
@@ -119,7 +136,7 @@ app.innerHTML = `
   </section>
 
 
-  <div class="grid">
+  <div class="grid" id="g3-row">
 
     <section class="card span-7" id="g3">
       <div class="card-head">
@@ -530,6 +547,7 @@ async function main() {
     $("heatmap-sub").textContent = `Each pair once, in the row of the ${ds.item} that passes more to the other, ${frame.label.toLowerCase().startsWith("full") ? "over the " : "in the "}${frame.label.replace(/^Full/, "full")}.`;
     heatmap.render(frame, p, model.maxPair[m], focus, s.pair, (n) => hueOfNow(n), p.band);
     renderHeatTakeaway(frame);
+    renderHome(s, frame, p);
     $<HTMLSelectElement>("palette").value = s.palette;
     renderDetail(s, frame, p);
     tightenDecimals(document, ".num");
@@ -877,6 +895,69 @@ ${
     tightenDecimals($("hm-takeaway"), ".num");
   }
 
+  /** The overview: a small version of each graph with its headline. The numbers are the same
+   * library values the full graphs show, for the same window; each card opens its graph. */
+  function renderHome(s: State, frame: ReturnType<Model["frame"]>, p: ReturnType<typeof readPalette>) {
+    if ($("home").hidden) return; // drawn when shown (see applyView)
+    const m = s.measure;
+    const dyn = meta.dynamic[m];
+    const v = dyn.total;
+    const full = staticBlock(data, m, "full").total;
+    const head = (q: string, title: string, tag: string) =>
+      `<div class="mini-head"><p class="q">${q}</p><span class="mini-open" aria-hidden="true">↗</span></div><h3>${title} <code class="tag">${tag}</code></h3>`;
+    // names at card size stay stone (AAA 7:1); colour is for the marks and the big numbers
+    const nm = (n: string) => `<b>${n}</b>`;
+    const fill = (n: string, send = true) => wash(hueOfNow(n), send ? WASH.send : WASH.recv);
+
+    // 1: the index, its value for the window on show and, for a single step, its rank
+    const t = s.window === "t" ? s.t : null;
+    const rank = t === null ? "" : ` · higher than ${Math.round((v.filter((x) => x < v[t]).length / v.length) * 100)}% of ${ds.steps}`;
+    $("mini-index").innerHTML =
+      head("1 · When did shocks spread most?", "Rolling spillover index", "dynamic_connectedness") +
+      `<p class="mini-num"><b class="num mini-big">${frame.total.toFixed(1)}%</b> <span>${frame.label}${rank}</span></p>
+      <div class="mini-chart mini-line">${miniLine(v, t, full, { ink: p.fg, accent: p.accent, wash: wash(hueOfNow(names[0]), 0.1), muted: p.muted })}</div>`;
+
+    // 2: the ring, and who passes on and takes in the most
+    const order = names.map((_, i) => i).sort((a, b) => frame.net[b] - frame.net[a]);
+    const [hi, lo] = [names[order[0]], names[order[order.length - 1]]];
+    $("mini-network").innerHTML =
+      head("2 · Who passes shocks to whom?", "Connectedness network", "connectedness_graph") +
+      `<p class="mini-num">${nm(hi)} passes on the most, ${nm(lo)} takes in the most</p>
+      <div class="mini-chart mini-ring">${miniRing(names, frame.net, frame.matrix, frame.threshold, model.maxNet[m], hueOfNow, fill, p.fg)}</div>`;
+
+    // 3: the matrix, with the heatmap's own one-line takeaway
+    $("mini-heatmap").innerHTML =
+      head("3 · How much does each pair pass on?", "Spillover heatmap", "spillover_heatmap") +
+      `<p class="mini-num">${$("hm-takeaway").innerHTML.replace(/ style="[^"]*"/g, "")}</p>
+      <div class="mini-chart mini-matrix">${miniMatrix(regionOrder(names), names, frame.matrix, frame.threshold, model.maxPair[m], hueOfNow, (n) => fill(n), p.fg)}</div>`;
+
+    // inside 1: how long shocks last, the same bar as under graph 1
+    $("mini-freq").innerHTML = head("Inside 1 · How long do shocks last?", "Frequency-domain connectedness", "frequency_connectedness") + speedLine(s, false);
+    // its headline, read off the bar's own legend: the band that carries the most
+    const bands = [...$("mini-freq").querySelectorAll(".speed-words > span")].map((el) => ({
+      share: +(el.querySelector("b")?.textContent ?? "0").replace("%", ""),
+      name: (el.childNodes[1]?.textContent ?? "").trim().toLowerCase(),
+      phrase: el.querySelector("em")?.textContent ?? "",
+    }));
+    const lead = bands.sort((a, b) => b.share - a.share)[0];
+    if (lead) $("mini-freq").querySelector(".mini-head + h3")!.insertAdjacentHTML("afterend", `<p class="mini-num"><b class="num mini-big">${lead.share}%</b> <span>of it is ${lead.name}, playing out in ${lead.phrase.replace("≤", "up to ").replace("+", " or more")}</span></p>`);
+
+    // the insight with the biggest move, as on graph 1's cards (dates as plain text: the card is a link)
+    const ins = findInsights(dyn, full, ds.steps, ds.items);
+    const size = (x: (typeof ins)[number]) => +(x.title.match(/ ([\d.]+) points/)?.[1] ?? 0);
+    const top = [...ins].sort((a, b) => size(b) - size(a))[0];
+    // dates as on graph 1's cards: month and year, or the day for daily data
+    const short = (i: number) => {
+      const d = parseDate(dyn.dates[i])!;
+      return ds.step === "day" ? fmtDate(d) : d3.utcFormat("%b %Y")(d);
+    };
+    $("mini-insight").innerHTML =
+      `<div class="mini-head"><p class="q">Worth knowing</p><span class="mini-open" aria-hidden="true">↗</span></div>
+      <h3>${top.title}</h3>
+      <p class="mini-body">${top.body.replace(/\{date:(\d+)\}/g, (_x, i) => `<b class="mono">${short(+i)}</b>`)}</p>`;
+    tightenDecimals($("home"), ".num");
+  }
+
   function renderPair(s: State, frame: ReturnType<Model["frame"]>, p: ReturnType<typeof readPalette>) {
     const el = $("detail");
     const [a, b] = s.pair!;
@@ -981,7 +1062,39 @@ ${
       pendingFull = false;
     });
   });
-  render(store.get());
+  // the overview, or one graph on its own: the address says which (#index, #network, #heatmap),
+  // so the browser's back button and a shared link both work
+  type View = "home" | "index" | "network" | "heatmap";
+  const TITLES: Record<Exclude<View, "home">, string> = {
+    index: "Rolling spillover index",
+    network: "Connectedness network",
+    heatmap: "Spillover heatmap",
+  };
+  let view: View | null = null;
+  const applyView = () => {
+    const h = location.hash.replace(/^#\/?/, "");
+    const v: View = h in TITLES ? (h as View) : "home";
+    const from = view;
+    view = v;
+    $("home").hidden = v !== "home";
+    $("g1").hidden = v !== "index";
+    $("g2").hidden = v !== "network";
+    $("g3").hidden = v !== "heatmap";
+    $("g3-row").hidden = v !== "network" && v !== "heatmap";
+    $("g3-row").classList.toggle("detail-only", v === "network");
+    $("crumb").hidden = v === "home";
+    $("crumb-here").textContent = v === "home" ? "" : TITLES[v];
+    document.title = v === "home" ? "PyConnectedness Explorer" : `${TITLES[v]} · PyConnectedness Explorer`;
+    if (from !== null && from !== v) {
+      scrollTo(0, 0);
+      // keyboard and screen-reader users land where the change happened
+      if (v === "home") document.getElementById(`mini-${from}`)?.focus();
+      else $("crumb").querySelector<HTMLElement>(".crumb-back")?.focus();
+    }
+    render(store.get()); // what was hidden is drawn now, at its real size
+  };
+  window.addEventListener("hashchange", applyView);
+  applyView();
 
   // controls
   onSegment($("measure"), (v) => setMeasure(v as Measure));
