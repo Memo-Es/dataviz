@@ -1,0 +1,75 @@
+name: Capture the strategic POV images
+
+# Builds the explorer at every commit the POV's image brief names (Appendix B), screenshots each
+# before / after state with Playwright, adds the library's own figures from Demo.ipynb, and commits
+# the PNGs to docs/pov-images on this branch. Runs only on the pov-images branch.
+
+on:
+  push:
+    branches: [pov-images]
+    paths:
+      - "docs/pov-images/capture.mjs"
+      - "docs/pov-images/static_images.py"
+      - ".github/workflows/pov-images.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Tools
+        run: |
+          pip install matplotlib
+          mkdir -p /tmp/cap && cd /tmp/cap && npm init -y >/dev/null && npm i playwright@1.48.2 >/dev/null && npx playwright install --with-deps chromium
+          cp "$GITHUB_WORKSPACE/docs/pov-images/capture.mjs" /tmp/cap/
+      - name: Build and capture every commit
+        run: |
+          OUT="$GITHUB_WORKSPACE/docs/pov-images"
+          : > "$OUT/capture-log.tsv"
+          HEAD_SHA=$(git rev-parse HEAD)
+          port=4300
+          for c in current 645639d 9473a4f 4708b55 5e8508a 3bfbe32 837e1d1 e2d012c 8becb4c 2c7df58 ab3b879 7639607 e23c7e5 bdd65c5 83f3b8f 521c472 16a013d 35326d3 78a101f 7762bef e8e9db0 239097f; do
+            port=$((port+1))
+            sha=$c; [ "$c" = current ] && sha=$HEAD_SHA
+            W=/tmp/w/$c
+            echo "::group::$c"
+            if git worktree add -f "$W" "$sha" >/dev/null 2>&1 \
+               && cp -r pyconnectedness-explorer/vendor/PyConnectedness/. "$W/pyconnectedness-explorer/vendor/PyConnectedness/" \
+               && cd "$W/pyconnectedness-explorer/app" \
+               && (npm ci --no-audit --no-fund || npm install --no-audit --no-fund) \
+               && (node scripts/copy-py.mjs || true) \
+               && npx vite build; then
+              (cd dist && python -m http.server $port >/dev/null 2>&1 &)
+              sleep 2
+              if [ "$c" = current ]; then npm run check:insights > /tmp/check.txt 2>&1 || true; fi
+              (cd /tmp/cap && node capture.mjs "$c" $port "$OUT") || echo -e "all\t$c\tFAILED: capture script" >> "$OUT/capture-log.tsv"
+            else
+              echo -e "all\t$c\tFAILED: build" >> "$OUT/capture-log.tsv"
+            fi
+            cd "$GITHUB_WORKSPACE"
+            echo "::endgroup::"
+          done
+          python docs/pov-images/static_images.py "$GITHUB_WORKSPACE" "$OUT" /tmp/check.txt
+          sort -V "$OUT/capture-log.tsv" -o "$OUT/capture-log.tsv"
+          cat "$OUT/capture-log.tsv"
+      - name: Commit the images
+        run: |
+          git config user.name "pov-images bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs/pov-images
+          git commit -m "POV images: captured from every commit in the image brief" || exit 0
+          git push origin HEAD:pov-images
