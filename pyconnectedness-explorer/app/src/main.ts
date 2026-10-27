@@ -67,6 +67,7 @@ app.innerHTML = `
         <div class="beads-regions" id="beads-regions" role="group" aria-label="Region shown"></div>
         <div id="beads" class="chart-host"></div>
         <p class="beads-legend" id="beads-legend"></p>
+        <div class="freq" id="freq" aria-live="polite"></div>
       </div>
     </div>
   </section>
@@ -659,9 +660,11 @@ ${
     const el = $("readout");
     el.classList.toggle("preview", preview);
     el.innerHTML = `
-      <p class="takeaway">${sentence}</p>
-      ${speedLine(s, preview)}`;
+      <p class="takeaway">${sentence}</p>`;
     tightenDecimals(el, ".num");
+    // the frequency-domain split sits under the chart, below the strings it describes
+    $("freq").innerHTML = speedLine(s, preview);
+    tightenDecimals($("freq"), ".num");
   }
 
   /** Graph 3's answer: where the strongest flows run, region to region */

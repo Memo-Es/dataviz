@@ -1797,3 +1797,8 @@ svg {
     order: 2;
   }
 }
+
+/* under graph 1's chart: the frequency-domain split of the window on show */
+.freq .ro-speed {
+  margin-top: 18px;
+}
