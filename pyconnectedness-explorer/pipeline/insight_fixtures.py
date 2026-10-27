@@ -8,6 +8,7 @@ the library really returns for that shape. Only what the insights read is kept.
 """
 from __future__ import annotations
 
+import pinned  # noqa: F401  (the library from the pinned GitHub submodule)
 import json
 import sys
 from pathlib import Path

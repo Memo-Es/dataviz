@@ -32,6 +32,8 @@ if sha != EXPECTED_SHA:
 # its figure as a cell output (saved to out/reference/ below)
 os.environ.pop("MPLBACKEND", None)
 os.environ["EXPLORER_DATA_DIR"] = str(ROOT / "app" / "public" / "data")
+# the notebook's kernel imports the library from the pinned submodule, not an installed copy
+os.environ["PYTHONPATH"] = os.pathsep.join(filter(None, [str(REPO / "src"), os.environ.get("PYTHONPATH")]))
 
 nb = nbformat.read(NB, as_version=4)
 nb.cells.append(nbformat.v4.new_code_cell((ROOT / "pipeline" / "export_cell.py").read_text()))

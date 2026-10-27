@@ -9,6 +9,7 @@ library's output once the module exists; the drawing code shouldn't need to chan
 """
 from __future__ import annotations
 
+import pinned  # noqa: F401  (the library from the pinned GitHub submodule)
 import sys
 from pathlib import Path
 

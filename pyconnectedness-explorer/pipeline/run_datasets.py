@@ -12,6 +12,7 @@ doesn't stop the others. Writes app/public/data/datasets.json, the selector's li
 """
 from __future__ import annotations
 
+import pinned  # noqa: F401  (the library from the pinned GitHub submodule)
 import json
 import sys
 import traceback

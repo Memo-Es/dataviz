@@ -7,6 +7,7 @@ run saved (app/public/data/raw_snapshot.csv.gz), so the numbers match what's in 
 """
 from __future__ import annotations
 
+import pinned  # noqa: F401  (the library from the pinned GitHub submodule)
 import sys
 from pathlib import Path
 
