@@ -18,6 +18,7 @@ import "@awesome.me/webawesome/dist/styles/themes/default.css";
 import { QuadrantChart } from "./charts/quadrants";
 import { RankingChart } from "./charts/ranking";
 import { HeatmapChart } from "./charts/heatmap";
+import { HeatmapGridChart } from "./charts/heatmap-grid";
 import { sparkline } from "./charts/sparkline";
 import { bandCopy } from "./charts/frequency";
 import { loadUpload, runUpload, saveUpload } from "./upload/upload";
@@ -158,8 +159,11 @@ app.innerHTML = `
           <p class="sub" id="heatmap-sub"></p>
           <p class="takeaway" id="hm-takeaway"></p>
         </div>
+        ${segmented("g3-style", "How the third graph is drawn", [["dots", "Dots"], ["grid", "Original"]], "dots", true)}
       </div>
       <div id="heatmap" class="chart-host"></div>
+      <!-- the library's own picture: spillover_heatmap(pairwise_net, cmap="RdBu_r") -->
+      <div id="heatmap-grid" class="chart-host"></div>
       <div class="legend" id="heatmap-legend"></div>
     </section>
 
@@ -312,10 +316,30 @@ async function main() {
   $("net-regions").innerHTML = presentRegions.length > 1
     ? presentRegions.map((g, i) => `<span class="reg"><i style="background:var(--bead-${i + 1})"></i>${g}</span>`).join("")
     : "";
-  $("heatmap-legend").innerHTML = `
+  const legendDots = `
     <span title="PyConnectedness: pairwise_net"><i class="hm-dot"></i>Dot: the row passes more to the column than it gets back · bigger = more</span>
     <span><i class="hm-ring"></i>Ring: among the strongest 10%, drawn in the network</span>
     ${presentRegions.length > 1 ? `<span>Colour: the sender's region, as in graph 1</span>` : ""}`;
+  const legendGrid = `
+    <span title="PyConnectedness: pairwise_net"><i class="hm-red"></i>Red: the row passes more to the column than it gets back</span>
+    <span><i class="hm-blue"></i>Blue: the column passes more to the row</span>
+    <span>Each pair twice, mirrored · the scale runs to this window's largest flow, as the library sets it</span>`;
+  // graph 3 as dots (default) or as the library draws it, remembered per browser
+  let g3Style: "dots" | "grid" = "dots";
+  try {
+    if (localStorage.getItem("pc-g3") === "grid") g3Style = "grid";
+  } catch {
+    /* storage unavailable: the dots */
+  }
+  onSegment($("g3-style"), (v) => {
+    g3Style = v as typeof g3Style;
+    try {
+      localStorage.setItem("pc-g3", g3Style);
+    } catch {
+      /* ignore */
+    }
+    render(store.get());
+  });
 
   const network = new NetworkChart($("network"), names, { onHover: hover, onSelect: select, onPair: pickPair });
   const quadrants = new QuadrantChart($("quadrants"), names, { onHover: hover, onSelect: select, onPair: pickPair });
@@ -384,6 +408,7 @@ async function main() {
   };
   const ranking = new RankingChart($("ranking"), names, hover, (n) => select(n));
   const heatmap = new HeatmapChart($("heatmap"), names, hover, (n) => select(n), pickPair);
+  const heatmapGrid = new HeatmapGridChart($("heatmap-grid"), names, hover, (n) => select(n), pickPair);
   // the line takes whatever room the beads take, so graph 1 is one height in either view
   const fitLine = () => {
     const chrome = $("g1-line").offsetHeight - $("timeline").offsetHeight;
@@ -544,7 +569,16 @@ async function main() {
     }
     else network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion, s.pair, readBeadColors().ink, g2Flows === "top" ? TOP_FLOWS : null);
     ranking.render(frame, p, model.maxNet[m], focus, s.selected, motion);
-    $("heatmap-sub").textContent = `Each pair once, in the row of the ${ds.item} that passes more to the other, ${frame.label.toLowerCase().startsWith("full") ? "over the " : "in the "}${frame.label.replace(/^Full/, "full")}.`;
+    const grid = g3Style === "grid";
+    const inWindow = `${frame.label.toLowerCase().startsWith("full") ? "over the " : "in the "}${frame.label.replace(/^Full/, "full")}`;
+    $("heatmap-sub").textContent = grid
+      ? `As the library draws it (spillover_heatmap, the demo's colours): every pair, ${inWindow}.`
+      : `Each pair once, in the row of the ${ds.item} that passes more to the other, ${inWindow}.`;
+    setSegment($("g3-style"), g3Style);
+    $("heatmap").hidden = grid;
+    $("heatmap-grid").hidden = !grid;
+    $("heatmap-legend").innerHTML = grid ? legendGrid : legendDots;
+    if (grid) heatmapGrid.render(frame, p, model.maxPair[m], focus, s.pair);
     heatmap.render(frame, p, model.maxPair[m], focus, s.pair, (n) => hueOfNow(n), p.band);
     renderHeatTakeaway(frame);
     renderHome(s, frame, p);
@@ -1156,8 +1190,8 @@ ${
       question: "3 · How much does each pair pass on?",
       tag: "spillover_heatmap",
       sentence: $("hm-takeaway").innerText,
-      host: $("heatmap"),
-      layers: [...$("heatmap").querySelectorAll<SVGSVGElement>(":scope > svg")],
+      host: $(g3Style === "grid" ? "heatmap-grid" : "heatmap"),
+      layers: [...$(g3Style === "grid" ? "heatmap-grid" : "heatmap").querySelectorAll<SVGSVGElement>(":scope > svg")],
       legends: [$("heatmap-legend")],
       source: source("spillover_heatmap (pairwise_net)"),
     };

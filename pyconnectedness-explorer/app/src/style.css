@@ -2484,3 +2484,39 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   color: var(--stone);
   font: 400 13px var(--f-num);
 }
+
+/* graph 3 as the library draws it: the legend's red and blue are RdBu_r's ends */
+.legend .hm-red,
+.legend .hm-blue {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+
+.legend .hm-red {
+  background: #b2182b;
+}
+
+.legend .hm-blue {
+  background: #2166ac;
+}
+
+.heatmap-grid .axis-name {
+  font-size: 11.5px;
+}
+
+.heatmap-grid .axis-title {
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.heatmap-grid .bar-tick {
+  font: 400 11px var(--f-num);
+}
+
+#g3 .card-head .switch {
+  flex: none;
+}
