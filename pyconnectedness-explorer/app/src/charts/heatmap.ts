@@ -10,7 +10,7 @@
  */
 import * as d3 from "d3";
 import type { Frame } from "../model";
-import { type Palette, REGION_OF, regionOrder } from "../encoding";
+import { type Palette, REGION_OF, WASH, regionOrder, wash } from "../encoding";
 import { hideTooltip, showTooltip } from "../tooltip";
 
 const CELL = 22;
@@ -121,7 +121,9 @@ export class HeatmapChart {
       .attr("cx", cx)
       .attr("cy", cy)
       .attr("r", (d) => (d.r !== d.c && d.v > 0 ? rad(d.v) : 0))
-      .attr("fill", (d) => hueOf(this.order[d.r]));
+      .attr("fill", (d) => wash(hueOf(this.order[d.r]), WASH.dot))
+      .attr("stroke", (d) => hueOf(this.order[d.r]))
+      .attr("stroke-width", 1);
 
     const label = (cls: string, horizontal: boolean) =>
       this.svg

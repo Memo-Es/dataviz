@@ -1593,7 +1593,9 @@ svg {
 }
 
 .legend .dot.solid {
-  background: var(--bead-1);
+  /* as on the ring: the region colour washed in (WASH.send), edged in the full hue */
+  background: color-mix(in srgb, var(--bead-1) 42%, var(--panel));
+  box-shadow: inset 0 0 0 1.75px var(--bead-1);
 }
 
 .legend .dot.ring {
@@ -1953,8 +1955,8 @@ svg {
 }
 
 .legend .dot.tint {
-  background: color-mix(in srgb, var(--bead-1) 28%, var(--panel));
-  box-shadow: inset 0 0 0 2px var(--bead-1);
+  background: color-mix(in srgb, var(--bead-1) 14%, var(--panel));
+  box-shadow: inset 0 0 0 1.75px var(--bead-1);
 }
 
 .edge-value {

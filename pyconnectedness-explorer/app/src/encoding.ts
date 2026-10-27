@@ -153,3 +153,17 @@ export function spreadMarks(xs: number[], gap: number, lo: number, hi: number): 
   }
   return out;
 }
+
+/** A region colour washed into the panel, for big shapes: `k` of the hue, the rest panel. Their
+ * edge stays the full hue, which carries the 3:1 contrast; the fill only has to be soft. Mixed
+ * toward the panel, not white, so it works in dark mode too. */
+export function wash(hex: string, k: number): string {
+  const panel = getComputedStyle(document.documentElement).getPropertyValue("--panel").trim() || "#ffffff";
+  const a = d3.color(hex)?.rgb();
+  const b = d3.color(panel)?.rgb();
+  if (!a || !b) return hex;
+  return d3.rgb(b.r + (a.r - b.r) * k, b.g + (a.g - b.g) * k, b.b + (a.b - b.b) * k).formatHex();
+}
+
+/** how much hue a big shape's fill keeps: a transmitter's, a receiver's */
+export const WASH = { send: 0.42, recv: 0.14, dot: 0.6 };

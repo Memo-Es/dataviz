@@ -41,6 +41,27 @@ export interface Palette {
 
 export const PALETTES: Palette[] = [
   {
+    // the default since 27 Oct 2026: cool, closely related hues and no orange, after Seurat's
+    // hues read as bright and jarring. Hues found by search against the palette checks
+    // (CVD 8.0 / 9.4, normal vision 15.8 / 15.2, all >= 3:1 on the panel); big shapes carry them
+    // as washes with a full-hue edge (encoding.ts, wash), so the page stays soft
+    id: "nympheas",
+    painter: "Monet",
+    painting: "Nymphéas (Water Lilies)",
+    year: "1914–26",
+    note: "A water garden in haze: sage leaves, misty blue water, mauve and lavender blossom; deep ink indigo for the highlight.",
+    light: {
+      bg: "#f0f1ec", panel: "#fbfbf8", base: "#e9ebe4", ink: "#1c2530",
+      hues: ["#297c46", "#1793b2", "#823f6b", "#9188cd", "#199d94", "#5b6000", "#4c79b6", "#943f48"],
+      accent: "#002472", ramp: ["#24414a", "#5b7f88", "#a6c0c4"],
+    },
+    dark: {
+      bg: "#121416", panel: "#1a1c1f", base: "#25292d", ink: "#e6e9ee",
+      hues: ["#258957", "#359cbd", "#974f7d", "#8d82d2", "#00a396", "#74761b", "#4471b5", "#b66375"],
+      accent: "#b2cbff", ramp: ["#d6e4e7", "#a6c0c4", "#5b7f88"],
+    },
+  },
+  {
     id: "seurat",
     painter: "Seurat",
     painting: "Un dimanche après-midi à l'Île de la Grande Jatte",

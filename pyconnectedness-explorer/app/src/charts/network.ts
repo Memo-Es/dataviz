@@ -18,7 +18,7 @@
  */
 import * as d3 from "d3";
 import type { Frame } from "../model";
-import { type Palette, fmtSigned, hueOf } from "../encoding";
+import { type Palette, WASH, fmtSigned, hueOf, wash } from "../encoding";
 import { hideTooltip, showTooltip } from "../tooltip";
 
 const SIZE = 760;
@@ -53,12 +53,6 @@ export interface NetworkCallbacks {
   onPair(sender: string, receiver: string): void;
 }
 
-/** a hex colour mixed toward white: the receivers' tint */
-function tint(hex: string, t: number) {
-  const c = d3.color(hex)?.rgb();
-  if (!c) return hex;
-  return d3.rgb(c.r + (255 - c.r) * t, c.g + (255 - c.g) * t, c.b + (255 - c.b) * t).formatHex();
-}
 
 export class NetworkChart {
   private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
@@ -280,9 +274,10 @@ export class NetworkChart {
     nodes
       .select<SVGCircleElement>("circle.dot")
       .style("opacity", (d) => (lit(d) ? 1 : 0.28))
-      .attr("fill", (d) => (d.top ? hueOf(d.name) : tint(hueOf(d.name), 0.72)))
-      .attr("stroke", (d) => (d.name === selected ? p.fg : d.top ? "none" : hueOf(d.name)))
-      .attr("stroke-width", (d) => (d.name === selected ? 3 : 2));
+      // soft fills, the full hue on the edge: deeper for a transmitter, paler for a receiver
+      .attr("fill", (d) => wash(hueOf(d.name), d.top ? WASH.send : WASH.recv))
+      .attr("stroke", (d) => (d.name === selected ? p.fg : hueOf(d.name)))
+      .attr("stroke-width", (d) => (d.name === selected ? 3 : 1.75));
     tr(nodes.select<SVGCircleElement>("circle.dot")).attr("r", (d: Pos) => nodeR(Math.abs(frame.net[d.idx])));
     // the name and its net, outside the ring: above on the top half, below on the bottom half
     // near 12 and 6 o'clock the circles sit closest: alternate those labels between two rows

@@ -13,7 +13,7 @@
  */
 import * as d3 from "d3";
 import type { Frame } from "../model";
-import { type Palette, fmtSigned, hueOf } from "../encoding";
+import { type Palette, WASH, fmtSigned, hueOf, wash } from "../encoding";
 import { hideTooltip, showTooltip } from "../tooltip";
 import type { NetworkCallbacks } from "./network";
 
@@ -49,11 +49,6 @@ interface Edge {
   v: number;
 }
 
-function tint(hex: string, t: number) {
-  const c = d3.color(hex)?.rgb();
-  if (!c) return hex;
-  return d3.rgb(c.r + (255 - c.r) * t, c.g + (255 - c.g) * t, c.b + (255 - c.b) * t).formatHex();
-}
 
 export class QuadrantChart {
   private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
@@ -239,8 +234,8 @@ export class QuadrantChart {
       .select<SVGCircleElement>("circle.dot")
       .attr("r", NODE_R)
       .style("opacity", (d) => (lit(d) ? 1 : 0.28))
-      .attr("fill", (d) => (sends(d) ? hueOf(d.name) : tint(hueOf(d.name), 0.72)))
-      .attr("stroke", (d) => (d.name === selected ? p.fg : sends(d) ? p.panel : hueOf(d.name)))
+      .attr("fill", (d) => wash(hueOf(d.name), sends(d) ? WASH.send : WASH.recv))
+      .attr("stroke", (d) => (d.name === selected ? p.fg : hueOf(d.name)))
       .attr("stroke-width", (d) => (d.name === selected ? 3 : 2));
 
     // a label to the right of each market, else to its left; where neither is free the name is

@@ -4,7 +4,7 @@
  */
 import * as d3 from "d3";
 import type { Frame } from "../model";
-import { tightenDecimals, type Palette, fmtSigned, hueOf } from "../encoding";
+import { tightenDecimals, type Palette, WASH, fmtSigned, hueOf, wash } from "../encoding";
 
 const ROW = 26;
 
@@ -96,11 +96,11 @@ export class RankingChart {
     tr(bars)
       .attr("x", (d: { v: number }) => Math.min(x(0), x(d.v)))
       .attr("width", (d: { v: number }) => Math.max(1, Math.abs(x(d.v) - x(0))))
-      // region colour; transmitters solid (right of zero), receivers a tint with an edge (left)
-      .attr("fill", (d: { name: string; v: number }) => hueOf(d.name))
-      .attr("fill-opacity", (d: { v: number }) => (d.v >= 0 ? 1 : 0.28))
-      .attr("stroke", (d: { name: string; v: number }) => (d.v >= 0 ? "none" : hueOf(d.name)))
-      .attr("stroke-width", 1.5);
+      // region colour, as on the ring: a deeper wash for transmitters (right of zero), a paler
+      // one for receivers (left), both edged in the full hue
+      .attr("fill", (d: { name: string; v: number }) => wash(hueOf(d.name), d.v >= 0 ? WASH.send : WASH.recv))
+      .attr("stroke", (d: { name: string; v: number }) => hueOf(d.name))
+      .attr("stroke-width", 1.25);
     g.select("text.row-value")
       .attr("x", W - 6)
       .attr("y", ROW / 2 - 1)

@@ -104,8 +104,8 @@ app.innerHTML = `
         <div id="network" class="chart-host network-host"></div>
         <div id="quadrants" class="chart-host network-host"></div>
         <div class="legend">
-          <span title="PyConnectedness: net" id="leg-solid"><i class="dot solid"></i>Top half, solid: passes on more</span>
-          <span title="PyConnectedness: net" id="leg-tint"><i class="dot tint"></i>Bottom half, tinted: takes in more · bigger = more</span>
+          <span title="PyConnectedness: net" id="leg-solid"><i class="dot solid"></i>Top half, deeper: passes on more</span>
+          <span title="PyConnectedness: net" id="leg-tint"><i class="dot tint"></i>Bottom half, paler: takes in more · bigger = more</span>
           <span title="PyConnectedness: pairwise_net" id="leg-arrow"><i class="arrowkey"></i></span>
           <span id="net-regions"></span>
         </div>
@@ -176,9 +176,10 @@ async function main() {
     /* storage unavailable: fall back to light */
   }
   document.documentElement.dataset.theme = theme;
-  let palette = "seurat";
+  let palette = "nympheas";
   try {
-    const saved = localStorage.getItem("pc-palette");
+    // a new key since the default changed, so a remembered Seurat doesn't outlive it
+    const saved = localStorage.getItem("pc-palette-2");
     if (saved && (saved === "agam" || PALETTES.some((x) => x.id === saved))) palette = saved;
   } catch {
     /* storage unavailable: the default */
@@ -495,11 +496,11 @@ async function main() {
     $("network").hidden = quad;
     $("quadrants").hidden = !quad;
     $("leg-solid").innerHTML = quad
-      ? `<i class="dot solid"></i>Solid: right of 0, passes on more`
-      : `<i class="dot solid"></i>Top half, solid: passes on more`;
+      ? `<i class="dot solid"></i>Deeper: right of 0, passes on more`
+      : `<i class="dot solid"></i>Top half, deeper: passes on more`;
     $("leg-tint").innerHTML = quad
-      ? `<i class="dot tint"></i>Tinted: left of 0, takes in more`
-      : `<i class="dot tint"></i>Bottom half, tinted: takes in more · bigger = more`;
+      ? `<i class="dot tint"></i>Paler: left of 0, takes in more`
+      : `<i class="dot tint"></i>Bottom half, paler: takes in more · bigger = more`;
     $("leg-arrow").innerHTML = quad
       ? `<i class="arrowkey"></i>Hover or pick a ${ds.item} for its path over the last ${quadLag(m)} ${ds.steps} and its arrows`
       : `<i class="arrowkey"></i>Arrow: from the ${ds.item} that passes on more to the one that takes in · wider = stronger`;
@@ -991,7 +992,7 @@ ${
   $("palette").addEventListener("change", (ev) => {
     const id = (ev.target as HTMLSelectElement).value;
     try {
-      localStorage.setItem("pc-palette", id);
+      localStorage.setItem("pc-palette-2", id);
     } catch {
       /* ignore */
     }
