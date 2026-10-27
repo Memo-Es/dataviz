@@ -2451,13 +2451,38 @@ wa-dropdown wa-dropdown-item {
   font: 500 15px/1.3 var(--f-sans);
 }
 
-.ds-select wa-option:state(current),
-.ds-select wa-option:hover,
-wa-dropdown wa-dropdown-item:focus,
-wa-dropdown wa-dropdown-item:hover {
+.ds-select wa-option:state(current) {
   background: var(--band);
   color: var(--stone);
   box-shadow: inset 0 0 0 2px var(--stone);
+}
+
+/* menus: the pointer gets a pale band; only keyboard focus gets the stone ring, so a menu never
+   shows two rows as if both were chosen */
+.ds-select wa-option:hover,
+wa-dropdown wa-dropdown-item:hover {
+  background: var(--band);
+  color: var(--stone);
+}
+
+wa-dropdown wa-dropdown-item:focus-visible {
+  background: var(--band);
+  box-shadow: inset 0 0 0 2px var(--stone);
+}
+
+wa-dropdown wa-dropdown-item:focus:not(:focus-visible) {
+  box-shadow: none;
+}
+
+/* the Download menu: a short title, and what it's for in quieter type beside it */
+#export wa-dropdown-item {
+  font-weight: 600;
+}
+
+#export wa-dropdown-item [slot="details"] {
+  margin-left: 16px;
+  font: 400 13px var(--f-sans);
+  color: var(--stone);
 }
 
 .ds-select wa-option:state(selected) {

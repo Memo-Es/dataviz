@@ -62,8 +62,8 @@ app.innerHTML = `
       <!-- the graph as a figure for a report, with whatever is picked still highlighted -->
       <wa-dropdown id="export" placement="bottom-end">
         <button slot="trigger" class="crumb-btn" type="button">Download ▾</button>
-        <wa-dropdown-item value="png">PNG image, for documents and slides</wa-dropdown-item>
-        <wa-dropdown-item value="svg">SVG, vector, for editing</wa-dropdown-item>
+        <wa-dropdown-item value="png">PNG image<span slot="details">documents and slides</span></wa-dropdown-item>
+        <wa-dropdown-item value="svg">SVG vector<span slot="details">for editing</span></wa-dropdown-item>
       </wa-dropdown>
     </span>
   </nav>
