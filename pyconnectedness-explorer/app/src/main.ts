@@ -1,3 +1,4 @@
+import * as d3 from "d3";
 import "./style.css";
 import { type Dataset, type Measure, loadDatasets, loadExplorerData, pairSeriesAt, staticBlock } from "./data";
 import { Model, type State, Store, type WindowKey, windowOptions } from "./model";
@@ -290,14 +291,37 @@ async function main() {
     }
     render(store.get());
   });
-  // fixed axes for the quadrants: every TO and FROM the library returned for the measure
-  const quadDomains = (m: Measure) => {
-    const all = (k: "to" | "from") => {
-      const vals: number[] = meta.dynamic[m][k].flat();
-      for (const b of Object.values(meta.static[m] as Record<string, { to: number[]; from: number[] }>)) vals.push(...b[k]);
-      return [Math.floor(Math.min(...vals) / 10) * 10, Math.ceil(Math.max(...vals) / 10) * 10] as [number, number];
-    };
-    return { to: all("to"), from: all("from") };
+  // the quadrants: net (right passes on more) against its change over about a quarter, on axes
+  // fixed across every step; a window that isn't a single step shows the step it ends on
+  const quadLag = (m: Measure) => Math.max(4, Math.round((meta.dynamic[m].window * 13) / 200));
+  const quadAxes = new Map<Measure, { xMax: number; yMax: number }>();
+  const axesFor = (m: Measure) => {
+    if (!quadAxes.has(m)) {
+      const net = meta.dynamic[m].net;
+      const L = quadLag(m);
+      // each axis spans its 99th percentile over every step and item, rounded up: sized to the
+      // largest extremes, an ordinary quarter's change would sit flat on the line. The rare
+      // values beyond sit on the edge; the tooltip has the true number.
+      const xs: number[] = [];
+      const ys: number[] = [];
+      for (let t = 0; t < net.length; t++)
+        for (let i = 0; i < names.length; i++) {
+          xs.push(Math.abs(net[t][i]));
+          if (t >= L) ys.push(Math.abs(net[t][i] - net[t - L][i]));
+        }
+      const q99 = (v: number[]) => d3.quantile(v.sort((a, b) => a - b), 0.99) ?? 1;
+      quadAxes.set(m, { xMax: Math.ceil(q99(xs) / 10) * 10, yMax: Math.ceil(q99(ys) / 5) * 5 });
+    }
+    return quadAxes.get(m)!;
+  };
+  const stepOfWindow = (s: State) => {
+    const dates = meta.dynamic[s.measure].dates;
+    if (s.window === "t") return s.t;
+    const end = staticBlock(data, s.measure, s.window as Exclude<WindowKey, "t">).end;
+    const iso = /^\d{4}$/.test(end) ? `${end}-12-31` : end;
+    let k = 0;
+    while (k < dates.length - 1 && dates[k + 1] <= iso) k++;
+    return k;
   };
   const ranking = new RankingChart($("ranking"), names, hover, (n) => select(n));
   const heatmap = new HeatmapChart($("heatmap"), names, hover, (n) => select(n), pickPair);
@@ -382,15 +406,35 @@ async function main() {
     $("network").hidden = quad;
     $("quadrants").hidden = !quad;
     $("leg-solid").innerHTML = quad
-      ? `<i class="dot solid"></i>Solid: above the diagonal, passes on more`
+      ? `<i class="dot solid"></i>Solid: right of 0, passes on more`
       : `<i class="dot solid"></i>Top half, solid: passes on more`;
     $("leg-tint").innerHTML = quad
-      ? `<i class="dot tint"></i>Tinted: below it, takes in more · bigger = further from it`
+      ? `<i class="dot tint"></i>Tinted: left of 0, takes in more`
       : `<i class="dot tint"></i>Bottom half, tinted: takes in more · bigger = more`;
     $("leg-arrow").innerHTML = quad
-      ? `<i class="arrowkey"></i>Hover or pick a ${ds.item} to see its arrows · thicker = stronger`
+      ? `<i class="arrowkey"></i>Hover or pick a ${ds.item} for its path over the last ${quadLag(m)} ${ds.steps} and its arrows`
       : `<i class="arrowkey"></i>Arrow: sender to receiver · thicker and darker = stronger`;
-    if (quad) quadrants.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion, s.pair, readBeadColors().ink, quadDomains(m));
+    if (quad) {
+      const t = stepOfWindow(s);
+      const net = meta.dynamic[m].net;
+      const L = quadLag(m);
+      const delta = (j: number, i: number) => (j >= L ? net[j][i] - net[j - L][i] : 0);
+      const every = Math.max(1, Math.round(L / 6));
+      const trails = names.map((_, i) => {
+        const path: [number, number][] = [];
+        for (let j = Math.max(L, t - L); j <= t; j += every) path.push([net[j][i], delta(j, i)]);
+        if (path.length && t >= L) path.push([net[t][i], delta(t, i)]);
+        return path;
+      });
+      const stepFrame = model.frame({ ...s, window: "t", t });
+      quadrants.render(stepFrame, p, model.maxPair[m], focus, s.selected, motion, s.pair, readBeadColors().ink, {
+        change: names.map((_, i) => delta(t, i)),
+        trails,
+        ...axesFor(m),
+        lag: L,
+        steps: ds.steps,
+      });
+    }
     else network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion, s.pair, readBeadColors().ink);
     ranking.render(frame, p, model.maxNet[m], focus, s.selected, motion);
     $("heatmap-sub").textContent = `Each pair once, in the row of the ${ds.item} that passes more to the other, ${frame.label.toLowerCase().startsWith("full") ? "over the " : "in the "}${frame.label.replace(/^Full/, "full")}.`;
