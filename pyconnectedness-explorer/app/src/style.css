@@ -2559,3 +2559,30 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   font: 12.5px var(--f-sans);
   fill: var(--stone);
 }
+
+/* the demo's two series, chosen with the data: what spreads, and in a line, what that means */
+.measure-row {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.measure-q {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--stone);
+}
+
+.switch wa-radio small {
+  margin-left: 6px;
+  font: 400 11px var(--f-num);
+  color: var(--stone);
+}
+
+#measure-line {
+  flex: 1 1 320px;
+}

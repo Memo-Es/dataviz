@@ -26,6 +26,12 @@ import { PALETTES, applyPalette, textSafe } from "./palettes";
 import { hueOf as hueOfNow } from "./encoding";
 
 
+/** the demo's two series of the stock data, in words that say what each asks */
+const MEASURE_COPY: Partial<Record<string, { label: string; term: string; line: string }>> = {
+  returns: { label: "Price moves", term: "returns", line: "Each market's weekly % change: when one moves, do the others follow?" },
+  volatility: { label: "Turbulence", term: "volatility", line: "How widely each market swung within the week: when one turns turbulent, does it spread?" },
+};
+
 /** the ring draws this many of the library's strongest flows until a market is picked */
 const TOP_FLOWS = 10;
 
@@ -37,7 +43,6 @@ app.innerHTML = `
     <span>PyConnectedness <b>Explorer</b></span>
   </div>
   <div class="topbar-right">
-    <div id="measure-host"></div>
     <button class="icon-btn" id="theme" type="button" aria-label="Toggle dark mode"></button>
     <!-- the palette is a design-review choice, not something a reader needs: a small menu, last -->
     <wa-dropdown id="palette" placement="bottom-end">
@@ -209,6 +214,8 @@ async function main() {
   setDatasetEncoding(ds.groups, ds.group_order, ds.episodes, ds.step, ds.steps);
   const measures = Object.keys(ds.measures) as Measure[];
   const mName = (m: Measure) => ds.measures[m] ?? m;
+  // the demo's two series of one dataset (returns and volatility): the page offers the choice
+  const twoSeries = !own && measures.length > 1;
   const data = own?.data ?? (await loadExplorerData(ds));
   const model = new Model(data);
   const names = model.names;
@@ -441,8 +448,6 @@ async function main() {
   );
 
   renderTop();
-  $("measure-host").innerHTML = segmented("measure", "Measure", measures.map((k) => [k, mName(k)]), store.get().measure);
-  $("measure-host").hidden = measures.length < 2;
   $("side-title").innerHTML = `Net connectedness by ${ds.item} <code>net</code>`;
   $("side-sub").textContent = `What each ${ds.item} gives minus what it takes, in pp: the circles' sizes, as bars.`;
 
@@ -501,7 +506,10 @@ async function main() {
     const word = m === "returns" ? "return" : "volatility";
 
     // controls
-    setSegment($("measure"), m);
+    if (twoSeries) {
+      setSegment($("measure"), m);
+      $("measure-line").textContent = `${MEASURE_COPY[m]?.line ?? mName(m)} Both series as the authors' demo builds them (Demo.ipynb).`;
+    }
     $("theme").textContent = s.theme === "dark" ? "☀" : "☾";
     // the windows: a Web Awesome radio group, built once and updated in place, so arrow keys
     // move through it without losing focus as the page redraws
@@ -780,6 +788,16 @@ ${
         <div class="data-row" id="src-public"${own ? " hidden" : ""}>
           <wa-select id="ds-select" class="ds-select" label="Dataset" placeholder="Choose a dataset" value="${own ? "" : ds.id}">${options}</wa-select>
           <p class="data-meta">${own ? "" : `${facts} · from the <a href="${ds.api_url}" target="_blank" rel="noopener">${ds.api}</a>`}</p>
+          ${
+            // two series of the same data (the demo's returns and volatility): which one the page shows
+            twoSeries
+              ? `<div class="measure-row">
+              <span class="measure-q">What spreads</span>
+              ${segmented("measure", "What spreads", measures.map((k) => [k, MEASURE_COPY[k] ? `${MEASURE_COPY[k].label} <small>${MEASURE_COPY[k].term}</small>` : mName(k)]), store.get().measure, true)}
+              <p class="data-meta" id="measure-line"></p>
+            </div>`
+              : ""
+          }
         </div>
         <div class="data-row" id="src-own"${own ? "" : " hidden"}>
           <label class="file-btn">
@@ -1317,7 +1335,7 @@ ${
   });
 
   // controls
-  onSegment($("measure"), (v) => setMeasure(v as Measure));
+  if (twoSeries) onSegment($("measure"), (v) => setMeasure(v as Measure));
   $("palette").insertAdjacentHTML(
     "beforeend",
     PALETTES.map((x) => `<wa-dropdown-item type="checkbox" value="${x.id}">${x.painter} · ${x.painting.split(" (")[0]}<span slot="details">${x.year}</span></wa-dropdown-item>`).join("") +
