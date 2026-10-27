@@ -792,28 +792,7 @@ svg {
   font-weight: 700;
 }
 
-.player {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.play {
-  width: 42px;
-  height: 42px;
-  border-radius: 999px;
-  border: 0;
-  background: var(--fg);
-  color: var(--panel);
-  font-size: 13px;
-  letter-spacing: -2px;
-}
-
-.play:hover {
-  background: var(--accent);
-}
-
-/* graph 1's time row: the player and the windows, right above the sentence they change */
+/* graph 1's time row: the windows, right above the sentence they change */
 .time-row {
   display: flex;
   flex-wrap: wrap;
@@ -855,6 +834,11 @@ svg {
   border: 2px solid var(--stone);
   color: var(--stone);
   font-weight: 800;
+}
+
+/* the window ending at the week picked on the chart, named by that week; one width for every week */
+.win-picked {
+  font-variant-numeric: tabular-nums;
 }
 
 /* the picked step: ink like every pressed button, ringed in the highlight colour */
@@ -1623,8 +1607,7 @@ svg {
   min-height: 44px;
 }
 
-.icon-btn,
-.play {
+.icon-btn {
   width: 44px;
   height: 44px;
 }

@@ -27,7 +27,6 @@ export interface State {
   hovered: string | null;
   /** week under the pointer on the timeline: previews the readout, changes nothing else */
   hoverT: number | null;
-  playing: boolean;
   theme: "light" | "dark";
   /** a palette id from palettes.ts, or "agam" for the original */
   palette: string;

@@ -50,14 +50,9 @@ app.innerHTML = `
         <button type="button" data-style="line">Line</button>
       </div>
     </div>
-    <!-- time: step through the weeks or pick a window; the sentence right under it says what's
-         picked, date first, and every graph follows -->
+    <!-- time: the window every graph shows -- the one ending at the week picked on the chart, or
+         a fixed period; the sentence right under it says what's picked, date first -->
     <div class="time-row">
-      <div class="player">
-        <button class="icon-btn" id="prev" aria-label="Previous step">‹</button>
-        <button class="play" id="play" aria-label="Play"></button>
-        <button class="icon-btn" id="next" aria-label="Next step">›</button>
-      </div>
       <div class="windows" id="windows" role="group" aria-label="Window shown on every chart"></div>
     </div>
     <div class="readout" id="readout" aria-live="polite"></div>
@@ -205,7 +200,6 @@ async function main() {
     pair: null,
     hovered: null,
     hoverT: null,
-    playing: false,
     theme,
     palette,
   });
@@ -264,7 +258,7 @@ async function main() {
   // an insight's date picks that week, like a click on its string
   $("insights").addEventListener("click", (ev) => {
     const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-t]");
-    if (b) store.set({ t: +b.dataset.t!, window: "t", playing: false });
+    if (b) store.set({ t: +b.dataset.t!, window: "t" });
   });
   $("g1-style").addEventListener("click", (ev) => {
     const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-style]");
@@ -380,13 +374,37 @@ async function main() {
     <p class="muted">A design prototype for the coaching, not the stage 2 browser interface.</p>`;
 
   // a change of week/window/measure animates; hover, selection and theme changes don't
-  const PLAY_MS = 90;
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   let lastFrameKey = "";
 
+  // the date chip keeps one width, its widest date's, so picking a week never moves the chips beside it
+  let pickedWidth = 0;
+  let pickedKey = "";
+  const sizePicked = (dates: string[]) => {
+    const key = `${dates[0]}|${dates.length}|${document.fonts.status}`;
+    if (key === pickedKey) return;
+    pickedKey = key;
+    const probe = document.createElement("button");
+    probe.className = "win-picked";
+    probe.setAttribute("aria-pressed", "true"); // bolder when pressed: measure it at its widest
+    probe.style.cssText = "position:absolute;visibility:hidden";
+    $("windows").appendChild(probe);
+    const ctx = document.createElement("canvas").getContext("2d")!;
+    ctx.font = getComputedStyle(probe).font;
+    let widest = "";
+    for (const d of dates) {
+      const l = fmtStep(d);
+      if (ctx.measureText(l).width > ctx.measureText(widest).width) widest = l;
+    }
+    probe.textContent = widest;
+    pickedWidth = Math.ceil(probe.getBoundingClientRect().width);
+    probe.remove();
+  };
+  document.fonts.ready.then(() => render(store.get()));
+
   const render = (s: State) => {
     const frameKey = `${s.measure}|${s.window}|${s.t}`;
-    const motion = reduceMotion || !lastFrameKey || frameKey === lastFrameKey ? 0 : s.playing ? PLAY_MS : 180;
+    const motion = reduceMotion || !lastFrameKey || frameKey === lastFrameKey ? 0 : 180;
     lastFrameKey = frameKey;
     const p = readPalette();
     const m = s.measure;
@@ -399,15 +417,20 @@ async function main() {
     // controls
     $("measure").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.measure === m)));
     $("theme").textContent = s.theme === "dark" ? "☀" : "☾";
-    $("play").textContent = s.playing ? "❚❚" : "▶";
-    $("play").setAttribute("aria-label", s.playing ? "Pause" : `Play through the ${ds.steps}`);
     const wins = $("windows");
     wins.innerHTML = "";
+    sizePicked(meta.dynamic[m].dates);
     for (const o of windowOptions(data, m)) {
       const b = document.createElement("button");
-      b.textContent = o.key === "t" ? `Picked ${ds.step}` : o.label;
+      // the picked window is named by its date: the window ending at the step picked on the chart
+      if (o.key === "t") {
+        b.textContent = fmtStep(dyn.dates[s.t]);
+        b.className = "win-picked";
+        b.style.minWidth = `${pickedWidth}px`;
+        b.setAttribute("aria-label", `The ${dyn.window} ${ds.steps} up to ${fmtStep(dyn.dates[s.t], false)}`);
+      } else b.textContent = o.label;
       b.setAttribute("aria-pressed", String(o.key === s.window));
-      b.onclick = () => store.set({ window: o.key, playing: false });
+      b.onclick = () => store.set({ window: o.key });
       wins.appendChild(b);
     }
 
@@ -515,7 +538,7 @@ async function main() {
     if (asBeads) {
       $("timeline-sub").textContent = `How much of each ${ds.item}'s moves came from shocks elsewhere, over rolling ${dyn.window}-${ds.step} windows.`;
       $("beads-legend").innerHTML = `<span title="PyConnectedness: total"><i class="bk-index"></i>Spillover index: the average of all ${ds.items}</span>
-        <span>Each string looks back ${dyn.window} ${ds.steps}: a jump is a shock arriving, a cliff ${dyn.window - dyn.lags} ${ds.steps} later is it leaving</span>
+        <span>Each string looks back ${dyn.window} ${ds.steps}: a jump is a shock arriving, a cliff ${dyn.window - dyn.lags} ${ds.steps} later is it leaving. Click a string to pick its ${ds.step}.</span>
         <span title="PyConnectedness: directional_from"><i class="bk-height"></i>Height: share of moves from shocks elsewhere</span>
 ${
           events ? `<span class="muted">▲ events</span>` : ""
@@ -950,29 +973,6 @@ ${
     const s = store.get();
     store.set({ t: Math.max(0, Math.min(last, s.t + d)), window: "t" });
   };
-  $("prev").addEventListener("click", () => step(-1));
-  $("next").addEventListener("click", () => step(1));
-
-  let timer = 0;
-  $("play").addEventListener("click", () => {
-    const s = store.get();
-    if (s.playing) {
-      clearInterval(timer);
-      store.set({ playing: false });
-      return;
-    }
-    store.set({ playing: true, window: "t", t: s.t >= last ? 0 : s.t });
-    timer = window.setInterval(() => {
-      const cur = store.get();
-      if (!cur.playing) return clearInterval(timer);
-      if (cur.t >= last) {
-        clearInterval(timer);
-        store.set({ playing: false });
-        return;
-      }
-      store.set({ t: Math.min(last, cur.t + 2) });
-    }, PLAY_MS);
-  });
 
   window.addEventListener("keydown", (ev) => {
     if ((ev.target as HTMLElement).closest("input,select,textarea")) return;
