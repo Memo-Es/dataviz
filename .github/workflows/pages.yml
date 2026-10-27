@@ -6,6 +6,7 @@ on:
     paths:
       - "pyconnectedness-explorer/app/**"
       - "pyconnectedness-explorer/pipeline/compute.py"
+      - "pyconnectedness-explorer/pipeline/insight_fixtures.py"
       - "pyconnectedness-explorer/vendor/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
@@ -32,10 +33,12 @@ jobs:
           submodules: true
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: pyconnectedness-explorer/app/package-lock.json
       - run: npm ci
+      # graph 1's insights: every printed number recomputed, on every dataset and on synthetic uploads
+      - run: npm run check:insights
       # no network calls to Yahoo here: public/data/ is committed, the build only reads it;
       # it also copies the pinned library and pipeline/compute.py into public/py/
       - run: npm run build

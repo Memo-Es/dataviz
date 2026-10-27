@@ -226,3 +226,25 @@ Oct 27: on Memo's ask, the split in graph 1 is called what the library's README 
 "Frequency-domain connectedness" (`frequency_connectedness`), not "Short vs long term". Graph 1's
 numbers now change only on a pick, never on hover, and its time row sits right above the sentence
 it changes.
+
+## Graph 1 insights: how the cards are grounded (Oct 27)
+
+`app/src/charts/insights.ts` writes the cards from the library's own numbers only:
+`dynamic_connectedness(...).total` and `.directional_from` per window, and the full-sample
+`static_connectedness(...).total`.
+
+- **Moves** are the index's swings, found with a zigzag. A swing must be at least 2 points, or a
+  quarter of the dataset's range, so sudden shocks and slow shifts are both found on any data.
+  A move is called "jumped" when 40% of it came in the few steps to one date.
+- **Breadth** counts the items whose `directional_from` rose (or fell) over the swing.
+- **The window explanation** is exact. A step stops counting `window - lags` steps after it came in
+  (VAR(2): 198 weeks for a 200-week window, confirmed on the stocks data). A fall is called
+  "the window moving on" only when the same steps raised the index by a comparable amount
+  coming in.
+- **Level** ranks the latest window among all of them. The full-sample figure is compared with the
+  windows only when it sits among them; short windows read higher, so on calm or short data it
+  sits below all of them.
+
+`npm run check:insights` recomputes every printed number. It runs on all built-in datasets and on
+synthetic uploads of known shapes (`pipeline/insight_fixtures.py`, run through `run_upload`).
+The Pages deploy runs it before building.
