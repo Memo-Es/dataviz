@@ -2228,3 +2228,46 @@ svg {
   color: var(--stone);
   font-size: 14px;
 }
+
+/* an insight's details, folded: the card shows its one line */
+.ins-more {
+  margin-top: 6px;
+}
+
+.ins-more summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--stone);
+  cursor: pointer;
+  list-style: none;
+}
+
+.ins-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.ins-more summary::before {
+  content: "+";
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  border: 1px solid var(--axis);
+  border-radius: 50%;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.ins-more[open] summary::before {
+  content: "−";
+}
+
+.ins-more summary:focus-visible {
+  outline: 3px solid var(--stone);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

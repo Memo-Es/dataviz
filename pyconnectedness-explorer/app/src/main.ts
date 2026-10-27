@@ -590,12 +590,17 @@ async function main() {
       return ds.step === "day" ? fmtDate(d) : `${mon} ${d.getUTCFullYear()}`;
     };
     const icon = { jump: "↗", drop: "↘", peak: "▲", level: "✱\uFE0E" } as const;
+    // {date:t} tokens as dates that pick their step, kept on one line with what follows
+    const withDates = (str: string) =>
+      str.replace(/\{date:(\d+)\}([.,:;]?)/g, (_m, t, p) => `<span class="ins-nowrap"><button type="button" class="ins-date" data-t="${t}">${shortDate(+t)}</button>${p}</span>`);
     $("insights").innerHTML = insights
       .map(
         (x, i) => `<li class="insight${s.window === "t" && s.t === x.t ? " on" : ""}">
           <span class="ins-mark" aria-hidden="true">${i + 1}</span>
           <div><p class="ins-title"><span class="ins-icon" aria-hidden="true">${icon[x.icon]}</span>${x.title}</p>
-          <p class="ins-body">${x.body.replace(/\{date:(\d+)\}([.,:;]?)/g, (_m, t, p) => `<span class="ins-nowrap"><button type="button" class="ins-date" data-t="${t}">${shortDate(+t)}</button>${p}</span>`)}</p></div>
+          <p class="ins-body">${withDates(x.body)}</p>${
+            x.more ? `<details class="ins-more"><summary>Details</summary><p class="ins-body">${withDates(x.more)}</p></details>` : ""
+          }</div>
         </li>`
       )
       .join("");
@@ -1018,7 +1023,11 @@ ${
   function renderDetail(s: State, frame: ReturnType<Model["frame"]>, p: ReturnType<typeof readPalette>) {
     if (s.pair) return renderPair(s, frame, p); // stays put while the mouse crosses markets
     const el = $("detail");
-    const name = s.selected ?? s.hovered;
+    // what's picked, never what's under the pointer; with nothing picked, the window's biggest
+    // transmitter, so the panel always shows data
+    const byNet = names.map((_, j) => j).sort((a, b) => frame.net[b] - frame.net[a]);
+    const name = s.selected ?? names[byNet[0]];
+    const isDefault = !s.selected;
     if (!name) {
       el.innerHTML = `<div class="card-head"><div><p class="q">Detail · graphs 2 and 3</p><h2>Pick a ${ds.item} or a pair</h2><p class="sub">Click a ${ds.item} (a circle, a bar or a heatmap label) to see where its shocks go and come from, or a pair (an arrow or a heatmap cell) to follow it over time.</p></div></div>
         <div class="empty">${names
@@ -1039,7 +1048,7 @@ ${
     const net = frame.net[i];
     el.innerHTML = `
       <div class="card-head">
-        <div><p class="q">Detail · ${ds.item} · ${REGION_OF[name]}</p><h2>${name}</h2><p class="sub">${frame.label}</p></div>
+        <div><p class="q">Detail · ${isDefault ? `the biggest transmitter · ${REGION_OF[name]}` : `${ds.item} · ${REGION_OF[name]}`}</p><h2>${name}</h2><p class="sub">${frame.label}${isDefault ? ` · pick a ${ds.item} on the graph, or below` : ""}</p></div>
         ${s.selected ? `<button class="icon-btn" id="clear" aria-label="Clear selection">✕</button>` : ""}
       </div>
       <div class="trio">
@@ -1052,7 +1061,9 @@ ${
       <div class="lists">
         <div><p class="k">Sends most to</p><ul>${list(sends, "send")}</ul></div>
         <div><p class="k">Receives most from</p><ul>${list(gets, "recv")}</ul></div>
-      </div>`;
+      </div>
+      ${isDefault ? `<p class="k">Another ${ds.item}</p><div class="empty">${names.filter((n) => n !== name).slice().sort().map((n) => `<button data-n="${n}">${n}</button>`).join("")}</div>` : ""}`;
+    el.querySelectorAll<HTMLButtonElement>("button[data-n]").forEach((b) => (b.onclick = () => select(b.dataset.n!)));
     const dyn = meta.dynamic[s.measure];
     sparkline($("spark"), dyn.dates, dyn.net.map((row) => row[i]), s.window === "t" ? s.t : null, model.maxNet[s.measure], p);
     el.querySelector<HTMLButtonElement>("#clear")?.addEventListener("click", () => store.set({ selected: null }));

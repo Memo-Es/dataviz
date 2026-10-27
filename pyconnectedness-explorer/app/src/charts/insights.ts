@@ -19,8 +19,10 @@ export interface Insight {
   t: number;
   icon: "jump" | "drop" | "peak" | "level";
   title: string;
-  /** may hold {date:t} tokens, rendered as dates that pick step t */
+  /** the one line a card shows: may hold {date:t} tokens, rendered as dates that pick step t */
   body: string;
+  /** the rest, folded under "Details": the sharpest stretch, who moved, the window's part */
+  more?: string;
 }
 
 export interface Swing {
@@ -153,9 +155,9 @@ export function findInsights(dyn: DynamicBlock, longRun: number, steps: string, 
       icon: "jump",
       title: `Spillover ${st?.sharp ? "jumped" : "rose"} ${pts(v[s.to] - v[s.from])} points${isPeak ? ", to its peak" : ""}`,
       body:
-        `From ${pct(v[s.from])} at {date:${s.from}} to ${pct(v[s.to])} at {date:${s.to}} (${span(s.from, s.to)}). ` +
-        (st ? (st.sharp ? `+${pts(st.d)} of it in the ${k} ${steps} to {date:${st.t}}. ` : `Sharpest ${k} ${steps}: +${pts(st.d)}, to {date:${st.t}}. `) : "") +
-        breadthText(s.from, s.to, true),
+        `From ${pct(v[s.from])} at {date:${s.from}} to ${pct(v[s.to])} at {date:${s.to}} (${span(s.from, s.to)}).` +
+        (st?.sharp ? ` +${pts(st.d)} of it in the ${k} ${steps} to {date:${st.t}}.` : ""),
+      more: (st && !st.sharp ? `Sharpest ${k} ${steps}: +${pts(st.d)}, to {date:${st.t}}. ` : "") + breadthText(s.from, s.to, true),
     });
   }
   for (const s of top(falls)) {
@@ -168,13 +170,21 @@ export function findInsights(dyn: DynamicBlock, longRun: number, steps: string, 
       t: st?.sharp ? st.t : s.to,
       icon: "drop",
       title: `Spillover ${st?.sharp ? "dropped" : "fell"} ${pts(v[s.to] - v[s.from])} points${fromPeak ? ", from its peak" : ""}`,
+      // the reading that matters stays on the card: whether the fall is the window moving on
       body:
-        `From ${pct(v[s.from])} at {date:${s.from}} to ${pct(v[s.to])} at {date:${s.to}} (${span(s.from, s.to)}). ` +
-        (st ? (st.sharp ? `−${pts(st.d)} of it in the ${k} ${steps} to {date:${st.t}}. ` : `Sharpest ${k} ${steps}: −${pts(st.d)}, to {date:${st.t}}. `) : "") +
+        `From ${pct(v[s.from])} at {date:${s.from}} to ${pct(v[s.to])} at {date:${s.to}} (${span(s.from, s.to)}).` +
+        (st?.sharp ? ` −${pts(st.d)} of it in the ${k} ${steps} to {date:${st.t}}.` : "") +
         (echo
-          ? `Meanwhile {date:${echo.a}} to {date:${echo.b}} left the ${W}-${step} window; coming in, it added ${pts(echo.rise)} points. ${echo.rise >= 0.8 * size(s) ? `Mostly the window moving on, not the ${items} calming.` : `Partly the window moving on.`}`
+          ? ` ${echo.rise >= 0.8 * size(s) ? `Mostly the window moving on, not the ${items} calming.` : `Partly the window moving on.`}`
           : stEcho && st
-            ? `That is the ${k} ${steps} to {date:${stEcho.b}} leaving the ${W}-${step} window; coming in, they added +${pts(stEcho.rise)}. ${stEcho.rise >= 0.8 * st.d ? `The window moving on, not the ${items} calming.` : `Partly the window moving on.`}`
+            ? ` ${stEcho.rise >= 0.8 * st.d ? `The window moving on, not the ${items} calming.` : `Partly the window moving on.`}`
+            : ""),
+      more:
+        (st && !st.sharp ? `Sharpest ${k} ${steps}: −${pts(st.d)}, to {date:${st.t}}. ` : "") +
+        (echo
+          ? `Meanwhile {date:${echo.a}} to {date:${echo.b}} left the ${W}-${step} window; coming in, it added ${pts(echo.rise)} points.`
+          : stEcho && st
+            ? `That is the ${k} ${steps} to {date:${stEcho.b}} leaving the ${W}-${step} window; coming in, they added +${pts(stEcho.rise)}.`
             : breadthText(s.from, s.to, false)),
     });
   }
@@ -199,9 +209,10 @@ export function findInsights(dyn: DynamicBlock, longRun: number, steps: string, 
   const move = out.find((x) => x.t === last);
   if (move) {
     // a move that ends at the latest step: one card, one mark on the chart
-    move.body += ` Now ${pct(v[last])}, ${rank}: ${usualness}. ${lr}${low}`;
+    move.body += ` Now ${pct(v[last])}, ${rank}: ${usualness}.`;
+    move.more = `${move.more ?? ""} ${lr}${low}`.trim();
   } else {
-    out.push({ t: last, icon: "level", title: `Now ${pct(v[last])}: ${rank}`, body: `At {date:${last}}: ${usualness}. ${lr}${low}` });
+    out.push({ t: last, icon: "level", title: `Now ${pct(v[last])}: ${rank}`, body: `At {date:${last}}: ${usualness}.`, more: `${lr}${low}` });
   }
   // in date order, so the numbers on the chart run left to right
   return out.sort((a, b) => a.t - b.t);

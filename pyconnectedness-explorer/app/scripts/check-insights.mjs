@@ -28,17 +28,17 @@ const isMove = (x) => /^Spillover (rose|jumped|fell|dropped) /.test(x.title);
 const points = (x) => +x.title.match(/ ([\d.]+) points/)[1];
 const rises = (ins) => ins.filter((x) => isMove(x) && x.icon === "jump");
 const falls = (ins) => ins.filter((x) => isMove(x) && x.icon === "drop");
-const text = (x) => `${x.title} ${x.body}`;
+const text = (x) => `${x.title} ${x.body} ${x.more ?? ""}`; // the folded details are checked too
 
 // what each synthetic shape must (and must not) say
 const expect = {
   "upload:calm": (ins) => [
     [!ins.some((x) => /jumped|dropped/.test(x.title)), "no sharp moves in unrelated series"],
-    [ins.some((x) => x.body.includes("No window passed")), "says spillover stays low"],
+    [ins.some((x) => text(x).includes("No window passed")), "says spillover stays low"],
   ],
   "upload:one-shock": (ins) => [
     [rises(ins).some((x) => points(x) >= 10), "the shock's rise"],
-    [falls(ins).some((x) => /window moving on/.test(x.body)), "its fall explained as the window moving on"],
+    [falls(ins).some((x) => /window moving on/.test(text(x))), "its fall explained as the window moving on"],
   ],
   "upload:daily-2shock": (ins) => [[rises(ins).length >= 2, "both shocks"]],
   "upload:monthly-min": (ins) => [[ins.length >= 3, "a short monthly file still gets cards"]],
@@ -49,7 +49,7 @@ const expect = {
   ],
   "upload:regime-down": (ins) => [
     [falls(ins).some((x) => points(x) >= 50), "the shift down"],
-    [!ins.some((x) => /window moving on/.test(x.body)), "a real fall, not the window"],
+    [!ins.some((x) => /window moving on/.test(text(x))), "a real fall, not the window"],
   ],
   "upload:always-high": (ins) => [[!ins.some((x) => isMove(x) && points(x) > 6), "no big moves in a steady series"]],
   // the authors' demo: the COVID crash, and its exit from the window 198 weeks later
@@ -57,7 +57,7 @@ const expect = {
     const covid = dyn.dates.indexOf("2020-03-20");
     return [
       [ins.some((x) => x.t === covid && x.icon === "jump"), "the COVID jump at 20 Mar 2020"],
-      [ins.some((x) => x.icon === "drop" && x.body.includes(`{date:${covid}} leaving`)), "its exit from the window"],
+      [ins.some((x) => x.icon === "drop" && text(x).includes(`{date:${covid}} leaving`)), "its exit from the window"],
     ];
   },
 };
@@ -76,8 +76,9 @@ for (const c of cases) {
 
   if (ins.length < 2 || ins.length > 6) errs.push(`${ins.length} cards`);
   ins.forEach((x, i) => {
+    if (x.body.length > 200) errs.push(`card ${i + 1}'s line runs ${x.body.length} characters: fold more under Details`);
     if (i && x.t <= ins[i - 1].t) errs.push(`cards not in date order, or two at one step (${x.t})`);
-    for (const [, t] of x.body.matchAll(/\{date:(\d+)\}/g)) if (+t < 0 || +t >= T) errs.push(`date ${t} out of range`);
+    for (const [, t] of `${x.body} ${x.more ?? ""}`.matchAll(/\{date:(\d+)\}/g)) if (+t < 0 || +t >= T) errs.push(`date ${t} out of range`);
     const s = text(x);
     // From A% at a to B% at b, and the points between them
     const fm = s.match(/From ([\d.]+)% at \{date:(\d+)\} to ([\d.]+)% at \{date:(\d+)\}/);
@@ -97,7 +98,7 @@ for (const c of cases) {
       const km = s.match(/[+−]([\d.]+)(?: of it in the \d+ \w+ to|, to) \{date:(\d+)\}/);
       if (km) near(+km[1], Math.abs(v[+km[2]] - v[+km[2] - k]), "sharpest stretch");
       // a window echo: the steps leaving are the steps that came in L steps earlier
-      const em = s.match(/to \{date:(\d+)\}\. That is the \d+ \w+ to \{date:(\d+)\} leaving .*?added \+(\d+\.\d)/);
+      const em = s.match(/to \{date:(\d+)\}\..*?That is the \d+ \w+ to \{date:(\d+)\} leaving .*?added \+(\d+\.\d)/);
       if (em) {
         if (+em[1] - +em[2] !== L) errs.push(`echo ${+em[1] - +em[2]} steps back, not ${L}`);
         near(+em[3], v[+em[2]] - v[+em[2] - k], "echo rise");

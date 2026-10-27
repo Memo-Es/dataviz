@@ -80,6 +80,7 @@ export class HeatmapChart {
       .join((e) => {
         const gg = e.append("g").attr("class", "cell");
         gg.append("circle").attr("class", "base");
+        gg.append("circle").attr("class", "pin");
         gg.append("circle").attr("class", "ring");
         gg.append("circle").attr("class", "dot");
         return gg;
@@ -101,12 +102,21 @@ export class HeatmapChart {
       })
       .on("mouseleave", hideTooltip);
 
-    // the pale circle every cell has (none on the diagonal: a market with itself)
+    // every cell: an invisible target to hover, and a pinpoint so the grid reads as a grid; the
+    // pale circle each cell used to have made a texture louder than the flows
+    void base;
     g.select<SVGCircleElement>("circle.base")
       .attr("cx", cx)
       .attr("cy", cy)
       .attr("r", R)
-      .attr("fill", (d) => (d.r === d.c ? "transparent" : base));
+      .attr("fill", "transparent");
+    g.select<SVGCircleElement>("circle.pin")
+      .attr("cx", cx)
+      .attr("cy", cy)
+      .attr("r", (d) => (d.r === d.c || d.v > 0 ? 0 : 1.1)) // only where no dot is drawn
+      .attr("fill", p.fg)
+      .attr("fill-opacity", 0.22)
+      .attr("pointer-events", "none");
     // a ring: the pair is one of the strongest, or the one picked
     g.select<SVGCircleElement>("circle.ring")
       .attr("cx", cx)
@@ -165,6 +175,18 @@ export class HeatmapChart {
       .attr("y", (b) => TOP + b * CELL + 3)
       .attr("width", 2.5)
       .attr("height", (b, i) => ((breaks[i] ?? n) - b) * CELL - 6) // runs to the next break
+      .attr("rx", 1)
+      .attr("fill", (b) => hueOf(this.order[b]));
+    // and the same above the columns, so a column's region reads without its tilted name
+    this.svg
+      .selectAll<SVGRectElement, number>("rect.region-mark-col")
+      .data([0, ...breaks])
+      .join("rect")
+      .attr("class", "region-mark-col")
+      .attr("x", (b) => LEFT + b * CELL + 3)
+      .attr("y", TOP - 4)
+      .attr("width", (b, i) => ((breaks[i] ?? n) - b) * CELL - 6)
+      .attr("height", 2.5)
       .attr("rx", 1)
       .attr("fill", (b) => hueOf(this.order[b]));
   }

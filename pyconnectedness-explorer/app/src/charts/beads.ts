@@ -333,7 +333,11 @@ export class BeadsChart {
     if (longRun !== null && longRun >= y.domain()[0] && longRun <= y.domain()[1]) {
       const ly = y(longRun);
       svg.append("line").attr("x1", M.left).attr("x2", M.left + this.plotW).attr("y1", ly).attr("y2", ly).attr("stroke", p.fg).attr("stroke-width", 1.2).attr("stroke-dasharray", "4 4").attr("opacity", 0.8);
-      svg.append("text").attr("class", "beads-longrun").attr("x", M.left + 4).attr("y", ly - 6).attr("fill", p.fg).text(`long-run ${longRun.toFixed(1)}%`);
+      // on a small backing of the panel colour: the strings and beads under it never show through
+      const label = `long-run ${longRun.toFixed(1)}%`;
+      const lw = label.length * 6.6 + 10;
+      svg.append("rect").attr("class", "beads-longrun-bg").attr("x", M.left + 1).attr("y", ly - 19).attr("width", lw).attr("height", 16).attr("rx", 4).attr("fill", p.panel).attr("fill-opacity", 0.94);
+      svg.append("text").attr("class", "beads-longrun").attr("x", M.left + 6).attr("y", ly - 7).attr("fill", p.fg).text(label);
     }
 
     // the insights beside the chart, numbered where they point
