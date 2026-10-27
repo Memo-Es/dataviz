@@ -1709,37 +1709,77 @@ svg {
   align-items: start;
 }
 
+/* the insights: cards in a container that scrolls past a set height */
 .insights {
   margin: 0;
-  padding: 0;
+  padding: 10px;
   list-style: none;
   display: grid;
-  gap: 18px;
+  gap: 10px;
+  align-content: start;
+  max-height: 520px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--band);
+  border-radius: 20px;
+  /* the scrollbar: invisible until the pointer is over the list (its thumb takes this border's colour) */
+  border: 0 solid transparent;
+  border-color: transparent;
+  transition: border-color 0.3s;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.insights:hover,
+.insights:focus-within,
+.insights:focus-visible {
+  border-color: var(--stone);
+  scrollbar-color: var(--stone) transparent;
+}
+
+.insights::-webkit-scrollbar {
+  width: 10px;
+}
+
+.insights::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.insights::-webkit-scrollbar-thumb {
+  border-right: 4px solid;
+  border-color: inherit;
+  border-radius: 6px;
+  background-clip: padding-box;
 }
 
 .insight {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--panel);
+  border-radius: 14px;
+  /* the border is always there, so picking a card never moves anything */
+  box-shadow: inset 0 0 0 2px transparent;
+}
+
+.insight.on {
+  box-shadow: inset 0 0 0 2px var(--accent);
 }
 
 .ins-mark {
   display: inline-grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border: 1.5px solid var(--stone);
   border-radius: 50%;
   font: 700 11.5px/1 var(--f-num);
   color: var(--stone);
 }
 
-.insight.on .ins-mark {
-  box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent);
-}
-
 .ins-title {
-  margin: 1px 0 4px;
+  margin: 2px 0 4px;
   font-size: 15px;
   font-weight: 700;
   color: var(--stone);
@@ -1747,6 +1787,8 @@ svg {
 
 .ins-icon {
   margin-right: 6px;
+  font-family: var(--f-sans);
+  font-variant-emoji: text;
 }
 
 .ins-body {
@@ -1756,24 +1798,27 @@ svg {
   color: var(--stone);
 }
 
-/* a date in an insight: a chip that picks that week */
-.insights .chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 0 9px;
-  margin: 0 1px;
-  border: 1px solid var(--axis);
-  border-radius: 999px;
-  background: var(--band);
+/* a date in an insight: bold mono text that picks that week */
+.insights .ins-date {
+  display: inline;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
   color: var(--stone);
-  font: 600 13px/1 var(--f-sans);
+  font: 700 13.5px/1 var(--f-num);
+  text-decoration: underline;
+  text-decoration-color: var(--axis);
+  text-underline-offset: 3px;
   cursor: pointer;
-  vertical-align: baseline;
 }
 
-.insights .chip:hover {
-  border-color: var(--stone);
+.ins-nowrap {
+  white-space: nowrap;
+}
+
+.insights .ins-date:hover {
+  text-decoration-color: var(--stone);
 }
 
 .beads-longrun {
@@ -1795,6 +1840,7 @@ svg {
 
   .insights {
     order: 2;
+    max-height: 420px;
   }
 }
 

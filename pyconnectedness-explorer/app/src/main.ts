@@ -63,7 +63,7 @@ app.innerHTML = `
     <div class="readout" id="readout" aria-live="polite"></div>
     <!-- insights on the left, read off the numbers, each pointing at a week; the chart on the right -->
     <div class="g1-body">
-      <ol class="insights" id="insights" aria-label="What the chart shows"></ol>
+      <ol class="insights" id="insights" tabindex="0" aria-label="What the chart shows"></ol>
       <div class="g1-chart">
         <div id="timeline" class="chart-host"></div>
         <div class="beads-regions" id="beads-regions" role="group" aria-label="Region shown"></div>
@@ -246,7 +246,7 @@ async function main() {
     const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-region]");
     if (b) pickRegion(b.dataset.region || null);
   });
-  // an insight's date chip picks that week, like a click on its string
+  // an insight's date picks that week, like a click on its string
   $("insights").addEventListener("click", (ev) => {
     const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-t]");
     if (b) store.set({ t: +b.dataset.t!, window: "t", playing: false });
@@ -471,17 +471,24 @@ async function main() {
       const mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getUTCMonth()];
       return ds.step === "day" ? fmtDate(d) : `${mon} ${d.getUTCFullYear()}`;
     };
-    const icon = { jump: "↗", drop: "↘", peak: "▲", level: "✱" } as const;
+    const icon = { jump: "↗", drop: "↘", peak: "▲", level: "✱\uFE0E" } as const;
     $("insights").innerHTML = insights
       .map(
         (x, i) => `<li class="insight${s.window === "t" && s.t === x.t ? " on" : ""}">
           <span class="ins-mark" aria-hidden="true">${i + 1}</span>
           <div><p class="ins-title"><span class="ins-icon" aria-hidden="true">${icon[x.icon]}</span>${x.title}</p>
-          <p class="ins-body">${x.body.replace(/\{date:(\d+)\}/g, (_m, t) => `<button type="button" class="chip" data-t="${t}">${shortDate(+t)}</button>`)}</p></div>
+          <p class="ins-body">${x.body.replace(/\{date:(\d+)\}([.,:;]?)/g, (_m, t, p) => `<span class="ins-nowrap"><button type="button" class="ins-date" data-t="${t}">${shortDate(+t)}</button>${p}</span>`)}</p></div>
         </li>`
       )
       .join("");
     tightenDecimals($("insights"), ".num");
+    // keep the picked card in view inside the scroll, without moving the page
+    const box = $("insights");
+    const on = box.querySelector<HTMLElement>(".insight.on");
+    if (on) {
+      const top = on.offsetTop - box.offsetTop - 10;
+      if (top < box.scrollTop || top + on.offsetHeight + 20 > box.scrollTop + box.clientHeight) box.scrollTop = top;
+    }
     $("g1-style").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.style === g1Style)));
     $("timeline").hidden = asBeads;
     $("beads").hidden = !asBeads;
