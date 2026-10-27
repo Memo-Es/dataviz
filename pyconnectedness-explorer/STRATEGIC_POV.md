@@ -68,7 +68,7 @@ That is also the line against the black-box dashboards. A dashboard gives you a 
 
 The look follows from that, with every choice made against the "corporate or bank product" feel:
 
-- **Palettes after French and Dutch Impressionist painters** (Seurat as the default, plus Monet, Renoir, Van Gogh and Breitner), instead of traffic-light red, amber and green. Each was tuned until it passed colour-blind and contrast checks. They read as independent and cultural, never as a trading screen.
+- **Palettes after French and Dutch Impressionist painters**, instead of traffic-light red, amber and green. The default is Monet's *Nymphéas* (the Water Lilies): sage, misty blue, mauve and lavender, with no orange. Seurat, Monet's *Impression, soleil levant*, Renoir, Van Gogh and Breitner remain as alternatives. Each was tuned until it passed colour-blind and contrast checks. They read as independent and cultural, never as a trading screen.
 - **Quiet type and a single text colour.** Plus Jakarta Sans for words, B612 Mono for numbers, all text in one stone grey. Academic credibility comes from restraint, not from logos.
 - **The library's own names everywhere.** "Rolling spillover index", "Connectedness network", "Spillover heatmap", "Frequency-domain connectedness". A reader who meets a term on the website meets the same term in the code and the paper. This matters most for reproducibility, and costs nothing.
 
@@ -180,6 +180,32 @@ In the **Original** view everything else is kept as the library draws it: the re
 
 None of it is a new number.
 
+### How each proposal was decided
+
+Every proposal went through the same steps.
+
+1. **See where a reader stumbles**, in review or in a screenshot.
+2. **Weigh the alternatives against the library's own picture.**
+3. **Keep the original one click away** wherever both are worth having.
+4. **Check the result** with the contrast, layout and number checks before shipping.
+
+| Proposal | What went wrong before | Alternatives, and why not | Chosen, and why |
+|---|---|---|---|
+| Beads for the rolling index | The average hid which region moved, and a fall four years after a crisis read as calm | A line per region tangles; small multiples put the regions too far apart to compare | **Beads**, with the demo's line one switch away: who moved, and the window's own length, are visible |
+| Insight cards | Readers did not find the moments that matter on their own | Notes on the chart alone crowd it and can't explain the rolling window | **Numbered cards tied to numbered marks**, every number recomputed by a check that blocks the deploy |
+| Ordered ring | On the library's circle, position meant nothing | A spring layout moves the nodes every week (the library's own docstring warns of this); two rows, which we weighed, lose the familiar picture | **The ordered circle**: users keep the library's picture, and position becomes a ranking |
+| Quadrants | The ring cannot show who is changing | A table of changes says it in numbers, not at a glance | **A plane**, as a switch: once the ring read like coordinates in review, a real plane was the honest step |
+| The 10 strongest flows | Twenty or more arrows tangled | Fainter arrows still tangle; hiding small ones for good loses the library's set | **The 10 strongest by default, all on request**: readable, with nothing hidden for good |
+| Dots heatmap | Every coloured square looked equally important, and half the grid repeated the other half | Keeping only the colour grid keeps both problems | **Dots**, with the library's grid as **Original**: big flows stand out, and checking against the demo stays easy |
+| Frequency bar and page | The library returns the bands only as numbers | A table must be read row by row | **One bar per period**: "how long do shocks last" at a glance, on its own page |
+| Overview | One long scroll: a reader with one question had to scroll through all of them | Tabs hide what the other graphs say | **Cards with small graphs**, as in the dashboard references: each reader goes straight to their question |
+| Colour | Bright and jarring, then still orange | Muting the same hues, which we tried, kept the orange in the largest shapes | **Nymphéas**, with washes and edges and a monochrome selected state: calm, accessible, one meaning per colour |
+| Controls | Hand-made; then the library's blue theme showing through | React with shadcn/ui and Motion Primitives, both weighed; see Controls below | **Web Awesome**, themed at the source: tested behaviour, no rewrite |
+| Values change on pick only | Numbers flickered under the pointer, which we tried and dropped | Hover previews can't be trusted or quoted | **Pick only**: numbers you can trust and quote |
+| No play button | It animated what the chart showed, and readers could not stop on a moment | Keeping it adds motion without information | **Removed**, in favour of picking a week anywhere |
+| "What spreads" | The Returns / Volatility toggle was unexplained and in the wrong place | Removing it would lose the demo's volatility run, often the clearer crisis signal | **Moved to the data, named for its question and credited to the demo** |
+| Downloads | The graphs could not go into a report as they had been set up | A screenshot loses the source; the library's plots lose the pick | **Figures from the page**: the same pick, framed with its source |
+
 ### The rules behind every graph
 
 Each rule exists because breaking it made a real reader stumble during the redesign.
@@ -222,7 +248,7 @@ The beads tell the story. The line is kept for checking exact dates and for cont
 - *They refuse to overclaim.* On calm or short data, every rolling window reads higher than the full sample, so the comparison would mislead, and the card says that instead. When spillover never passes 25%, the card warns that small swings may be noise.
 - *They are checked like the methods are.* An automated check recomputes every number printed on a card. It runs on all seven datasets and on synthetic uploads built to tell a known story (a single shock, a slow shift, unrelated series), which go through the same code as a real upload. The site does not deploy if a check fails. We broke the code on purpose to confirm the check catches it. This is the team's correctness principle applied to explanations: an explanation that is wrong is worse than none.
 
-The cards sit in a scrolling list as tall as the chart, with a soft blur where they run off the edge, so the chart never gets pushed down. The picked card is marked in the same accent colour as the picked string, so text and picture are visibly the same moment.
+The cards sit in a scrolling list as tall as the chart, with a soft blur where they run off the edge, so the chart never gets pushed down. The picked card gets the same ink outline as the picked string, so text and picture are visibly the same moment.
 
 ### Graph 2: Connectedness network
 
@@ -237,6 +263,60 @@ A second view, **Quadrants**, answers the question the circle can't: *who is cha
 ### Graph 3: Spillover heatmap
 
 We redrew the full colour grid as a dot matrix. Each pair is drawn once, in the sender's row. The dot's size is how much more it passes on than it gets back, and its colour is the sender's region, the same colours as graph 1. A dark ring marks the strongest links, the same ones the network draws, so the two graphs visibly describe the same flows. A grid of coloured squares makes every cell look equally important. Dots let the big flows stand out and the small ones recede, which is what readers want from this view. An **Original** switch draws the heatmap as the library does, so anyone checking against the demo sees the familiar picture.
+
+### The overview, and a page for each graph
+
+The page used to be one long scroll of every graph. It now opens on an **overview**: one card per graph, each a small version of it with its headline. Clicking a card opens that graph on its own, with a way back.
+
+- *Why:* the questionnaire's readers arrive with different questions. A supervisor wants who passes risk to whom; a journalist wants when it peaked. The overview shows all four answers at a glance and lets each reader go straight to theirs, as the dashboard references do.
+- *Every card leads somewhere different.* The frequency card first opened graph 1, the same place as the first card, which made two cards one destination. Frequency-domain connectedness now has its own page: every period's split, one bar each, with the period on show outlined. The "worth knowing" card is no longer a link, because its only destination would be graph 1 again.
+- *The address names the view* (`#network`, `#heatmap`), so the browser's back button works and a link can be shared straight to a graph.
+- *The week chips sit above every view*, because they change all of them: the control-above rule, applied to the whole page.
+- *The small graphs are the real ones, simplified:* the same library values for the same window, drawn without labels. A card never shows a number the full graph would not.
+
+### Colour: from bright to calm
+
+Colour took three rounds, and each failure taught something.
+
+1. **Seurat, as first chosen, read as bright and jarring.** The hues were at full saturation and the highlight was vermilion.
+2. **Toning it down was not enough.** Lowering the saturation kept Europe in sienna, an orange, and that orange filled the largest shapes on the page: the network's transmitters, the net bars and the heatmap dots.
+3. **What worked was the painters' method, not their saturation.** Impressionist softness comes from harmony: closely related cool hues, light broken fills, strong colour only in thin strokes. So the default became Monet's *Nymphéas*, with no orange at all. Big shapes are pale washes of their colour with a thin edge in the full hue. The edge carries the contrast that accessibility requires, so the fill is free to be soft.
+
+The exact shades were not picked by eye. A search tried thousands of variations of each painter's hue and kept only palettes that pass every check: colour-blind separation, separation for normal vision, and at least 3:1 contrast on the page. Among those it chose the calmest.
+
+**The selected state is monochrome.** Each palette first brought its own highlight colour, orange in several, so a picked chip, string or row competed with the region colours and changed with every palette. The selected state is now the palette's ink, in every palette and both modes. Colour then means one thing only, region, and "picked" is always the same dark outline.
+
+### Controls: why Web Awesome
+
+The page's controls (switches, chips, menus) were hand-made. A UI library gives tested keyboard and screen-reader behaviour, and the team gets less code to maintain.
+
+| Option | For | Against | Decision |
+|---|---|---|---|
+| Web Awesome (web components) | Works in the current page without a rewrite; themeable to our colours and fonts; handles the keyboard and labelling | Adds about 34 kB, mostly its base framework | **Chosen** |
+| React with shadcn/ui | The strongest accessibility building blocks | A rewrite of the app, weeks before the November release, for no gain in readability | Revisit for the stage-two browser interface |
+| Motion Primitives | Polished animated components | Requires React; most of its value is motion, and our rule is that nothing moves that isn't data | Not chosen |
+
+The library's own look came through at first: a blue glow on focus, bright blue options, and two focus rings stacked on each other. The fix was to theme it once, at the source: its colour, surface, focus and font settings now point at ours, so every component matches in both modes. Each control has exactly one focus ring, and the option under the keyboard gets the pale band with a stone ring, a change visible enough for AAA.
+
+**"What spreads" moved to the data it chooses.** The Returns / Volatility toggle sat unexplained in the top bar. It is not a library option: it switches between the two series the authors' demo builds from the stock data. It now sits with the dataset, named for the question each answers ("Price moves", "Turbulence"), with the demo's terms beside them, one plain line on what the current choice means, and a credit to the demo.
+
+### Figures for reports
+
+Each graph has a **Download** menu, PNG or SVG, because the readers in section 2 put graphs into reports, slides and papers.
+
+- *The figure is the graph as you set it up:* the same week, and whatever is picked still highlighted. With Germany picked, the network figure shows Germany ringed and only its flows.
+- *It carries what a reader of the report needs:* the question, the title and its library call, the sentence for the selection, the legend, and a source line naming the library commit, the function, the dataset, the window and the pick.
+- *It stands alone.* The SVG keeps the chart editable, with the two fonts embedded, so it looks the same anywhere. The PNG is drawn at twice its size for print. Screen-only text ("Click a string…") is left out.
+- *One limit:* the beads are drawn as an image, so in an SVG their strings arrive as a picture under editable labels.
+
+### Smaller decisions, each from a reader's stumble
+
+- **The network draws its 10 strongest flows** until a market is picked, then all of that market's flows; an "All" switch draws the library's full set. Twenty or more crossing arrows were a hairball.
+- **The detail panel opens on the biggest transmitter** instead of an empty "pick something", and it follows only what is picked. It used to follow the pointer, so its numbers changed on hover, against our own rule.
+- **Insight cards show one line**, with the rest folded under "Details". A fall's verdict ("the window moving on, not the markets calming") stays on the card.
+- **The heatmap lost its pale circles.** A circle in all 400 cells made a texture louder than the flows; empty cells keep a pinpoint so the grid still reads as a grid.
+- **The play and step buttons were removed**, and the "Picked week" chip became the date it shows. They animated what the chart already showed, and "picked week" was abstract.
+- **Beads and Line take exactly the same space**, so switching between them moves nothing below.
 
 ### Changes over time and animation
 
@@ -264,7 +344,8 @@ Teach the reasons, not just the recipes, so the team can make the next decision 
 **Tools, all in the language and libraries the team already uses**
 
 - **The style sheet and recipes:** one line, `plt.style.use(...)`, makes any matplotlib figure match the house style.
-- **A palette validator:** checks a palette for colour-blind safety and contrast before it ships. This is how the Impressionist palettes were tuned. It still has to be added to the repository for the team's own use.
+- **A palette validator:** checks a palette for colour-blind safety and contrast before it ships. This is how the Impressionist palettes were tuned, and the search behind *Nymphéas* ran it thousands of times. It still has to be added to the repository for the team's own use.
+- **One theme for the controls:** the Web Awesome settings in the stylesheet. Changing a colour there changes every switch, menu and list.
 - **Checks that turn design rules into tests**, so a rule holds without a designer watching:
   - the insights check: every printed number recomputed from the library. It is in the repository, and the site's deploy runs it;
   - text contrast against AAA, in every palette and both light and dark mode;
@@ -304,7 +385,7 @@ Ordered by the timeline, each tied to a success criterion.
 
 - Ship the style sheet and the restyled network, heatmap and time-series recipes into the documentation, so the redesign is in the project and not only in the explorer.
 - Decide which explorer ideas move into the library's own plots. The ordered ring and the insight cards are the strongest candidates; tapered or hand-drawn shapes are not, because they would make the plotting code hard to maintain without a designer.
-- Bring the style guide up to date with this round's decisions: no hover previews, no play button, the date-named window, the ordered ring and the quadrants.
+- Bring the style guide up to date with the explorer's decisions. It still describes hover previews, the play button and the earlier network edges. It should add the overview, *Nymphéas* with washes and edges, the monochrome selected state, the Web Awesome theme, the figure downloads, the Dots and Original heatmap, the 10-strongest rule and "What spreads".
 - Move the palette validator and the contrast and layout-shift checks into the repository next to the insights check, and have the deploy run them too.
 
 **For the December conference** *(success: readable without explanation)*
