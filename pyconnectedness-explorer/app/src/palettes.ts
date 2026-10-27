@@ -45,16 +45,18 @@ export const PALETTES: Palette[] = [
     painter: "Seurat",
     painting: "Un dimanche après-midi à l'Île de la Grande Jatte",
     year: "1884–86",
-    note: "Pointillist complementaries: emerald grass, orange light, ultramarine shade; the vermilion parasols as the highlight.",
+    note: "Pointillist complementaries, softened to the painting's afternoon haze: sage grass, sienna earth, slate shade; a deep madder for the highlight.",
+    // muted: chroma held just over the 0.10 floor (was 0.12-0.18); every check passes in both
+    // modes: CVD separation 9.3 / 11.1, normal vision 19.1 / 15.4, all >= 3:1 on the panel
     light: {
       bg: "#f1f0e6", panel: "#fbfaf5", base: "#ebe9dc", ink: "#1d2a22",
-      hues: ["#0c7847", "#d37507", "#4b49a8", "#3b8fc8", "#b18c00", "#8959a7", "#7a9a2a", "#c7587d"],
-      accent: "#d2452f", ramp: ["#2f4a3c", "#5f7a6a", "#9db3a5"],
+      hues: ["#44956b", "#955110", "#4b5494", "#3c98c2", "#987f23", "#885590", "#6b8132", "#c16682"],
+      accent: "#7b0f2b", ramp: ["#2f4a3c", "#5f7a6a", "#9db3a5"],
     },
     dark: {
       bg: "#121412", panel: "#1a1c1a", base: "#262924", ink: "#e8ebe4",
-      hues: ["#36a067", "#d07200", "#5f59c1", "#2297d9", "#836600", "#a179c5", "#7c9b28", "#cd6790"],
-      accent: "#e8604a", ramp: ["#d5e3da", "#9db3a5", "#5f7a6a"],
+      hues: ["#59a06d", "#925a20", "#6063a8", "#299bbd", "#836e00", "#ab71ab", "#798e3f", "#9f4e68"],
+      accent: "#ea7f5e", ramp: ["#d5e3da", "#9db3a5", "#5f7a6a"],
     },
   },
   {

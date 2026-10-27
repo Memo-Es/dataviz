@@ -1975,3 +1975,16 @@ svg {
 #g2 .card-head .segmented {
   flex: none;
 }
+
+/* a card header with more than one control on the right */
+.head-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+#g2-flows-all {
+  min-width: 7ch; /* "All 38" or "All 120": the header doesn't move as the weeks change */
+  font-variant-numeric: tabular-nums;
+}

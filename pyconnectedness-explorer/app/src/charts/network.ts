@@ -10,8 +10,9 @@
  * - flat circles in the region's colour (after the transit-map reference): solid if a market
  *   passes on more, a light tint with a thin outline in its colour if it takes more; sized by
  *   |net|. Each is labelled with its name and net value.
- * - thin ink lines, heavier and darker for bigger flows (`pairwise_net`), with a small arrowhead at
- *   the receiver; the strongest three stay fully dark.
+ * - ink arrows whose width grows with the flow (`pairwise_net`), on one scale across every week.
+ *   Only the strongest few are drawn until a market is picked (then all of its flows), so the
+ *   picture never turns into a hairball; "all" draws every flow above the library's cut-off.
  * - a faint square grid behind, as in the reference.
  * Scales are fixed across every week, so scrubbing or playing never rescales the picture.
  */
@@ -25,8 +26,8 @@ const C = SIZE / 2;
 const R = 232; // the ring
 const NODE_MIN = 7;
 const NODE_MAX = 20;
-const LINE_MIN = 1;
-const LINE_MAX = 5;
+const LINE_MIN = 1.2;
+const LINE_MAX = 6.5;
 const GAP = 0.2; // radians left empty at 3 and 9 o'clock, between the halves
 const BEND = 0.3; // how far a link bows toward the centre
 const CELL = 38; // the background grid
@@ -154,7 +155,9 @@ export class NetworkChart {
     selected: string | null,
     duration = 0,
     pair: [string, string] | null = null,
-    ink = p.fg
+    ink = p.fg,
+    /** how many of the strongest flows to draw when no market is picked; null: all of them */
+    limit: number | null = 10
   ) {
     const tr = <S extends d3.Selection<any, any, any, any>>(sel: S): S =>
       (duration > 0 ? sel.transition().duration(duration).ease(d3.easeLinear) : sel.interrupt()) as unknown as S;
@@ -164,25 +167,30 @@ export class NetworkChart {
     for (const q of pos) this.byIdx[q.idx] = q;
     const k = this.names.length;
     const nodeR = d3.scaleSqrt().domain([0, maxNet]).range([NODE_MIN, NODE_MAX]).clamp(true);
-    const weight = d3.scaleSqrt().domain([0, maxPair]).range([LINE_MIN, LINE_MAX]).clamp(true);
+    // width from the cut-off up to the strongest flow in any week: the step between widths is
+    // the step between flows, and the scale never moves as the weeks change
+    const weight = d3.scaleLinear().domain([frame.threshold, maxPair]).range([LINE_MIN, LINE_MAX]).clamp(true);
     const focusIdx = focus ? this.names.indexOf(focus) : -1;
     const pairIdx = pair && focusIdx < 0 ? pair.map((n) => this.names.indexOf(n)) : null;
     const isPair = (e: Edge) =>
       !!pairIdx && ((e.s === pairIdx[0] && e.r === pairIdx[1]) || (e.s === pairIdx[1] && e.r === pairIdx[0]));
 
-    const edges: Edge[] = [];
+    // every flow above the library's cut-off; which of them are drawn depends on what's picked
+    const all: Edge[] = [];
     for (let s = 0; s < k; s++)
-      for (let r = 0; r < k; r++) if (frame.matrix[s][r] > frame.threshold) edges.push({ s, r, v: frame.matrix[s][r] });
-    edges.sort((a, b) => a.v - b.v); // strongest on top
-    // weaker arrows recede, further when there are many (the set drawn is the library's)
-    const strength = d3.scaleLinear().domain([frame.threshold, maxPair]).range([edges.length > 30 ? 0.14 : 0.35, 1]).clamp(true);
-    const top3 = new Set(edges.slice(-3).map((e) => `${e.s}-${e.r}`));
+      for (let r = 0; r < k; r++) if (frame.matrix[s][r] > frame.threshold) all.push({ s, r, v: frame.matrix[s][r] });
+    all.sort((a, b) => a.v - b.v); // strongest on top
+    const edges = pairIdx
+      ? all.filter(isPair)
+      : focusIdx >= 0
+        ? all.filter((e) => e.s === focusIdx || e.r === focusIdx)
+        : limit === null
+          ? all
+          : all.slice(-limit);
+    // weaker arrows a little lighter, so the widest read first; all of them dark enough to follow
+    const strength = d3.scaleLinear().domain([frame.threshold, maxPair]).range([edges.length > 20 ? 0.3 : 0.55, 1]).clamp(true);
 
-    const style = (e: Edge) => {
-      if (pairIdx) return isPair(e) ? { c: p.accent, op: 1 } : { c: ink, op: 0.06 };
-      if (focusIdx < 0) return { c: ink, op: strength(e.v) };
-      return e.s === focusIdx || e.r === focusIdx ? { c: ink, op: 1 } : { c: ink, op: 0.06 };
-    };
+    const style = (e: Edge) => (pairIdx ? { c: p.accent, op: 1 } : { c: ink, op: strength(e.v) });
     const shape = (e: Edge) => this.link(e, nodeR(Math.abs(frame.net[e.s])), nodeR(Math.abs(frame.net[e.r])), weight(e.v));
 
     const joined = this.gEdges.selectAll<SVGGElement, Edge>("g.edge:not(.exiting)").data(edges, (e) => `${e.s}-${e.r}`);
@@ -214,7 +222,7 @@ export class NetworkChart {
       .attr("text-anchor", "middle")
       .attr("fill", p.fg)
       .text(""); // values on arrows collided where they cross: names carry the net, the tooltip the flow
-    tr(edgeSel).style("opacity", (e: Edge) => (top3.has(`${e.s}-${e.r}`) && focusIdx < 0 && !pairIdx ? 1 : style(e).op));
+    tr(edgeSel).style("opacity", (e: Edge) => style(e).op);
     edgeSel
       .on("mousemove", (ev: MouseEvent, e) => {
         showTooltip(ev.clientX, ev.clientY, `${this.names[e.s]} → ${this.names[e.r]}`, [
@@ -232,7 +240,7 @@ export class NetworkChart {
     const linked = new Set<number>(pairIdx ?? []);
     if (focusIdx >= 0) {
       linked.add(focusIdx);
-      for (const e of edges) {
+      for (const e of all) {
         if (e.s === focusIdx) linked.add(e.r);
         if (e.r === focusIdx) linked.add(e.s);
       }

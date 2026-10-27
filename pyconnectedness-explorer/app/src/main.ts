@@ -17,6 +17,9 @@ import { PALETTES, applyPalette, textSafe } from "./palettes";
 import { hueOf as hueOfNow } from "./encoding";
 
 
+/** the ring draws this many of the library's strongest flows until a market is picked */
+const TOP_FLOWS = 10;
+
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
 <header class="topbar">
@@ -90,9 +93,16 @@ app.innerHTML = `
         <h2>Connectedness network <code class="tag">connectedness_graph</code></h2>
         <p class="sub" id="network-sub"></p>
       </div>
-      <div class="segmented small" id="g2-style" role="group" aria-label="How the second graph is drawn">
-        <button type="button" data-style="ring">Ring</button>
-        <button type="button" data-style="quad">Quadrants</button>
+      <div class="head-controls">
+        <!-- the ring draws the strongest flows until a market is picked; "all" is the library's set -->
+        <div class="segmented small" id="g2-flows" role="group" aria-label="Flows drawn on the ring">
+          <button type="button" data-flows="top">Strongest ${TOP_FLOWS}</button>
+          <button type="button" data-flows="all" id="g2-flows-all">All</button>
+        </div>
+        <div class="segmented small" id="g2-style" role="group" aria-label="How the second graph is drawn">
+          <button type="button" data-style="ring">Ring</button>
+          <button type="button" data-style="quad">Quadrants</button>
+        </div>
       </div>
     </div>
     <div class="readout" id="net-readout" aria-live="polite"></div>
@@ -103,7 +113,7 @@ app.innerHTML = `
         <div class="legend">
           <span title="PyConnectedness: net" id="leg-solid"><i class="dot solid"></i>Top half, solid: passes on more</span>
           <span title="PyConnectedness: net" id="leg-tint"><i class="dot tint"></i>Bottom half, tinted: takes in more · bigger = more</span>
-          <span title="PyConnectedness: pairwise_net" id="leg-arrow"><i class="arrowkey"></i>Arrow: sender to receiver · thicker and darker = stronger</span>
+          <span title="PyConnectedness: pairwise_net" id="leg-arrow"><i class="arrowkey"></i></span>
           <span id="net-regions"></span>
         </div>
       </div>
@@ -140,6 +150,7 @@ app.innerHTML = `
 `;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+
 
 function insightFades() {
   const box = document.getElementById("insights");
@@ -298,6 +309,23 @@ async function main() {
   } catch {
     /* storage unavailable: the ring */
   }
+  let g2Flows: "top" | "all" = "top";
+  try {
+    if (localStorage.getItem("pc-g2-flows") === "all") g2Flows = "all";
+  } catch {
+    /* storage unavailable: the strongest few */
+  }
+  $("g2-flows").addEventListener("click", (ev) => {
+    const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-flows]");
+    if (!b) return;
+    g2Flows = b.dataset.flows as typeof g2Flows;
+    try {
+      localStorage.setItem("pc-g2-flows", g2Flows);
+    } catch {
+      /* ignore */
+    }
+    render(store.get());
+  });
   $("g2-style").addEventListener("click", (ev) => {
     const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-style]");
     if (!b) return;
@@ -452,7 +480,28 @@ async function main() {
     // charts
     renderTimeline(s, p);
 
-    $("network-sub").textContent = `The strongest 10% of flows, ${frame.label.toLowerCase().startsWith("full") ? "over the " : "in the "}${frame.label.replace(/^Full/, "full")}: each arrow runs from the ${ds.item} that passes on more to the one that takes it in.`;
+    // the library keeps the strongest 10% of flows; the ring draws the strongest few of those
+    const nFlows = frame.matrix.reduce((a, row) => a + row.filter((v) => v > frame.threshold).length, 0);
+    const span = `${frame.label.toLowerCase().startsWith("full") ? "over the " : "in the "}${frame.label.replace(/^Full/, "full")}`;
+    // the sentence follows what's picked, never what's under the pointer (hover only lights arrows up)
+    const sel = s.selected;
+    const selIdx = sel ? names.indexOf(sel) : -1;
+    const own = selIdx < 0 ? 0 : frame.matrix[selIdx].filter((v) => v > frame.threshold).length + frame.matrix.filter((row) => row[selIdx] > frame.threshold).length;
+    const how = `each arrow runs from the ${ds.item} that passes on more to the one that takes it in`;
+    $("network-sub").textContent =
+      g2Style !== "ring"
+        ? `The strongest 10% of flows ${span}, ${nFlows} in all: ${how}.`
+        : s.pair
+          ? `One pair of the ${nFlows} flows in the library's strongest 10% ${span}: ${how}.`
+          : sel
+            ? `${sel}'s ${own} of the ${nFlows} flows in the library's strongest 10% ${span}: ${how}.`
+            : g2Flows === "top" && nFlows > TOP_FLOWS
+              ? `The ${TOP_FLOWS} strongest of ${nFlows} flows ${span} (the library's strongest 10%): ${how}. Pick a ${ds.item} for all its flows.`
+              : `All ${nFlows} flows in the library's strongest 10% ${span}: ${how}.`;
+    $("g2-flows-all").textContent = `All ${nFlows}`;
+    $("g2-flows").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.flows === g2Flows)));
+    // only the ring has arrows to thin out; kept in place (invisible) so the header never shifts
+    $("g2-flows").style.visibility = g2Style === "ring" && nFlows > TOP_FLOWS ? "" : "hidden";
     renderNetReadout(s, frame);
     const quad = g2Style === "quad";
     $("g2-style").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.style === g2Style)));
@@ -466,7 +515,7 @@ async function main() {
       : `<i class="dot tint"></i>Bottom half, tinted: takes in more · bigger = more`;
     $("leg-arrow").innerHTML = quad
       ? `<i class="arrowkey"></i>Hover or pick a ${ds.item} for its path over the last ${quadLag(m)} ${ds.steps} and its arrows`
-      : `<i class="arrowkey"></i>Arrow: sender to receiver · thicker and darker = stronger`;
+      : `<i class="arrowkey"></i>Arrow: from the ${ds.item} that passes on more to the one that takes in · wider = stronger`;
     if (quad) {
       const t = stepOfWindow(s);
       const net = meta.dynamic[m].net;
@@ -488,7 +537,7 @@ async function main() {
         steps: ds.steps,
       });
     }
-    else network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion, s.pair, readBeadColors().ink);
+    else network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion, s.pair, readBeadColors().ink, g2Flows === "top" ? TOP_FLOWS : null);
     ranking.render(frame, p, model.maxNet[m], focus, s.selected, motion);
     $("heatmap-sub").textContent = `Each pair once, in the row of the ${ds.item} that passes more to the other, ${frame.label.toLowerCase().startsWith("full") ? "over the " : "in the "}${frame.label.replace(/^Full/, "full")}.`;
     heatmap.render(frame, p, model.maxPair[m], focus, s.pair, (n) => hueOfNow(n), p.band);
