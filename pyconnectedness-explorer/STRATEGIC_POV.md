@@ -203,7 +203,8 @@ Every proposal went through the same steps.
 | Controls | Hand-made; then the library's blue theme showing through | React with shadcn/ui and Motion Primitives, both weighed; see Controls below | **Web Awesome**, themed at the source: tested behaviour, no rewrite |
 | Values change on pick only | Numbers flickered under the pointer, which we tried and dropped | Hover previews can't be trusted or quoted | **Pick only**: numbers you can trust and quote |
 | No play button | It animated what the chart showed, and readers could not stop on a moment | Keeping it adds motion without information | **Removed**, in favour of picking a week anywhere |
-| "What spreads" | The Returns / Volatility toggle was unexplained and in the wrong place | Removing it would lose the demo's volatility run, often the clearer crisis signal | **Moved to the data, named for its question and credited to the demo** |
+| "What spreads" | The Returns / Volatility toggle was unexplained and in the wrong place | Removing it would lose the demo's volatility run, often the clearer crisis signal | **Beside the dataset, named for its question; the demo's term and credit in a caption, not in the buttons** |
+| A market's trail in Quadrants | It looped like a connection: a smoothing curve overshot between samples, drawn as thick as an arrow | Keeping the curve invents movement the data doesn't have | **Straight, thin and dotted, a dot per sample fading to now**: a path in time, never mistaken for a flow |
 | Downloads | The graphs could not go into a report as they had been set up | A screenshot loses the source; the library's plots lose the pick | **Figures from the page**: the same pick, framed with its source |
 
 ### The rules behind every graph
@@ -298,7 +299,9 @@ The page's controls (switches, chips, menus) were hand-made. A UI library gives 
 
 The library's own look came through at first: a blue glow on focus, bright blue options, and two focus rings stacked on each other. The fix was to theme it once, at the source: its colour, surface, focus and font settings now point at ours, so every component matches in both modes. Each control has exactly one focus ring, and the option under the keyboard gets the pale band with a stone ring, a change visible enough for AAA.
 
-**"What spreads" moved to the data it chooses.** The Returns / Volatility toggle sat unexplained in the top bar. It is not a library option: it switches between the two series the authors' demo builds from the stock data. It now sits with the dataset, named for the question each answers ("Price moves", "Turbulence"), with the demo's terms beside them, one plain line on what the current choice means, and a credit to the demo.
+**"What spreads" moved to the data it chooses.** The Returns / Volatility toggle sat unexplained in the top bar. It is not a library option: it switches between the two series the authors' demo builds from the stock data. It now sits beside the dataset, named for the question each answers ("Price moves", "Turbulence").
+
+The data bar went through two layouts before it settled. The first crammed the demo's terms into the buttons, set a long sentence between the controls and left the source switch floating on its own. The second stacked the groups into rows, but they belong side by side. The bar is now one row: **Data** (public dataset or your own file, then the dataset) and **What spreads**, next to each other at one height. Underneath, two quiet captions give the dataset's facts and what the current series means, naming the demo's term and crediting it: "Price moves: the returns of the authors' demo (Demo.ipynb), each market's weekly % change. When one moves, do the others follow?" On a phone each group stacks the same way, its label above its controls.
 
 ### Figures for reports
 
@@ -317,6 +320,7 @@ Each graph has a **Download** menu, PNG or SVG, because the readers in section 2
 - **The heatmap lost its pale circles.** A circle in all 400 cells made a texture louder than the flows; empty cells keep a pinpoint so the grid still reads as a grid.
 - **The play and step buttons were removed**, and the "Picked week" chip became the date it shows. They animated what the chart already showed, and "picked week" was abstract.
 - **Beads and Line take exactly the same space**, so switching between them moves nothing below.
+- **A market's trail in Quadrants is a dotted path**, straight between its fortnightly positions. A smoothing curve had invented loops and looked like a flow arrow. Its "13 weeks ago" note sits above the market names, so none of them covers it.
 
 ### Changes over time and animation
 
