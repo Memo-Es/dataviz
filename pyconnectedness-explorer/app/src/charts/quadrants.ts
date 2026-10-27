@@ -54,6 +54,8 @@ export class QuadrantChart {
   private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
   private gFrame: d3.Selection<SVGGElement, unknown, null, undefined>;
   private gTrail: d3.Selection<SVGGElement, unknown, null, undefined>;
+  /** the trail's "a quarter ago" note, above the market labels so none of them covers it */
+  private gNote: d3.Selection<SVGGElement, unknown, null, undefined>;
   private gEdges: d3.Selection<SVGGElement, unknown, null, undefined>;
   private gNodes: d3.Selection<SVGGElement, unknown, null, undefined>;
 
@@ -76,6 +78,7 @@ export class QuadrantChart {
     this.gTrail = this.svg.append("g").attr("class", "q-trail");
     this.gEdges = this.svg.append("g").attr("class", "edges");
     this.gNodes = this.svg.append("g").attr("class", "nodes");
+    this.gNote = this.svg.append("g").attr("class", "q-trail-note").attr("pointer-events", "none");
   }
 
   render(
@@ -128,15 +131,28 @@ export class QuadrantChart {
     const focusIdx = focus ? this.names.indexOf(focus) : -1;
     const pairIdx = pair && focusIdx < 0 ? pair.map((n) => this.names.indexOf(n)) : null;
     const trailOf = focusIdx >= 0 ? [focusIdx] : pairIdx ?? [];
-    const line = d3.line<[number, number]>().x((d) => x(d[0])).y((d) => y(d[1])).curve(d3.curveCatmullRom.alpha(0.5));
+    // straight between the samples: a smoothed curve rounds the turns and overshoots, inventing
+    // loops the data doesn't have
+    const line = d3.line<[number, number]>().x((d) => x(d[0])).y((d) => y(d[1]));
     this.gTrail.selectAll("*").remove();
+    this.gNote.selectAll("*").remove();
     for (const i of trailOf) {
       const path = o.trails[i];
       if (!path || path.length < 2) continue;
-      this.gTrail.append("path").attr("d", line(path)).attr("fill", "none").attr("stroke", hueOf(this.names[i])).attr("stroke-width", 2.5).attr("stroke-linecap", "round").attr("opacity", 0.85);
-      // where it was a quarter ago
-      this.gTrail.append("circle").attr("cx", x(path[0][0])).attr("cy", y(path[0][1])).attr("r", 4).attr("fill", p.panel).attr("stroke", hueOf(this.names[i])).attr("stroke-width", 2);
-      this.gTrail.append("text").attr("class", "q-note").attr("x", x(path[0][0]) + 7).attr("y", y(path[0][1]) + 4).attr("fill", p.fg).text(`${o.lag} ${o.steps} ago`);
+      // a trail through time, not a flow: a thin dotted line, a dot at each sample, fading from
+      // a quarter ago to now, so it never reads like the arrows
+      const hue = hueOf(this.names[i]);
+      this.gTrail.append("path").attr("d", line(path)).attr("fill", "none").attr("stroke", hue).attr("stroke-width", 1.5).attr("stroke-dasharray", "1 4").attr("stroke-linecap", "round");
+      path.forEach((q, j) =>
+        this.gTrail.append("circle").attr("cx", x(q[0])).attr("cy", y(q[1])).attr("r", 2.4).attr("fill", hue).attr("opacity", 0.3 + (0.7 * j) / Math.max(1, path.length - 1))
+      );
+      // where it was a quarter ago, named on a backing so nearby markets never cover it
+      const label = `${o.lag} ${o.steps} ago`;
+      const lx = x(path[0][0]) + 8;
+      const ly = y(path[0][1]) + 4;
+      this.gTrail.append("circle").attr("cx", x(path[0][0])).attr("cy", y(path[0][1])).attr("r", 4).attr("fill", p.panel).attr("stroke", hue).attr("stroke-width", 2);
+      this.gNote.append("rect").attr("x", lx - 3).attr("y", ly - 12).attr("width", label.length * 6.4 + 6).attr("height", 16).attr("rx", 4).attr("fill", p.panel).attr("fill-opacity", 0.94);
+      this.gNote.append("text").attr("class", "q-note").attr("x", lx).attr("y", ly).attr("fill", p.fg).text(label);
     }
 
     const isPair = (e: Edge) =>
