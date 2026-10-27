@@ -52,7 +52,7 @@ questionnaire, and the names from the library:
 | | Question | Name | Library |
 |---|---|---|---|
 | Graph 1 | When did markets become fragile? | **Rolling spillover index** | `dynamic_connectedness(…).total` |
-| inside graph 1 | How long do shocks last? | **Short vs long term** (bands: short, medium, long term) | `frequency_connectedness` |
+| inside graph 1 | How long do shocks last? | **Frequency-domain connectedness**, the README's name (bands: short, medium, long term) | `frequency_connectedness` |
 | Graph 2 | Who passes risk to whom? | **Connectedness network** | `connectedness_graph` |
 | Graph 3 | How much does each pair pass on? | **Spillover heatmap** | `spillover_heatmap` |
 | Side panel | (detail for graphs 2 and 3) | **Detail · market / pair** | `directional_to`, `directional_from`, `net`, `pairwise_net` |
@@ -68,7 +68,7 @@ before scrolling. Other terms keep the library's words: "net transmitter" and "n
 (`viz/network.py`), not "sender"; "net pairwise" for `pairwise_net`.
 
 **Readouts never change height.** Every slot is always drawn with the same structure, so hovering
-can't move the chart under the pointer. "Short vs long term" is always shown: for a picked period
+can't move the chart under the pointer. "Frequency-domain connectedness" is always shown: for a picked period
 it's that period, and for a single week it's the period the week falls in, labelled as such.
 
 ## Layout rule: controls above what they control

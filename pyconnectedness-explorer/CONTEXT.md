@@ -221,3 +221,8 @@ temperatures (Open-Meteo). The stock markets stay the authors' demo, unchanged; 
 library's own functions with the demo's settings, on preparation we wrote (README, "The other
 datasets"). Note for the client conversation: a dataset selector edges toward the stage 2 browser
 interface; it stays a design exploration with pre-built datasets, no upload.
+
+Oct 27: on Memo's ask, the split in graph 1 is called what the library's README calls it,
+"Frequency-domain connectedness" (`frequency_connectedness`), not "Short vs long term". Graph 1's
+numbers now change only on a pick, never on hover, and its time row sits right above the sentence
+it changes.

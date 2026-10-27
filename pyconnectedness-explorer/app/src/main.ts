@@ -548,7 +548,7 @@ ${
     });
   }
 
-  /** "Short vs long term": the library's frequency_connectedness (export_cell.py), which exists per
+  /** "Frequency-domain connectedness", as the library's README names it: frequency_connectedness (export_cell.py), which exists per
    * period, not per week. Always drawn with the same structure, so the readout never changes
    * height (it sits above the chart, so a height change moves the chart under the pointer). */
   function speedLine(s: State, preview: boolean) {
@@ -582,7 +582,7 @@ ${
       })
       .join("");
     return `<div class="ro-speed">
-      <p class="ro-speed-head" title="PyConnectedness: frequency_connectedness (Baruník–Křehlík). How long shocks take to play out, on a ${fb.horizon}-${ds.step} horizon, so the three add up to ${fb.static_total.toFixed(1)}% rather than exactly the index."><b>Short vs long term</b> <span class="ro-hint">· ${context}</span></p>
+      <p class="ro-speed-head" title="PyConnectedness: frequency_connectedness (Baruník–Křehlík). How long shocks take to play out, on a ${fb.horizon}-${ds.step} horizon, so the three add up to ${fb.static_total.toFixed(1)}% rather than exactly the index."><b>Frequency-domain connectedness</b> <code class="tag">frequency_connectedness</code> <span class="ro-hint">· ${context}</span></p>
       <div class="speed-bar">${segs}</div>
       <div class="speed-words">${words}</div></div>`;
   }
