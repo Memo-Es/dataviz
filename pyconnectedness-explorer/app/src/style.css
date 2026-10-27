@@ -1700,3 +1700,100 @@ svg {
   padding-top: 2px;
   border-top: 0;
 }
+
+/* ---- graph 1: insights beside the chart ---- */
+.g1-body {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(0, 2.6fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.insights {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 18px;
+}
+
+.insight {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.ins-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid var(--stone);
+  border-radius: 50%;
+  font: 700 11.5px/1 var(--f-num);
+  color: var(--stone);
+}
+
+.insight.on .ins-mark {
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent);
+}
+
+.ins-title {
+  margin: 1px 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--stone);
+}
+
+.ins-icon {
+  margin-right: 6px;
+}
+
+.ins-body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--stone);
+}
+
+/* a date in an insight: a chip that picks that week */
+.insights .chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 9px;
+  margin: 0 1px;
+  border: 1px solid var(--axis);
+  border-radius: 999px;
+  background: var(--band);
+  color: var(--stone);
+  font: 600 13px/1 var(--f-sans);
+  cursor: pointer;
+  vertical-align: baseline;
+}
+
+.insights .chip:hover {
+  border-color: var(--stone);
+}
+
+.beads-longrun {
+  font-size: 11.5px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--panel);
+  stroke-width: 3px;
+}
+
+.beads-mark text {
+  font: 700 11px var(--f-num);
+}
+
+@media (max-width: 960px) {
+  .g1-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .insights {
+    order: 2;
+  }
+}

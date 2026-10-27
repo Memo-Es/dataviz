@@ -5,6 +5,7 @@ import { REGION_OF, REGION_ORDER, STEP, setHueOf, fmtDate, fmtSigned, fmtStep, p
 import { NetworkChart } from "./charts/network";
 import { TimelineChart, type PeriodBand } from "./charts/timeline";
 import { BeadsChart, readBeadColors } from "./charts/beads";
+import { findInsights } from "./charts/insights";
 import { RankingChart } from "./charts/ranking";
 import { HeatmapChart } from "./charts/heatmap";
 import { sparkline } from "./charts/sparkline";
@@ -58,10 +59,16 @@ app.innerHTML = `
       <div class="windows" id="windows" role="group" aria-label="Window shown on every chart"></div>
     </div>
     <div class="readout" id="readout" aria-live="polite"></div>
-    <div id="timeline" class="chart-host"></div>
-    <div class="beads-regions" id="beads-regions" role="group" aria-label="Region shown"></div>
-    <div id="beads" class="chart-host"></div>
-    <p class="beads-legend" id="beads-legend"></p>
+    <!-- insights on the left, read off the numbers, each pointing at a week; the chart on the right -->
+    <div class="g1-body">
+      <ol class="insights" id="insights" aria-label="What the chart shows"></ol>
+      <div class="g1-chart">
+        <div id="timeline" class="chart-host"></div>
+        <div class="beads-regions" id="beads-regions" role="group" aria-label="Region shown"></div>
+        <div id="beads" class="chart-host"></div>
+        <p class="beads-legend" id="beads-legend"></p>
+      </div>
+    </div>
   </section>
 
   <!-- graph 2: the network, with its own readout and its node values (net) beside it -->
@@ -231,6 +238,11 @@ async function main() {
     const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-region]");
     if (b) pickRegion(b.dataset.region || null);
   });
+  // an insight's date chip picks that week, like a click on its string
+  $("insights").addEventListener("click", (ev) => {
+    const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-t]");
+    if (b) store.set({ t: +b.dataset.t!, window: "t", playing: false });
+  });
   $("g1-style").addEventListener("click", (ev) => {
     const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-style]");
     if (!b) return;
@@ -359,6 +371,24 @@ async function main() {
     const dyn = meta.dynamic[m];
     const events = Object.keys(ds.episodes).length;
     const asBeads = g1Style === "beads";
+    const insights = findInsights(dyn, staticBlock(data, m, "full").total, ds.steps, ds.items);
+    const insightSteps = insights.map((x) => x.t);
+    const shortDate = (i: number) => {
+      const d = parseDate(dyn.dates[i])!;
+      const mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getUTCMonth()];
+      return ds.step === "day" ? fmtDate(d) : `${mon} ${d.getUTCFullYear()}`;
+    };
+    const icon = { jump: "↗", drop: "↘", peak: "▲", level: "✱" } as const;
+    $("insights").innerHTML = insights
+      .map(
+        (x, i) => `<li class="insight${s.window === "t" && s.t === x.t ? " on" : ""}">
+          <span class="ins-mark" aria-hidden="true">${i + 1}</span>
+          <div><p class="ins-title"><span class="ins-icon" aria-hidden="true">${icon[x.icon]}</span>${x.title}</p>
+          <p class="ins-body">${x.body.replace(/\{date:(\d+)\}/g, (_m, t) => `<button type="button" class="chip" data-t="${t}">${shortDate(+t)}</button>`)}</p></div>
+        </li>`
+      )
+      .join("");
+    tightenDecimals($("insights"), ".num");
     $("g1-style").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.style === g1Style)));
     $("timeline").hidden = asBeads;
     $("beads").hidden = !asBeads;
@@ -368,6 +398,7 @@ async function main() {
     if (asBeads) {
       $("timeline-sub").textContent = `How much of each ${ds.item}'s moves came from shocks elsewhere, over rolling ${dyn.window}-${ds.step} windows.`;
       $("beads-legend").innerHTML = `<span title="PyConnectedness: total"><i class="bk-index"></i>Spillover index: the average of all ${ds.items}</span>
+        <span>Each string looks back ${dyn.window} ${ds.steps}: a jump is a shock arriving, a cliff ${dyn.window} ${ds.steps} later is it leaving</span>
         <span title="PyConnectedness: directional_from"><i class="bk-height"></i>Height: share of moves from shocks elsewhere</span>
 ${
           events ? `<span class="muted">▲ events</span>` : ""
@@ -387,7 +418,9 @@ ${
         s.hoverT,
         s.hovered,
         beadRegion,
-        `${m}|${s.theme}|${s.palette}`
+        `${m}|${s.theme}|${s.palette}`,
+        insightSteps,
+        staticBlock(data, m, "full").total
       );
       $("beads-floor").textContent = `Strings start at ${beads.floor}%, not 0`;
       renderReadout(s);

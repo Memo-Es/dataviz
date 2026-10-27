@@ -27,8 +27,8 @@ export function readBeadColors(): BeadColors {
   return { ink: v("--bead-ink"), hues: [1, 2, 3, 4, 5, 6, 7, 8].map((i) => v(`--bead-${i}`)) };
 }
 
-const H = 360;
-const M = { top: 40, bottom: 28, left: 44 };
+const H = 390;
+const M = { top: 66, bottom: 28, left: 44 }; // room above for the value tag and the insight marks
 const BEAD_H = 12; // the index bead's length along its string
 const SIDE_H = 6; // a region's or item's
 
@@ -163,9 +163,11 @@ export class BeadsChart {
     hoverT: number | null,
     hoveredItem: string | null,
     region: string | null,
-    paintKey: string
+    paintKey: string,
+    marks: number[] = [],
+    longRun: number | null = null
   ) {
-    this.last = [dyn, periods, t, activePeriod, p, c, hoverT, hoveredItem, region, paintKey];
+    this.last = [dyn, periods, t, activePeriod, p, c, hoverT, hoveredItem, region, paintKey, marks, longRun];
     this.dyn = dyn;
     this.T = dyn.dates.length;
     const groups = this.groups;
@@ -205,7 +207,7 @@ export class BeadsChart {
       this.paint(dyn, periods, activePeriod, c, p.panel);
       this.paintedKey = key;
     }
-    this.overlay(dyn, t, p, hoverT, hoveredItem, multi && !region);
+    this.overlay(dyn, t, p, hoverT, hoveredItem, multi && !region, marks, longRun);
   }
 
   /** the beads themselves: only when the data, size, theme, period or region changes */
@@ -273,7 +275,7 @@ export class BeadsChart {
   }
 
   /** axis, end labels, episodes, the picked step and the hover: cheap, redrawn every time */
-  private overlay(dyn: DynamicBlock, t: number | null, p: Palette, hoverT: number | null, hoveredItem: string | null, regionsShown: boolean) {
+  private overlay(dyn: DynamicBlock, t: number | null, p: Palette, hoverT: number | null, hoveredItem: string | null, regionsShown: boolean, marks: number[], longRun: number | null) {
     const W = this.width;
     const svg = this.svg.attr("width", W).attr("height", H).attr("viewBox", `0 0 ${W} ${H}`);
     svg.selectAll("*").remove();
@@ -326,6 +328,22 @@ export class BeadsChart {
       .attr("text-anchor", "middle")
       .attr("fill", p.muted)
       .text((d) => d.getUTCFullYear());
+
+    // the long-run level (the full-sample static total), dashed, named at its left end
+    if (longRun !== null && longRun >= y.domain()[0] && longRun <= y.domain()[1]) {
+      const ly = y(longRun);
+      svg.append("line").attr("x1", M.left).attr("x2", M.left + this.plotW).attr("y1", ly).attr("y2", ly).attr("stroke", p.fg).attr("stroke-width", 1.2).attr("stroke-dasharray", "4 4").attr("opacity", 0.8);
+      svg.append("text").attr("class", "beads-longrun").attr("x", M.left + 4).attr("y", ly - 6).attr("fill", p.fg).text(`long-run ${longRun.toFixed(1)}%`);
+    }
+
+    // the insights beside the chart, numbered where they point
+    marks.forEach((mt, i) => {
+      const x = this.xOf(mt);
+      const g = svg.append("g").attr("class", "beads-mark");
+      g.append("line").attr("x1", x).attr("x2", x).attr("y1", M.top - 12).attr("y2", M.top - 2).attr("stroke", p.fg).attr("stroke-width", 1.2);
+      g.append("circle").attr("cx", x).attr("cy", M.top - 20).attr("r", 9).attr("fill", p.panel).attr("stroke", p.fg).attr("stroke-width", 1.5);
+      g.append("text").attr("x", x).attr("y", M.top - 20).attr("dy", "0.35em").attr("text-anchor", "middle").attr("fill", p.fg).text(String(i + 1));
+    });
 
     // notable events: a small mark under the strings, named on hover
     const ep = svg.append("g").attr("class", "beads-episodes");
