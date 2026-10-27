@@ -23,7 +23,7 @@ def text_png(path, text, title):
     fig.patch.set_facecolor("white")
     fig.text(0.02, 0.98, title, va="top", ha="left", family="DejaVu Sans", fontsize=10, color="#444")
     fig.text(0.02, 0.98 - 0.5 / (0.24 * len(lines) + 0.9), text, va="top", ha="left", family="DejaVu Sans Mono", fontsize=8.5, color="#111")
-    fig.savefig(path, facecolor="white"); plt.close(fig)
+    fig.savefig(path, facecolor="white", bbox_inches="tight", pad_inches=0.3); plt.close(fig)
 
 data = json.loads((root / "pyconnectedness-explorer/app/public/data/connectedness.json").read_text())
 fr = data["frequency"]["returns"]["full"]

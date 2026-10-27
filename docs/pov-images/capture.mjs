@@ -95,8 +95,11 @@ for (const s of specs) {
     if (s.region) { try { await page.locator("#g1").getByText(s.region, { exact: true }).first().click({ timeout: 5000 }); await page.waitForTimeout(800); } catch { notes.push("region pick failed"); } }
     if (s.pick) {
       try {
-        const host = page.locator("#g2 svg text").filter({ hasText: new RegExp("^" + s.pick) });
-        await host.first().click({ timeout: 5000, force: true }); await page.waitForTimeout(900);
+        // the bar label in the net ranking picks the market (same as clicking its circle)
+        const bar = page.locator("#g2").getByText(s.pick, { exact: true });
+        if (await bar.count()) await bar.first().click({ timeout: 5000 });
+        else await page.locator("#g2 svg text").filter({ hasText: new RegExp("^" + s.pick) }).first().click({ timeout: 5000, force: true });
+        await page.waitForTimeout(900);
       } catch { notes.push("pick failed"); }
     }
     if (s.insight) {
