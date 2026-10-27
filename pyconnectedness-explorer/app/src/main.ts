@@ -42,23 +42,26 @@ app.innerHTML = `
         <h2>Rolling spillover index <code class="tag">dynamic_connectedness(…).total</code></h2>
         <p class="sub" id="timeline-sub"></p>
       </div>
+      <div class="segmented small" id="g1-style" role="group" aria-label="How the first graph is drawn">
+        <button type="button" data-style="beads">Beads</button>
+        <button type="button" data-style="line">Line</button>
+      </div>
+    </div>
+    <!-- time: step through the weeks or pick a window; the sentence right under it says what's
+         picked, date first, and every graph follows -->
+    <div class="time-row">
       <div class="player">
-        <div class="segmented small" id="g1-style" role="group" aria-label="How the first graph is drawn">
-          <button type="button" data-style="beads">Beads</button>
-          <button type="button" data-style="line">Line</button>
-        </div>
         <button class="icon-btn" id="prev" aria-label="Previous step">‹</button>
         <button class="play" id="play" aria-label="Play"></button>
         <button class="icon-btn" id="next" aria-label="Next step">›</button>
       </div>
+      <div class="windows" id="windows" role="group" aria-label="Window shown on every chart"></div>
     </div>
-    <!-- the chart's own readout: what the picked (or hovered) week says -->
     <div class="readout" id="readout" aria-live="polite"></div>
     <div id="timeline" class="chart-host"></div>
     <div class="beads-regions" id="beads-regions" role="group" aria-label="Region shown"></div>
     <div id="beads" class="chart-host"></div>
     <p class="beads-legend" id="beads-legend"></p>
-    <div class="windows" id="windows" role="group" aria-label="Window shown on every chart"></div>
   </section>
 
   <!-- graph 2: the network, with its own readout and its node values (net) beside it -->
