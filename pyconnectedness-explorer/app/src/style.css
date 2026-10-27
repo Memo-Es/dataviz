@@ -1816,3 +1816,42 @@ svg {
   stroke-linejoin: round;
   pointer-events: none;
 }
+
+/* graph 2 as coordinates */
+.q-axis {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.q-note {
+  font-size: 11.5px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--panel);
+  stroke-width: 3px;
+}
+
+.q-name {
+  font-size: 14px;
+  paint-order: stroke;
+  stroke: var(--panel);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.q-name .q-sub {
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.quadrants .node {
+  cursor: pointer;
+}
+
+.quadrants .node-label {
+  font-size: 11.5px;
+}
+
+#g2 .card-head .segmented {
+  flex: none;
+}

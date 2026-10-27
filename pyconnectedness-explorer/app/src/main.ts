@@ -6,6 +6,7 @@ import { NetworkChart } from "./charts/network";
 import { TimelineChart, type PeriodBand } from "./charts/timeline";
 import { BeadsChart, readBeadColors } from "./charts/beads";
 import { findInsights } from "./charts/insights";
+import { QuadrantChart } from "./charts/quadrants";
 import { RankingChart } from "./charts/ranking";
 import { HeatmapChart } from "./charts/heatmap";
 import { sparkline } from "./charts/sparkline";
@@ -80,15 +81,20 @@ app.innerHTML = `
         <h2>Connectedness network <code class="tag">connectedness_graph</code></h2>
         <p class="sub" id="network-sub"></p>
       </div>
+      <div class="segmented small" id="g2-style" role="group" aria-label="How the second graph is drawn">
+        <button type="button" data-style="ring">Ring</button>
+        <button type="button" data-style="quad">Quadrants</button>
+      </div>
     </div>
     <div class="readout" id="net-readout" aria-live="polite"></div>
     <div class="graph2-body">
       <div class="graph2-net">
         <div id="network" class="chart-host network-host"></div>
+        <div id="quadrants" class="chart-host network-host"></div>
         <div class="legend">
-          <span title="PyConnectedness: net"><i class="dot solid"></i>Top half, solid: passes on more</span>
-          <span title="PyConnectedness: net"><i class="dot tint"></i>Bottom half, tinted: takes in more · bigger = more</span>
-          <span title="PyConnectedness: pairwise_net"><i class="arrowkey"></i>Arrow: sender to receiver · thicker and darker = stronger</span>
+          <span title="PyConnectedness: net" id="leg-solid"><i class="dot solid"></i>Top half, solid: passes on more</span>
+          <span title="PyConnectedness: net" id="leg-tint"><i class="dot tint"></i>Bottom half, tinted: takes in more · bigger = more</span>
+          <span title="PyConnectedness: pairwise_net" id="leg-arrow"><i class="arrowkey"></i>Arrow: sender to receiver · thicker and darker = stronger</span>
           <span id="net-regions"></span>
         </div>
       </div>
@@ -265,6 +271,34 @@ async function main() {
     ${presentRegions.length > 1 ? `<span>Colour: the sender's region, as in graph 1</span>` : ""}`;
 
   const network = new NetworkChart($("network"), names, { onHover: hover, onSelect: select, onPair: pickPair });
+  const quadrants = new QuadrantChart($("quadrants"), names, { onHover: hover, onSelect: select, onPair: pickPair });
+  // graph 2 as a ring (default) or as coordinates, remembered per browser
+  let g2Style: "ring" | "quad" = "ring";
+  try {
+    if (localStorage.getItem("pc-g2") === "quad") g2Style = "quad";
+  } catch {
+    /* storage unavailable: the ring */
+  }
+  $("g2-style").addEventListener("click", (ev) => {
+    const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("button[data-style]");
+    if (!b) return;
+    g2Style = b.dataset.style as typeof g2Style;
+    try {
+      localStorage.setItem("pc-g2", g2Style);
+    } catch {
+      /* ignore */
+    }
+    render(store.get());
+  });
+  // fixed axes for the quadrants: every TO and FROM the library returned for the measure
+  const quadDomains = (m: Measure) => {
+    const all = (k: "to" | "from") => {
+      const vals: number[] = meta.dynamic[m][k].flat();
+      for (const b of Object.values(meta.static[m] as Record<string, { to: number[]; from: number[] }>)) vals.push(...b[k]);
+      return [Math.floor(Math.min(...vals) / 10) * 10, Math.ceil(Math.max(...vals) / 10) * 10] as [number, number];
+    };
+    return { to: all("to"), from: all("from") };
+  };
   const ranking = new RankingChart($("ranking"), names, hover, (n) => select(n));
   const heatmap = new HeatmapChart($("heatmap"), names, hover, (n) => select(n), pickPair);
   const timeline = new TimelineChart(
@@ -343,7 +377,21 @@ async function main() {
 
     $("network-sub").textContent = `The strongest 10% of flows, ${frame.label.toLowerCase().startsWith("full") ? "over the " : "in the "}${frame.label.replace(/^Full/, "full")}: each arrow runs from the ${ds.item} that passes on more to the one that takes it in.`;
     renderNetReadout(s, frame);
-    network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion, s.pair, readBeadColors().ink);
+    const quad = g2Style === "quad";
+    $("g2-style").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.style === g2Style)));
+    $("network").hidden = quad;
+    $("quadrants").hidden = !quad;
+    $("leg-solid").innerHTML = quad
+      ? `<i class="dot solid"></i>Solid: above the diagonal, passes on more`
+      : `<i class="dot solid"></i>Top half, solid: passes on more`;
+    $("leg-tint").innerHTML = quad
+      ? `<i class="dot tint"></i>Tinted: below it, takes in more · bigger = further from it`
+      : `<i class="dot tint"></i>Bottom half, tinted: takes in more · bigger = more`;
+    $("leg-arrow").innerHTML = quad
+      ? `<i class="arrowkey"></i>Hover or pick a ${ds.item} to see its arrows · thicker = stronger`
+      : `<i class="arrowkey"></i>Arrow: sender to receiver · thicker and darker = stronger`;
+    if (quad) quadrants.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion, s.pair, readBeadColors().ink, quadDomains(m));
+    else network.render(frame, p, model.maxNet[m], model.maxPair[m], focus, s.selected, motion, s.pair, readBeadColors().ink);
     ranking.render(frame, p, model.maxNet[m], focus, s.selected, motion);
     $("heatmap-sub").textContent = `Each pair once, in the row of the ${ds.item} that passes more to the other, ${frame.label.toLowerCase().startsWith("full") ? "over the " : "in the "}${frame.label.replace(/^Full/, "full")}.`;
     heatmap.render(frame, p, model.maxPair[m], focus, s.pair, (n) => hueOfNow(n), p.band);
