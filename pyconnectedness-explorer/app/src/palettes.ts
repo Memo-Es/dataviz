@@ -186,9 +186,11 @@ export function applyPalette(id: string, theme: "light" | "dark") {
   set("--band", m.base);
   set("--bead-ink", m.ink);
   m.hues.forEach((h, i) => set(`--bead-${i + 1}`, h));
-  set("--accent", m.accent);
-  set("--accent-ink", inkOn(m.accent));
-  set("--accent-wash", `${m.accent}22`);
+  // the selected state is monochrome in every palette: the palette's ink, never a colour of its
+  // own, so a pick never competes with the region colours (m.accent is kept as the painting's note)
+  set("--accent", m.ink);
+  set("--accent-ink", inkOn(m.ink));
+  set("--accent-wash", `${m.ink}14`);
   (["fast", "mid", "slow"] as const).forEach((k, i) => {
     set(`--band-${k}`, m.ramp[i]);
     set(`--band-${k}-ink`, inkOn(m.ramp[i]));

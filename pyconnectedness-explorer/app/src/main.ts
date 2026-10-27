@@ -74,8 +74,9 @@ app.innerHTML = `
     <a class="mini-card span-7" href="#index" id="mini-index"></a>
     <a class="mini-card span-5" href="#network" id="mini-network"></a>
     <a class="mini-card span-5" href="#heatmap" id="mini-heatmap"></a>
-    <a class="mini-card span-4" href="#index" id="mini-freq"></a>
-    <a class="mini-card span-3" href="#index" id="mini-insight"></a>
+    <a class="mini-card span-4" href="#frequency" id="mini-freq"></a>
+    <!-- not a link: its only place to go would be graph 1 again, which the first card opens -->
+    <div class="mini-card mini-static span-3" id="mini-insight"></div>
   </section>
 
   <section class="card span-12" id="g1">
@@ -148,6 +149,20 @@ app.innerHTML = `
     </div>
   </section>
 
+
+  <!-- inside graph 1, on its own: every period's frequency split, the one on show outlined -->
+  <section class="card span-12" id="g4" hidden>
+    <div class="card-head">
+      <div>
+        <p class="q">Inside 1 · How long do shocks last?</p>
+        <h2>Frequency-domain connectedness <code class="tag">frequency_connectedness</code></h2>
+        <p class="sub" id="freq-sub"></p>
+        <p class="takeaway" id="freq-takeaway"></p>
+      </div>
+    </div>
+    <div id="freq-chart" class="chart-host"></div>
+    <div class="legend" id="freq-legend"></div>
+  </section>
 
   <div class="grid" id="g3-row">
 
@@ -582,6 +597,7 @@ async function main() {
     heatmap.render(frame, p, model.maxPair[m], focus, s.pair, (n) => hueOfNow(n), p.band);
     renderHeatTakeaway(frame);
     renderHome(s, frame, p);
+    renderFrequency(s);
     $("palette").querySelectorAll<HTMLElement & { checked: boolean; value: string }>("wa-dropdown-item").forEach((it) => (it.checked = it.value === s.palette));
     renderDetail(s, frame, p);
     tightenDecimals(document, ".num");
@@ -939,6 +955,83 @@ ${
     tightenDecimals($("hm-takeaway"), ".num");
   }
 
+  /** Frequency-domain connectedness on its own: every period's split, as the library returns it
+   * (frequency_connectedness, per period): bar length is the period's total, split into the three
+   * bands; the period the picked week falls in (or the picked period) is outlined; a row picks it. */
+  function renderFrequency(s: State) {
+    if ($("g4").hidden) return;
+    const m = s.measure;
+    const blocks = meta.frequency[m] as Record<string, (typeof meta.frequency.returns)["full"]>;
+    const opts = windowOptions(data, m).filter((o) => o.key !== "t" && blocks[o.key]);
+    // the one on show: the picked period, or the period the picked week falls in (as under graph 1)
+    const when = parseDate(meta.dynamic[m].dates[s.t])!;
+    const ofWeek = (["p1", "p2", "p3", "p4"] as const).find((k) => {
+      const [a, z] = periodBounds(staticBlock(data, m, k));
+      return when >= a && when <= z;
+    }) ?? "p4";
+    const onKey = s.window !== "t" && blocks[s.window] ? s.window : ofWeek;
+    const W = 900;
+    const LBL = 150;
+    const BARW = 600;
+    const ROW = 62;
+    const top = Math.max(...opts.map((o) => blocks[o.key].bands.reduce((a, b) => a + b.total, 0)));
+    const x = (v: number) => (v / top) * BARW;
+    const rows = opts
+      .map((o, i) => {
+        const fb = blocks[o.key];
+        const sum = fb.bands.reduce((a, b) => a + b.total, 0);
+        const y = 8 + i * ROW;
+        let at = LBL;
+        const segs = fb.bands
+          .map((b) => {
+            const c = bandCopy(b.label);
+            const w = x(b.total);
+            const r = `<rect x="${at.toFixed(1)}" y="${y}" width="${Math.max(0, w - 2).toFixed(1)}" height="24" rx="3" fill="var(--band-${c.cls})"><title>${c.name}, ${c.phrase}: ${b.total.toFixed(1)} pp</title></rect>`;
+            at += w;
+            return r;
+          })
+          .join("");
+        const shares = fb.bands.map((b) => `${bandCopy(b.label).name.split(" ")[0]} ${((b.total / sum) * 100).toFixed(0)}%`).join(" · ");
+        const on = o.key === onKey;
+        return `<g class="freq-row" data-key="${o.key}" role="button" tabindex="0" aria-pressed="${on}" aria-label="${o.label}: ${shares}">
+          ${on ? `<rect x="2" y="${y - 6}" width="${W - 4}" height="${ROW - 6}" rx="10" fill="var(--accent-wash)" stroke="var(--accent)" stroke-width="2"/>` : ""}
+          <rect x="0" y="${y - 6}" width="${W}" height="${ROW - 6}" fill="transparent"/>
+          <text x="14" y="${y + 16}" class="freq-label" font-weight="${on ? 700 : 500}">${o.label}</text>
+          ${segs}
+          <text x="${LBL + x(sum) + 10}" y="${y + 17}" class="freq-total mono">${sum.toFixed(1)}%</text>
+          <text x="${LBL}" y="${y + 44}" class="freq-shares">${shares}</text>
+        </g>`;
+      })
+      .join("");
+    $("freq-chart").innerHTML = `<svg class="freq-svg" viewBox="0 0 ${W} ${8 + opts.length * ROW}" role="img" aria-label="Frequency-domain connectedness for each period">${rows}</svg>`;
+    $("freq-chart").querySelectorAll<SVGGElement>("g.freq-row").forEach((g) => {
+      const go = () => store.set({ window: g.dataset.key as WindowKey });
+      g.addEventListener("click", go);
+      g.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          go();
+        }
+      });
+    });
+    // the takeaway: how much of it is short term, across periods and in the one on show
+    const shortShare = (k: string) => {
+      const b = blocks[k].bands;
+      return (b[0].total / b.reduce((a, c) => a + c.total, 0)) * 100;
+    };
+    const all = opts.map((o) => shortShare(o.key));
+    const label = opts.find((o) => o.key === onKey)?.label ?? "";
+    $("freq-takeaway").innerHTML = `Short-term shocks carry <span class="num">${Math.min(...all).toFixed(0)}</span>–<span class="num">${Math.max(...all).toFixed(0)}%</span> of spillover across the periods; <span class="num">${shortShare(onKey).toFixed(0)}%</span> in ${label}.`;
+    $("freq-sub").textContent = `How long shocks take to play out, for each period: a bar's length is its spillover, split by how fast it passes (${blocks.full.horizon}-${ds.step} horizon). Pick a period to show it on every graph.`;
+    $("freq-legend").innerHTML = blocks.full.bands
+      .map((b) => {
+        const c = bandCopy(b.label);
+        return `<span><i class="key ${c.cls}"></i>${c.name}: ${c.phrase}</span>`;
+      })
+      .join("") + `<span>The bands add up to the period's total from frequency_connectedness, a little under the index</span>`;
+    tightenDecimals($("g4"), ".num, .mono");
+  }
+
   /** The overview: a small version of each graph with its headline. The numbers are the same
    * library values the full graphs show, for the same window; each card opens its graph. */
   function renderHome(s: State, frame: ReturnType<Model["frame"]>, p: ReturnType<typeof readPalette>) {
@@ -996,7 +1089,7 @@ ${
       return ds.step === "day" ? fmtDate(d) : d3.utcFormat("%b %Y")(d);
     };
     $("mini-insight").innerHTML =
-      `<div class="mini-head"><p class="q">Worth knowing</p><span class="mini-open" aria-hidden="true">↗</span></div>
+      `<div class="mini-head"><p class="q">Worth knowing</p></div>
       <h3>${top.title}</h3>
       <p class="mini-body">${top.body.replace(/\{date:(\d+)\}/g, (_x, i) => `<b class="mono">${short(+i)}</b>`)}</p>`;
     tightenDecimals($("home"), ".num");
@@ -1114,13 +1207,17 @@ ${
   });
   // the overview, or one graph on its own: the address says which (#index, #network, #heatmap),
   // so the browser's back button and a shared link both work
-  type View = "home" | "index" | "network" | "heatmap";
+  type View = "home" | "index" | "network" | "heatmap" | "frequency";
   const TITLES: Record<Exclude<View, "home">, string> = {
     index: "Rolling spillover index",
     network: "Connectedness network",
     heatmap: "Spillover heatmap",
+    frequency: "Frequency-domain connectedness",
   };
   let view: View | null = null;
+  let keyboardNav = false;
+  addEventListener("keydown", () => (keyboardNav = true), true);
+  addEventListener("pointerdown", () => (keyboardNav = false), true);
   const applyView = () => {
     const h = location.hash.replace(/^#\/?/, "");
     const v: View = h in TITLES ? (h as View) : "home";
@@ -1130,6 +1227,7 @@ ${
     $("g1").hidden = v !== "index";
     $("g2").hidden = v !== "network";
     $("g3").hidden = v !== "heatmap";
+    $("g4").hidden = v !== "frequency";
     $("g3-row").hidden = v !== "network" && v !== "heatmap";
     $("g3-row").classList.toggle("detail-only", v === "network");
     $("crumb").hidden = v === "home";
@@ -1137,9 +1235,12 @@ ${
     document.title = v === "home" ? "PyConnectedness Explorer" : `${TITLES[v]} · PyConnectedness Explorer`;
     if (from !== null && from !== v) {
       scrollTo(0, 0);
-      // keyboard and screen-reader users land where the change happened
-      if (v === "home") document.getElementById(`mini-${from}`)?.focus();
-      else $("crumb").querySelector<HTMLElement>(".crumb-back")?.focus();
+      // keyboard and screen-reader users land where the change happened; a mouse or touch user
+      // isn't handed a focus ring they didn't ask for
+      if (keyboardNav) {
+        if (v === "home") document.getElementById(`mini-${from === "frequency" ? "freq" : from}`)?.focus();
+        else $("crumb").querySelector<HTMLElement>(".crumb-back")?.focus();
+      }
     }
     render(store.get()); // what was hidden is drawn now, at its real size
   };
@@ -1183,6 +1284,18 @@ ${
         layers: [...host.querySelectorAll<SVGSVGElement>(":scope > svg")],
         legends: [$("net-legend")],
         source: source("connectedness_graph (strongest 10% of pairwise_net)"),
+      };
+    }
+    if (v === "frequency") {
+      return {
+        ...base,
+        question: "Inside 1 · How long do shocks last?",
+        tag: "frequency_connectedness",
+        sentence: $("freq-takeaway").innerText,
+        host: $("freq-chart"),
+        layers: [...$("freq-chart").querySelectorAll<SVGSVGElement>(":scope > svg")],
+        legends: [$("freq-legend")],
+        source: source("frequency_connectedness (Baruník–Křehlík, periods 5 and 20)"),
       };
     }
     return {
