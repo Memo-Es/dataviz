@@ -355,12 +355,12 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 ![Considered: one week drawn six ways](docs/pov-images/5.10c-options.png)
 
-**After.** Each flow runs from its wide end, under the market that passes on more, to a point at the one that takes it in. A key in the chart gives two widths in pp. *Source: current, `#network`, Ring (the After image of 5.10).*
+**After.** Each flow runs from its wide end, at the edge of the market that passes on more, to a point at the one that takes it in. A key in the chart gives two widths in pp. *Source: current, `#network`, Ring (the After image of 5.10).*
 
 - **What was added.** Flows as pointed lines, in full ink, with no arrowheads. The width at the wide end is proportional to the flow, from zero, on one scale for every week. The same lines draw a picked market's flows in Quadrants and the small ring on the overview. A key inside the chart ("2 pp, 8 pp, the wide end passes on") travels with downloaded figures.
 - **Why.** The arrows as they were overstated strength and changed meaning between weeks. Their width started at each week's own cut-off, so 1.37 times the flow was drawn 2.1 times as wide, and a 4 pp flow was 1.6 px in March 2020 but about 2.6 px in June 2017. A fade made weaker arrows paler, which reads as "less certain", and the arrowheads piled up on the biggest receiver (seven on Argentina in the COVID week).
 - **Considered.** *Stroke darkness*: lightness is poorly judged, 4.0 against 5.5 pp came out as 48% against 66% ink, and pale lines fall to about 3:1. *Proportional width with arrowheads*: honest, but the heads still pile up. *A gradient*: its pale half reads as weak, so direction and strength mix. *Dashes*: they make groups, not amounts, and read as "uncertain". Pointed lines also have support in research: tapered edges beat arrowheads for reading direction (Holten and van Wijk, 2009).
-- **Checked by.** AAA on every label, light and dark; no layout shift; the tips keep a 1.6 px point so every line visibly reaches its receiver. Matplotlib draws the same shape on the library's curved edges (`arrowstyle="wedge"` with `arc3`), tested, so the library's plots can follow.
+- **Checked by.** AAA on every label, light and dark; no layout shift; the wide end starts at the sender's edge, in full view, and the line narrows to a real point at the receiver's edge (an outline drawn behind the fill keeps the point from wearing away). Matplotlib draws the same shape on the library's curved edges (`arrowstyle="wedge"` with `arc3`), tested, so the library's plots can follow.
 
 #### 5.11 The 10 strongest flows, all on request
 

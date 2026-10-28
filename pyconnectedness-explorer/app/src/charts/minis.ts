@@ -75,7 +75,7 @@ export function miniRing(
       return [u * u * a.x + 2 * u * q * cx + q * q * b.x, u * u * a.y + 2 * u * q * cy + q * q * b.y];
     };
     const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-    return flowPath(at, Math.min(0.3, (r(Math.abs(net[s])) * 0.5) / len), 1 - Math.min(0.4, (r(Math.abs(net[t])) + 1) / len), flowWidth(v, maxPair) * scale * 1.6, 12, 0.9);
+    return flowPath(at, Math.min(0.3, (r(Math.abs(net[s])) + 0.5) / len), 1 - Math.min(0.4, (r(Math.abs(net[t])) + 1) / len), flowWidth(v, maxPair) * scale * 1.6, 12, 0.2);
   };
   const lines = top.map(([s, t, v]) => `<path d="${flow(s, t, v)}" fill="${ink}"/>`).join("");
   const dots = idx

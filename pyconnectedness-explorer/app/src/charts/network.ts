@@ -127,7 +127,7 @@ export class NetworkChart {
       return [u * u * a.x + 2 * u * t * cx + t * t * b.x, u * u * a.y + 2 * u * t * cy + t * t * b.y];
     };
     const len = Math.hypot(b.x - a.x, b.y - a.y) * 1.06 || 1;
-    const t0 = Math.min(0.3, (rs * 0.5) / len);
+    const t0 = Math.min(0.3, (rs + 1) / len); // the wide end starts at the sender's edge, in full view
     const tTip = 1 - Math.min(0.4, (rr + 2) / len);
     const n = 20;
     const f = ([x, y]: [number, number]) => `${x.toFixed(1)},${y.toFixed(1)}`;

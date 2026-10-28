@@ -10,9 +10,9 @@
 import type * as d3 from "d3";
 
 /** the width of the wide end for the strongest flow in any week, in the chart's own units */
-export const FLOW_MAX = 16;
-/** the point keeps this width, so the line visibly reaches the market that takes it in */
-export const FLOW_TIP = 1.6;
+export const FLOW_MAX = 20;
+/** a real point: the outline behind the fill (paint-order) keeps it from wearing away */
+export const FLOW_TIP = 0.35;
 
 export const flowWidth = (v: number, maxPair: number) => (maxPair > 0 ? (Math.max(0, v) / maxPair) * FLOW_MAX : 0);
 

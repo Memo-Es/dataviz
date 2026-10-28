@@ -166,13 +166,13 @@ export class QuadrantChart {
       if (focusIdx < 0) return { c: ink, op: 0 };
       return e.s === focusIdx || e.r === focusIdx ? { c: ink, op: 1 } : { c: ink, op: 0 };
     };
-    // straight, from under the sender's circle to a point at the receiver's edge
+    // straight, from the sender's edge to a point at the receiver's edge
     const shape = (e: Edge) => {
       const a = pts[e.s];
       const b = pts[e.r];
       const L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
       const at = (t: number): [number, number] => [a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t];
-      return flowPath(at, Math.min(0.3, (NODE_R * 0.5) / L), 1 - Math.min(0.4, (NODE_R + 2) / L), weight(e.v), 2);
+      return flowPath(at, Math.min(0.3, (NODE_R + 1) / L), 1 - Math.min(0.4, (NODE_R + 2) / L), weight(e.v), 2);
     };
     const joined = this.gEdges.selectAll<SVGGElement, Edge>("g.edge").data(edges, (e) => `${e.s}-${e.r}`);
     joined.exit().remove();
