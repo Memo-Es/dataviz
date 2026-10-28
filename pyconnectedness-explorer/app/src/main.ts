@@ -13,7 +13,9 @@ import "@awesome.me/webawesome/dist/components/dropdown/dropdown.js";
 import "@awesome.me/webawesome/dist/components/select/select.js";
 import "@awesome.me/webawesome/dist/components/option/option.js";
 import "@awesome.me/webawesome/dist/components/dropdown-item/dropdown-item.js";
+import "@awesome.me/webawesome/dist/components/dialog/dialog.js";
 import { type Figure, downloadPng, downloadSvg } from "./export";
+import { type CodeView, pythonFor } from "./code";
 import "@awesome.me/webawesome/dist/styles/themes/default.css";
 import { QuadrantChart } from "./charts/quadrants";
 import { RankingChart } from "./charts/ranking";
@@ -59,6 +61,8 @@ app.innerHTML = `
   <nav class="crumb" id="crumb" aria-label="Where you are" hidden>
     <a href="#" class="crumb-back">‹ All graphs</a><span class="crumb-here" id="crumb-here"></span>
     <span class="crumb-tools">
+      <!-- the library calls behind the graph, for what's on screen: to run, check or build on -->
+      <button class="crumb-btn" id="code-open" type="button" aria-haspopup="dialog">Code</button>
       <!-- the graph as a figure for a report, with whatever is picked still highlighted -->
       <wa-dropdown id="export" placement="bottom-end">
         <button slot="trigger" class="crumb-btn" type="button">Download ▾</button>
@@ -191,6 +195,15 @@ app.innerHTML = `
   </div>
 
 </main>
+
+<wa-dialog id="code-dialog" class="code-dialog" label="Python for this graph">
+  <p class="code-lede" id="code-lede"></p>
+  <pre class="code-block" id="code-block" tabindex="0" aria-label="Python code"><code></code></pre>
+  <div slot="footer" class="code-actions">
+    <button class="crumb-btn" id="code-save" type="button">Download .py</button>
+    <button class="crumb-btn code-copy" id="code-copy" type="button">Copy code</button>
+  </div>
+</wa-dialog>
 
 <footer class="footer" id="footer"></footer>
 `;
@@ -1339,6 +1352,84 @@ ${
       source: source("spillover_heatmap (pairwise_net)"),
     };
   };
+  // the graph's Python: the library calls the page made, for the window and pick on show
+  const freqKeyFor = (s: State) => {
+    const m = s.measure;
+    const blocks = meta.frequency[m] as Record<string, unknown>;
+    if (s.window !== "t" && blocks[s.window]) return s.window;
+    const when = parseDate(meta.dynamic[m].dates[s.t])!;
+    return (["p1", "p2", "p3", "p4"] as const).find((k) => {
+      const [a, z] = periodBounds(staticBlock(data, m, k));
+      return when >= a && when <= z;
+    }) ?? "p4";
+  };
+  const codeFor = (v: CodeView) => {
+    const s = store.get();
+    const m = s.measure;
+    const dyn = meta.dynamic[m];
+    const file = m === "volatility" ? "series_volatility.csv" : "series.csv";
+    return pythonFor({
+      view: v,
+      state: s,
+      frame: model.frame(s),
+      title: ds.title,
+      items: ds.items,
+      step: ds.step,
+      steps: ds.steps,
+      measureName: (ds.id === "stocks" && MEASURE_COPY[m]?.label) || mName(m),
+      stocks: ds.id === "stocks",
+      volatility: m === "volatility",
+      seriesUrl: own ? null : new URL(`data/${ds.dir}${file}`, document.baseURI).href,
+      upload: own ? { name: own.rec.name, kind: own.rec.kind } : null,
+      names,
+      window: dyn.window,
+      dates: dyn.dates,
+      total: dyn.total,
+      blocks: meta.static[m] as Record<string, { label: string; start: string; end: string; total: number }>,
+      freqKey: freqKeyFor(s),
+      regionOf: REGION_OF,
+      regions: REGION_ORDER.filter((g) => names.some((n) => REGION_OF[n] === g)),
+      quad: v === "network" && g2Style === "quad" ? { date: dyn.dates[stepOfWindow(s)], lag: quadLag(m) } : null,
+      grid: g3Style === "grid",
+    });
+  };
+  const codeDialog = $("code-dialog") as HTMLElement & { open: boolean };
+  let codeText = "";
+  let codeName = "";
+  $("code-open").addEventListener("click", () => {
+    if (view === "home" || view === null) return;
+    const s = store.get();
+    codeText = codeFor(view);
+    codeName = `pyconnectedness-${view}-${ds.id}-${s.measure}.py`;
+    codeDialog.setAttribute("label", `Python for the ${TITLES[view].charAt(0).toLowerCase()}${TITLES[view].slice(1)}`);
+    const pick = s.pair ? `, ${s.pair[0]} → ${s.pair[1]} picked` : s.selected && view !== "index" && view !== "frequency" ? `, ${s.selected} picked` : "";
+    $("code-lede").textContent = `The library's own calls for what's on screen: ${model.frame(s).label}${pick}. Run it in a notebook and every number it prints matches the page.`;
+    $("code-block").querySelector("code")!.textContent = codeText;
+    $("code-copy").textContent = "Copy code";
+    codeDialog.open = true;
+  });
+  $("code-copy").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(codeText);
+    } catch {
+      // no clipboard access (an http page, an old browser): select it for Ctrl+C instead
+      const r = document.createRange();
+      r.selectNodeContents($("code-block"));
+      getSelection()?.removeAllRanges();
+      getSelection()?.addRange(r);
+      $("code-copy").textContent = "Selected: press Ctrl+C";
+      return;
+    }
+    $("code-copy").textContent = "Copied";
+  });
+  $("code-save").addEventListener("click", () => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([codeText], { type: "text/x-python" }));
+    a.download = codeName;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  });
+
   $("export").addEventListener("wa-select", (ev) => {
     const kind = (ev as CustomEvent<{ item: HTMLElement & { value: string } }>).detail.item.value;
     if (view === "home" || view === null) return;

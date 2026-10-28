@@ -2194,6 +2194,8 @@ svg {
 
 .crumb-tools {
   margin-left: auto;
+  display: inline-flex;
+  gap: 8px;
 }
 
 #context {
@@ -2670,4 +2672,111 @@ wa-dropdown wa-dropdown-item [slot="details"] {
     min-width: 0;
     width: 100%;
   }
+}
+
+/* a graph's Python: the library calls behind it, to copy or download */
+.code-dialog {
+  --width: min(880px, calc(100vw - 32px));
+  --spacing: 24px;
+  --wa-color-surface-raised: var(--panel);
+  --wa-color-text-normal: var(--stone);
+  --wa-panel-border-radius: var(--radius);
+  font-family: var(--f-sans);
+  color: var(--stone);
+}
+
+.code-dialog::part(title) {
+  font: 700 18px var(--f-sans);
+  color: var(--stone);
+}
+
+.code-dialog::part(close-button) {
+  color: var(--stone);
+}
+
+.code-lede {
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--stone);
+}
+
+.code-block {
+  margin: 0;
+  max-height: min(60vh, 560px);
+  overflow: auto;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--stone);
+  font: 400 12.5px/1.6 var(--f-num);
+  white-space: pre;
+  tab-size: 4;
+}
+
+.code-block:focus-visible {
+  outline: 3px solid var(--stone);
+  outline-offset: 2px;
+}
+
+.code-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* the main action in ink; "Copied" fits the same width, so nothing moves */
+.code-copy {
+  min-width: 12.5em;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.code-copy:hover {
+  border-color: var(--accent);
+}
+
+.crumb-btn:focus-visible {
+  outline: 3px solid var(--stone);
+  outline-offset: 2px;
+}
+
+/* the page's inline `code` pill doesn't apply inside a block (its padding shifted the first line) */
+.code-block code {
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+.code-block ::selection {
+  background: var(--stone);
+  color: var(--panel);
+}
+
+/* on a phone the tools take their own row under the way back, so nothing runs off the screen */
+@media (max-width: 600px) {
+  .crumb {
+    flex-wrap: wrap;
+    gap: 8px 14px;
+  }
+  .crumb-tools {
+    margin-left: 0;
+    width: 100%;
+  }
+  .code-dialog {
+    --spacing: 16px;
+  }
+  .code-block {
+    max-height: 46vh;
+  }
+}
+
+.code-actions .crumb-btn {
+  white-space: nowrap;
 }
