@@ -10,7 +10,8 @@
  * - flat circles in the region's colour (after the transit-map reference): solid if a market
  *   passes on more, a light tint with a thin outline in its colour if it takes more; sized by
  *   |net|. Each is labelled with its name and net value.
- * - ink arrows whose width grows with the flow (`pairwise_net`), on one scale across every week.
+ * - ink pointed lines (charts/flow.ts): wide at the market passing on, a point at the one taking
+ *   in, the width proportional to the flow (`pairwise_net`), on one scale across every week.
  *   Only the strongest few are drawn until a market is picked (then all of its flows), so the
  *   picture never turns into a hairball; "all" draws every flow above the library's cut-off.
  * - a faint square grid behind, as in the reference.
@@ -20,14 +21,13 @@ import * as d3 from "d3";
 import type { Frame } from "../model";
 import { type Palette, WASH, fmtSigned, hueOf, wash } from "../encoding";
 import { hideTooltip, showTooltip } from "../tooltip";
+import { flowKey, flowPath, flowWidth } from "./flow";
 
 const SIZE = 760;
 const C = SIZE / 2;
 const R = 232; // the ring
 const NODE_MIN = 7;
 const NODE_MAX = 20;
-const LINE_MIN = 1.2;
-const LINE_MAX = 6.5;
 const GAP = 0.2; // radians left empty at 3 and 9 o'clock, between the halves
 const BEND = 0.3; // how far a link bows toward the centre
 const CELL = 38; // the background grid
@@ -108,8 +108,14 @@ export class NetworkChart {
     g.append("text").attr("class", "net-side").attr("x", 14).attr("y", C + 22).attr("fill", p.fg).text("↓ takes in more");
   }
 
-  /** a curve from a to b bowed toward the centre, trimmed at both circles, plus the arrowhead at b */
-  private link(e: Edge, rs: number, rr: number, w: number): { line: string; head: string; mid: [number, number] } {
+  /** the width key, bottom left: drawn in the chart, so a downloaded figure carries it */
+  private drawKey(p: Palette, maxPair: number, ink: string) {
+    flowKey(this.gGrid, 16, SIZE - 74, maxPair, ink, p.fg);
+  }
+
+  /** a curve from a to b bowed toward the centre: the pointed line along it (its wide end under
+   * the sender's circle, its point at the receiver's edge), and its centre line to hover */
+  private link(e: Edge, rs: number, rr: number, w: number): { line: string; hit: string; mid: [number, number] } {
     const a = this.byIdx[e.s];
     const b = this.byIdx[e.r];
     const mx = (a.x + b.x) / 2;
@@ -121,21 +127,12 @@ export class NetworkChart {
       return [u * u * a.x + 2 * u * t * cx + t * t * b.x, u * u * a.y + 2 * u * t * cy + t * t * b.y];
     };
     const len = Math.hypot(b.x - a.x, b.y - a.y) * 1.06 || 1;
-    const headLen = 6 + w * 1.6;
-    const headW = 3.5 + w * 1.1;
-    const t0 = Math.min(0.4, (rs + 3) / len);
-    const tTip = 1 - Math.min(0.4, (rr + 3) / len);
-    const tBase = Math.max(t0 + 0.02, tTip - headLen / len);
+    const t0 = Math.min(0.3, (rs * 0.5) / len);
+    const tTip = 1 - Math.min(0.4, (rr + 2) / len);
     const n = 20;
     const f = ([x, y]: [number, number]) => `${x.toFixed(1)},${y.toFixed(1)}`;
-    const line = `M${d3.range(n + 1).map((i) => f(at(t0 + ((tBase - t0) * i) / n))).join("L")}`;
-    const tip = at(tTip);
-    const base = at(tBase);
-    const L = Math.hypot(tip[0] - base[0], tip[1] - base[1]) || 1;
-    const ux = (tip[0] - base[0]) / L;
-    const uy = (tip[1] - base[1]) / L;
-    const head = `M${f(tip)}L${f([base[0] - uy * headW, base[1] + ux * headW])}L${f([base[0] + uy * headW, base[1] - ux * headW])}Z`;
-    return { line, head, mid: at(0.5) };
+    const hit = `M${d3.range(n + 1).map((i) => f(at(t0 + ((tTip - t0) * i) / n))).join("L")}`;
+    return { line: flowPath(at, t0, tTip, w, n), hit, mid: at(0.5) };
   }
 
   /** `duration` > 0 animates a change of week/window (play, scrub); 0 for hover, selection or
@@ -156,14 +153,14 @@ export class NetworkChart {
     const tr = <S extends d3.Selection<any, any, any, any>>(sel: S): S =>
       (duration > 0 ? sel.transition().duration(duration).ease(d3.easeLinear) : sel.interrupt()) as unknown as S;
     this.drawGrid(p);
+    this.drawKey(p, maxPair, ink);
     const pos = this.layout(frame);
     this.byIdx = [];
     for (const q of pos) this.byIdx[q.idx] = q;
     const k = this.names.length;
     const nodeR = d3.scaleSqrt().domain([0, maxNet]).range([NODE_MIN, NODE_MAX]).clamp(true);
-    // width from the cut-off up to the strongest flow in any week: the step between widths is
-    // the step between flows, and the scale never moves as the weeks change
-    const weight = d3.scaleLinear().domain([frame.threshold, maxPair]).range([LINE_MIN, LINE_MAX]).clamp(true);
+    // width proportional to the flow, from zero, on one scale for every week (charts/flow.ts)
+    const weight = (v: number) => flowWidth(v, maxPair);
     const focusIdx = focus ? this.names.indexOf(focus) : -1;
     const pairIdx = pair && focusIdx < 0 ? pair.map((n) => this.names.indexOf(n)) : null;
     const isPair = (e: Edge) =>
@@ -181,10 +178,8 @@ export class NetworkChart {
         : limit === null
           ? all
           : all.slice(-limit);
-    // weaker arrows a little lighter, so the widest read first; all of them dark enough to follow
-    const strength = d3.scaleLinear().domain([frame.threshold, maxPair]).range([edges.length > 20 ? 0.3 : 0.55, 1]).clamp(true);
-
-    const style = (e: Edge) => (pairIdx ? { c: p.accent, op: 1 } : { c: ink, op: strength(e.v) });
+    // every flow in full ink: strength is said by width alone (a fade read as "less certain")
+    const style = (e: Edge) => (pairIdx ? { c: p.accent, op: 1 } : { c: ink, op: 1 });
     const shape = (e: Edge) => this.link(e, nodeR(Math.abs(frame.net[e.s])), nodeR(Math.abs(frame.net[e.r])), weight(e.v));
 
     const joined = this.gEdges.selectAll<SVGGElement, Edge>("g.edge:not(.exiting)").data(edges, (e) => `${e.s}-${e.r}`);
@@ -194,19 +189,17 @@ export class NetworkChart {
     const entering = joined.enter().append("g").attr("class", "edge").style("opacity", 0);
     entering.append("path").attr("class", "hit");
     entering.append("path").attr("class", "line");
-    entering.append("path").attr("class", "head");
     entering.append("text").attr("class", "edge-value");
     const edgeSel = entering.merge(joined);
-    edgeSel.select<SVGPathElement>("path.hit").attr("d", (e) => shape(e).line).attr("fill", "none").attr("stroke", "transparent").attr("stroke-width", 14);
+    edgeSel.select<SVGPathElement>("path.hit").attr("d", (e) => shape(e).hit).attr("fill", "none").attr("stroke", "transparent").attr("stroke-width", 14);
+    // a hairline of the page's colour round each one, so lines that cross stay apart
     tr(edgeSel.select<SVGPathElement>("path.line"))
       .attr("d", (e: Edge) => shape(e).line)
-      .attr("fill", "none")
-      .attr("stroke", (e: Edge) => style(e).c)
-      .attr("stroke-width", (e: Edge) => weight(e.v))
-      .attr("stroke-linecap", "round");
-    tr(edgeSel.select<SVGPathElement>("path.head"))
-      .attr("d", (e: Edge) => shape(e).head)
-      .attr("fill", (e: Edge) => style(e).c);
+      .attr("fill", (e: Edge) => style(e).c)
+      .attr("stroke", p.panel)
+      .attr("stroke-width", 1.5)
+      .attr("stroke-linejoin", "round")
+      .attr("paint-order", "stroke"); // the outline sits behind the fill: it parts lines that cross without thinning them
     // the three strongest flows carry their value, like the reference's numbered stops
     edgeSel
       .select<SVGTextElement>("text.edge-value")

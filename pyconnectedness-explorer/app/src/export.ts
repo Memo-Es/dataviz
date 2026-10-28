@@ -189,7 +189,9 @@ export async function figureSvg(f: Figure): Promise<{ svg: string; w: number; h:
       x = PAD;
       y += 20;
     }
-    if (sw && swCol && swCol !== "rgba(0, 0, 0, 0)") parts.push(`<rect x="${x}" y="${y - 9}" width="10" height="10" rx="2" fill="${swCol}"${swEdge ? ` stroke="${swEdge}" stroke-width="1.5"` : ""}/>`);
+    // the line key is a pointed line (its swatch is clipped to one on the page): draw it as one
+    if (sw?.classList.contains("arrowkey")) parts.push(`<path d="M${x},${y - 9}L${x + 12},${y - 4}L${x},${y + 1}Z" fill="${swCol}"/>`);
+    else if (sw && swCol && swCol !== "rgba(0, 0, 0, 0)") parts.push(`<rect x="${x}" y="${y - 9}" width="10" height="10" rx="2" fill="${swCol}"${swEdge ? ` stroke="${swEdge}" stroke-width="1.5"` : ""}/>`);
     else if (sw && swEdge) parts.push(`<rect x="${x}" y="${y - 9}" width="10" height="10" rx="2" fill="none" stroke="${swEdge}" stroke-width="1.5"/>`);
     text(label, x + (sw ? 16 : 0), y, font);
     x += itemW;

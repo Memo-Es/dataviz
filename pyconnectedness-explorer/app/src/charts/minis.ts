@@ -4,6 +4,7 @@
  * Each returns an SVG string with a viewBox, so it scales to its card.
  */
 import * as d3 from "d3";
+import { flowPath, flowWidth } from "./flow";
 
 /** graph 1: the rolling index as a soft line, the long-run level dashed, the picked step a dot */
 export function miniLine(v: number[], t: number | null, longRun: number, c: { ink: string; accent: string; wash: string; muted: string }): string {
@@ -36,6 +37,8 @@ export function miniRing(
   hueOf: (n: string) => string,
   fill: (n: string, send: boolean) => string,
   ink: string,
+  /** the strongest flow in any week: the ring's one scale for every week */
+  maxPair: number,
   flows = 6
 ): string {
   const S = 240;
@@ -58,15 +61,23 @@ export function miniRing(
   matrix.forEach((row, s) => row.forEach((v, t) => v > threshold && edges.push([s, t, v])));
   edges.sort((a, b) => b[2] - a[2]);
   const top = edges.slice(0, flows).reverse();
-  const w = d3.scaleLinear().domain([threshold, edges[0]?.[2] ?? threshold + 1]).range([0.8, 2.4]);
-  const curve = (s: number, t: number) => {
+  // pointed lines as on the full ring (charts/flow.ts), at this ring's size
+  const scale = S / 760;
+  const flow = (s: number, t: number, v: number) => {
     const a = pos[s];
     const b = pos[t];
     const mx = (a.x + b.x) / 2;
     const my = (a.y + b.y) / 2;
-    return `M${a.x.toFixed(1)},${a.y.toFixed(1)}Q${(mx + (C - mx) * 0.3).toFixed(1)},${(my + (C - my) * 0.3).toFixed(1)} ${b.x.toFixed(1)},${b.y.toFixed(1)}`;
+    const cx = mx + (C - mx) * 0.3;
+    const cy = my + (C - my) * 0.3;
+    const at = (q: number): [number, number] => {
+      const u = 1 - q;
+      return [u * u * a.x + 2 * u * q * cx + q * q * b.x, u * u * a.y + 2 * u * q * cy + q * q * b.y];
+    };
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    return flowPath(at, Math.min(0.3, (r(Math.abs(net[s])) * 0.5) / len), 1 - Math.min(0.4, (r(Math.abs(net[t])) + 1) / len), flowWidth(v, maxPair) * scale * 1.6, 12, 0.9);
   };
-  const lines = top.map(([s, t, v]) => `<path d="${curve(s, t)}" fill="none" stroke="${ink}" stroke-opacity="0.7" stroke-width="${w(v).toFixed(2)}"/>`).join("");
+  const lines = top.map(([s, t, v]) => `<path d="${flow(s, t, v)}" fill="${ink}"/>`).join("");
   const dots = idx
     .map((i) => `<circle cx="${pos[i].x.toFixed(1)}" cy="${pos[i].y.toFixed(1)}" r="${r(Math.abs(net[i])).toFixed(1)}" fill="${fill(names[i], net[i] >= 0)}" stroke="${hueOf(names[i])}" stroke-width="1.25"/>`)
     .join("");

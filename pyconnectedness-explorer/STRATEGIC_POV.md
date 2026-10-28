@@ -344,10 +344,23 @@ Each rule exists because breaking it made a real reader stumble during the redes
 
 ![After: The ring ordered by net: transmitters across the top, strongest at the left; receivers across the bottom; "↑ passes on more / ↓ takes in more" across the middle](docs/pov-images/5.10b.png)
 
-- **What was added.** The library's circle, kept, with position given a meaning. Nodes are coloured by region, a deeper wash for transmitters and a paler one for receivers. Area comes from |net| and arrow width from the flow, both on one scale across every week. Each node is labelled with its name and net value.
+- **What was added.** The library's circle, kept, with position given a meaning. Nodes are coloured by region, a deeper wash for transmitters and a paler one for receivers. Area comes from |net|, on one scale across every week; the flows are pointed lines (below). Each node is labelled with its name and net value.
 - **Why.** On the library's circle, position means nothing, and the reader finds the transmitters by reading every label. Ordered, "who is most central" becomes "who is at the top left". One scale means a size can be compared between weeks.
 - **Considered.** A spring layout moves the nodes every week, which the library's own docstring warns about. A flat transit-map layout (height for net) was built and read well, but lost the picture users know. We weighed two rows, which lose it too.
 - **Checked by.** AAA on every label; labels sit outside the ring so none collide.
+
+##### 5.10, continued: pointed lines, strength and direction in one mark
+
+**Considered.** The same week (20 Mar 2020, the 10 strongest flows, real values) drawn six ways: the library's own, the arrows as they were, proportional width, pointed lines, a gradient and dashes. *Source: a prototype on the explorer's data.*
+
+![Considered: one week drawn six ways](docs/pov-images/5.10c-options.png)
+
+**After.** Each flow runs from its wide end, under the market that passes on more, to a point at the one that takes it in. A key in the chart gives two widths in pp. *Source: current, `#network`, Ring (the After image of 5.10).*
+
+- **What was added.** Flows as pointed lines, in full ink, with no arrowheads. The width at the wide end is proportional to the flow, from zero, on one scale for every week. The same lines draw a picked market's flows in Quadrants and the small ring on the overview. A key inside the chart ("2 pp, 8 pp, the wide end passes on") travels with downloaded figures.
+- **Why.** The arrows as they were overstated strength and changed meaning between weeks. Their width started at each week's own cut-off, so 1.37 times the flow was drawn 2.1 times as wide, and a 4 pp flow was 1.6 px in March 2020 but about 2.6 px in June 2017. A fade made weaker arrows paler, which reads as "less certain", and the arrowheads piled up on the biggest receiver (seven on Argentina in the COVID week).
+- **Considered.** *Stroke darkness*: lightness is poorly judged, 4.0 against 5.5 pp came out as 48% against 66% ink, and pale lines fall to about 3:1. *Proportional width with arrowheads*: honest, but the heads still pile up. *A gradient*: its pale half reads as weak, so direction and strength mix. *Dashes*: they make groups, not amounts, and read as "uncertain". Pointed lines also have support in research: tapered edges beat arrowheads for reading direction (Holten and van Wijk, 2009).
+- **Checked by.** AAA on every label, light and dark; no layout shift; the tips keep a 1.6 px point so every line visibly reaches its receiver. Matplotlib draws the same shape on the library's curved edges (`arrowstyle="wedge"` with `arc3`), tested, so the library's plots can follow.
 
 #### 5.11 The 10 strongest flows, all on request
 
@@ -591,6 +604,7 @@ The library, the documentation and the website then draw from one source instead
 | 5.8 | Checked cards | A card true for stocks could mislead on other data | Checking by eye covers one dataset once | **A check on every printed number, run on deploy** |
 | 5.9 | Frequency bar | The bands came back only as numbers | A table reads row by row | **One bar per period**, under graph 1 and on its own page |
 | 5.10 | Ordered ring | On the library's circle, position meant nothing | A spring layout moves every week; transit map and two rows lose the familiar picture | **The ordered circle** |
+| 5.10 | Pointed lines | Widths started at each week's cut-off: they overstated strength and changed meaning between weeks; arrowheads piled up | Stroke darkness, proportional width with arrowheads, a gradient, dashes | **Pointed lines, width ∝ flow on one scale, a key in the chart** |
 | 5.11 | 10 strongest | Twenty or more arrows tangled | Fainter arrows still tangle | **10 by default, all on request** |
 | 5.12 | Quadrants | The ring can't show who is changing | A table says it in numbers, not at a glance | **A plane, as a switch** |
 | 5.13 | Trail | It looped like a connection | Keeping the curve invents movement | **Straight, thin and dotted** |
@@ -656,7 +670,7 @@ Ordered by the timeline, each tied to a success criterion.
 **Before the November release** *(success: redesigned graphs in a release or the documentation)*
 
 - Ship the style sheet and the restyled network, heatmap and time-series recipes into the documentation, so the redesign is in the project and not only in the explorer.
-- Decide which explorer ideas move into the library's own plots. The ordered ring and the insight cards are the strongest candidates; tapered or hand-drawn shapes are not, because they would make the plotting code hard to maintain without a designer.
+- Decide which explorer ideas move into the library's own plots. The ordered ring, the pointed lines and the insight cards are the strongest candidates. Pointed lines cost the library almost nothing: matplotlib draws them (`arrowstyle="wedge"`) on the curved edges it already uses. Hand-drawn shapes are not candidates, because they would make the plotting code hard to maintain without a designer.
 - Bring the style guide up to date with the explorer's decisions. It still describes hover previews, the play button and the earlier network edges. It should add the overview, *Nymphéas* with washes and edges, the monochrome selected state, the Web Awesome theme, the figure downloads, the Dots and Original heatmap, the 10-strongest rule and "What spreads".
 - Move the palette validator and the contrast and layout-shift checks into the repository next to the insights check, and have the deploy run them too.
 
@@ -708,7 +722,7 @@ Every proposal starts from what the library and the authors' demo (`examples/Dem
 | Position | `circular_layout`, in data order: position means nothing | Transmitters across the top, strongest at the left; receivers across the bottom, biggest at the left; the middle line labelled "↑ passes on more / ↓ takes in more" | Position becomes a ranking: "most central" is "top left" |
 | Node colour | Red for net transmitters, blue for net receivers (`tab:red`, `tab:blue`) | Region colour, a deeper wash for transmitters and a paler one for receivers, each edged in the full hue | Colour carries region, as on every graph. Transmitter or receiver is already said twice: by position and by depth |
 | Node size | Area from \|net\|, relative to the largest in the plot | Area from \|net\|, on one scale across every week | Sizes can be compared between weeks |
-| Arrows | Grey, width relative to the strongest in the plot, slightly curved | Ink, width from the cut-off to the strongest flow in any week, curved toward the centre | Wider means stronger, and means the same in every week |
+| Flows | Grey arrows, width relative to the strongest in the plot, slightly curved | Ink pointed lines, wide at the sender, a point at the receiver; width proportional to the flow on one scale for every week; a width key in the chart | Wider means stronger, twice the flow is twice the width, and it means the same in every week |
 | Labels | The name on each node | The name and its net value beside each node, outside the ring | The number lives in the graph |
 | A second view | None | Quadrants: net across, its change over about a quarter up and down, with the corners named (rising transmitters, fading transmitters, deepening receivers, recovering receivers) | Answers what the ring can't: who is changing |
 

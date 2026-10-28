@@ -554,7 +554,7 @@ async function main() {
     const sel = s.selected;
     const selIdx = sel ? names.indexOf(sel) : -1;
     const own = selIdx < 0 ? 0 : frame.matrix[selIdx].filter((v) => v > frame.threshold).length + frame.matrix.filter((row) => row[selIdx] > frame.threshold).length;
-    const how = `each arrow runs from the ${ds.item} that passes on more to the one that takes it in`;
+    const how = `each line runs from the ${ds.item} that passes on more to the one that takes it in`;
     $("network-sub").textContent =
       g2Style !== "ring"
         ? `The strongest 10% of flows ${span}, ${nFlows} in all: ${how}.`
@@ -581,8 +581,8 @@ async function main() {
       ? `<i class="dot tint"></i>Paler: left of 0, takes in more`
       : `<i class="dot tint"></i>Bottom half, paler: takes in more · bigger = more`;
     $("leg-arrow").innerHTML = quad
-      ? `<i class="arrowkey"></i>Hover or pick a ${ds.item} for its path over the last ${quadLag(m)} ${ds.steps} and its arrows`
-      : `<i class="arrowkey"></i>Arrow: from the ${ds.item} that passes on more to the one that takes in · wider = stronger`;
+      ? `<i class="arrowkey"></i>Hover or pick a ${ds.item} for its path over the last ${quadLag(m)} ${ds.steps} and its flows`
+      : `<i class="arrowkey"></i>Each line runs from its wide end, the ${ds.item} that passes on more, to its point, the one that takes in · wider = stronger`;
     if (quad) {
       const t = stepOfWindow(s);
       const net = meta.dynamic[m].net;
@@ -1103,7 +1103,7 @@ ${
     $("mini-network").innerHTML =
       head("2 · Who passes shocks to whom?", "Connectedness network", "connectedness_graph") +
       `<p class="mini-num">${nm(hi)} passes on the most, ${nm(lo)} takes in the most</p>
-      <div class="mini-chart mini-ring">${miniRing(names, frame.net, frame.matrix, frame.threshold, model.maxNet[m], hueOfNow, fill, p.fg)}</div>`;
+      <div class="mini-chart mini-ring">${miniRing(names, frame.net, frame.matrix, frame.threshold, model.maxNet[m], hueOfNow, fill, p.fg, model.maxPair[m])}</div>`;
 
     // 3: the matrix, with the heatmap's own one-line takeaway
     $("mini-heatmap").innerHTML =
@@ -1194,7 +1194,7 @@ ${
     const name = s.selected ?? names[byNet[0]];
     const isDefault = !s.selected;
     if (!name) {
-      el.innerHTML = `<div class="card-head"><div><p class="q">Detail · graphs 2 and 3</p><h2>Pick a ${ds.item} or a pair</h2><p class="sub">Click a ${ds.item} (a circle, a bar or a heatmap label) to see where its shocks go and come from, or a pair (an arrow or a heatmap cell) to follow it over time.</p></div></div>
+      el.innerHTML = `<div class="card-head"><div><p class="q">Detail · graphs 2 and 3</p><h2>Pick a ${ds.item} or a pair</h2><p class="sub">Click a ${ds.item} (a circle, a bar or a heatmap label) to see where its shocks go and come from, or a pair (a line or a heatmap cell) to follow it over time.</p></div></div>
         <div class="empty">${names
           .slice()
           .sort()

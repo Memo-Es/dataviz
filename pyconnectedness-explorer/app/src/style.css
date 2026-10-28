@@ -892,7 +892,7 @@ svg {
   width: 30px;
   height: 10px;
   background: var(--bead-ink);
-  clip-path: polygon(0 40%, 70% 40%, 70% 0, 100% 50%, 70% 100%, 70% 60%, 0 60%);
+  clip-path: polygon(0 0, 100% 50%, 0 100%); /* a pointed line: wide end passes on, point takes in */
 }
 
 /* graph 2: the network and its node values in one card */

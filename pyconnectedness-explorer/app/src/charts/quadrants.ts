@@ -14,6 +14,7 @@
 import * as d3 from "d3";
 import type { Frame } from "../model";
 import { type Palette, WASH, fmtSigned, hueOf, wash } from "../encoding";
+import { flowPath, flowWidth } from "./flow";
 import { hideTooltip, showTooltip } from "../tooltip";
 import type { NetworkCallbacks } from "./network";
 
@@ -21,8 +22,6 @@ const W = 760;
 const H = 700;
 const M = { top: 34, right: 28, bottom: 58, left: 70 };
 const NODE_R = 9;
-const LINE_MIN = 0.9;
-const LINE_MAX = 4.5;
 
 export interface QuadOptions {
   /** each item's change in net over `lag` steps, at the step on show */
@@ -99,7 +98,8 @@ export class QuadrantChart {
     const y = d3.scaleLinear().domain([-o.yMax, o.yMax]).range([H - M.bottom, M.top]).clamp(true);
     const k = this.names.length;
     const pts: Pt[] = this.names.map((name, i) => ({ name, idx: i, x: x(frame.net[i]), y: y(o.change[i]) }));
-    const weight = d3.scaleSqrt().domain([0, maxPair]).range([LINE_MIN, LINE_MAX]).clamp(true);
+    // pointed lines, on the ring's scale (charts/flow.ts)
+    const weight = (v: number) => flowWidth(v, maxPair);
 
     // ---- the frame: grid, the two zero lines, the axis names, the four phases
     const g = this.gFrame;
@@ -164,39 +164,28 @@ export class QuadrantChart {
     const style = (e: Edge) => {
       if (pairIdx) return isPair(e) ? { c: p.accent, op: 1 } : { c: ink, op: 0 };
       if (focusIdx < 0) return { c: ink, op: 0 };
-      return e.s === focusIdx || e.r === focusIdx ? { c: ink, op: 0.9 } : { c: ink, op: 0 };
+      return e.s === focusIdx || e.r === focusIdx ? { c: ink, op: 1 } : { c: ink, op: 0 };
     };
+    // straight, from under the sender's circle to a point at the receiver's edge
     const shape = (e: Edge) => {
       const a = pts[e.s];
       const b = pts[e.r];
-      const w = weight(e.v);
       const L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-      const ux = (b.x - a.x) / L;
-      const uy = (b.y - a.y) / L;
-      const headLen = 6 + w * 1.6;
-      const headW = 3.5 + w * 1.1;
-      const s0: [number, number] = [a.x + ux * (NODE_R + 3), a.y + uy * (NODE_R + 3)];
-      const tip: [number, number] = [b.x - ux * (NODE_R + 3), b.y - uy * (NODE_R + 3)];
-      const base: [number, number] = [tip[0] - ux * headLen, tip[1] - uy * headLen];
-      const f = ([px, py]: [number, number]) => `${px.toFixed(1)},${py.toFixed(1)}`;
-      return {
-        line: `M${f(s0)}L${f(base)}`,
-        head: `M${f(tip)}L${f([base[0] - uy * headW, base[1] + ux * headW])}L${f([base[0] + uy * headW, base[1] - ux * headW])}Z`,
-      };
+      const at = (t: number): [number, number] => [a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t];
+      return flowPath(at, Math.min(0.3, (NODE_R * 0.5) / L), 1 - Math.min(0.4, (NODE_R + 2) / L), weight(e.v), 2);
     };
     const joined = this.gEdges.selectAll<SVGGElement, Edge>("g.edge").data(edges, (e) => `${e.s}-${e.r}`);
     joined.exit().remove();
     const entering = joined.enter().append("g").attr("class", "edge").style("opacity", 0);
     entering.append("path").attr("class", "line");
-    entering.append("path").attr("class", "head");
     const edgeSel = entering.merge(joined);
     tr(edgeSel.select<SVGPathElement>("path.line"))
-      .attr("d", (e: Edge) => shape(e).line)
-      .attr("fill", "none")
-      .attr("stroke", (e: Edge) => style(e).c)
-      .attr("stroke-width", (e: Edge) => weight(e.v))
-      .attr("stroke-linecap", "round");
-    tr(edgeSel.select<SVGPathElement>("path.head")).attr("d", (e: Edge) => shape(e).head).attr("fill", (e: Edge) => style(e).c);
+      .attr("d", (e: Edge) => shape(e))
+      .attr("fill", (e: Edge) => style(e).c)
+      .attr("stroke", p.panel)
+      .attr("stroke-width", 1.5)
+      .attr("stroke-linejoin", "round")
+      .attr("paint-order", "stroke"); // the outline sits behind the fill: it parts lines that cross without thinning them
     edgeSel.style("pointer-events", "none");
     tr(edgeSel).style("opacity", (e: Edge) => style(e).op);
 
