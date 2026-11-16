@@ -12,7 +12,7 @@
  */
 import type { Frame, State } from "./model";
 
-export const LIB_COMMIT = "4cc953f8de24c2af4de2b62cf87bf1e4fc51ba02";
+export const LIB_COMMIT = "1e47ed87bbb0b6491743d789718707fcf3821462";
 const PIP = `pip install "pyconnectedness @ git+https://github.com/zstoi/PyConnectedness@${LIB_COMMIT}" matplotlib`;
 
 export type CodeView = "index" | "network" | "heatmap" | "frequency";
@@ -255,6 +255,55 @@ function frequency(c: CodeContext): string {
     `# the period on show: ${shownLabel}`,
     `print(frequency_connectedness(periods[${q(shownLabel)}], **FREQ))`,
   ].join("\n");
+}
+
+export interface DanubeCodeContext {
+  threshold: number;
+  lower: number;
+  selectionSeed: number;
+  picked: number;
+  pickedRiver: string;
+  root: number;
+  edges: { cause: number; effect: number; score: number | null }[];
+}
+
+/** Graph 4's Python: MaxLinear(...).fit(method="qtree"), on the library's own Danube example
+ * file, with the threshold and lower quantile MaxLinear.select_threshold chose (no Danube
+ * notebook has landed in the library to fix them instead -- see README.md at the repo root). */
+export function pythonForDanube(c: DanubeCodeContext): string {
+  const lines = [
+    `# 4 · Directed tree for extremes · Danube · picked: station ${c.picked} (${c.pickedRiver})`,
+    "# The PyConnectedness call behind this graph in the explorer, on the library's own example file:",
+    `#   ${PIP}`,
+    "import pandas as pd",
+    "from pyconnectedness.causality import MaxLinear",
+    "",
+    "# the library's own Danube example (examples/data/danube_log_discharges.csv), already logged",
+    "X = pd.read_csv(" + q("danube_log_discharges.csv") + ")",
+    "model = MaxLinear(X, transform=None)  # transform is unused by method=\"qtree\"",
+    "",
+    "# threshold and lower are not fixed by any docstring or Danube notebook for this dataset, so",
+    "# they come from the library's own selection (Algorithm 2 of Tran, Buck and Klueppelberg, 2024):",
+    `selection = model.select_threshold(log=False, seed=${c.selectionSeed})`,
+    `print(round(selection.threshold, 2), round(selection.lower, 2))  # ${c.threshold}, ${c.lower} on the page`,
+    "",
+    "fit = model.fit(method=\"qtree\", threshold=selection.threshold, lower=selection.lower, log=False)",
+    `print(fit.root)  # ${c.root} on the page`,
+    "print(fit.edges())  # cause (upstream) -> effect (downstream), by the quantile score of eq. (7)",
+    "",
+    "# checked against the paper's own ground truth (examples/data/danube_network.csv)",
+    "true_network = pd.read_csv(\"danube_network.csv\", index_col=0)",
+    "true_network.columns = true_network.columns.astype(int)",
+    "order = [int(n) for n in fit.names]",
+    "true_adj = true_network.loc[order, order].to_numpy()",
+    "print(fit.compare(true_adj))  # nSHD, FDR, FPR, TPR, for the tree and its reachability",
+    "",
+    `# the picked station's path to the root, as drawn on the page`,
+    `reach = fit.reachability`,
+    `downstream = [i for i in reach.columns if reach.loc[str(${c.picked}), i]]`,
+    `print(downstream)`,
+  ];
+  return `${lines.join("\n")}\n`;
 }
 
 export function pythonFor(c: CodeContext): string {

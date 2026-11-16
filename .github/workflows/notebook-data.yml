@@ -15,6 +15,8 @@ on:
       - "pyconnectedness-explorer/pipeline/validate.py"
       - "pyconnectedness-explorer/pipeline/requirements.txt"
       - "pyconnectedness-explorer/pipeline/run_datasets.py"
+      - "pyconnectedness-explorer/pipeline/run_danube.py"
+      - "pyconnectedness-explorer/pipeline/validate_danube.py"
       - "pyconnectedness-explorer/pipeline/datasets/**"
       - ".github/workflows/notebook-data.yml"
   workflow_dispatch:
@@ -61,6 +63,12 @@ jobs:
       - name: Build the other datasets from their public APIs (each independent)
         continue-on-error: true
         run: python run_datasets.py
+      - name: Graph 4 -- the directed tree for extremes on the Danube (no network needed)
+        id: danube
+        continue-on-error: true
+        run: |
+          python run_danube.py
+          python validate_danube.py
       - name: Commit the data
         working-directory: .
         run: |
@@ -73,6 +81,10 @@ jobs:
               pyconnectedness-explorer/app/public/data/pairwise_volatility.f32 \
               pyconnectedness-explorer/app/public/data/raw_snapshot.csv.gz \
               pyconnectedness-explorer/pipeline/out/reference
+          fi
+          if [ "${{ steps.danube.outcome }}" != "success" ]; then
+            echo "graph 4 (danube) failed to build or validate: keeping its last good build"
+            git checkout -- pyconnectedness-explorer/app/public/data/danube
           fi
           git add pyconnectedness-explorer/app/public/data pyconnectedness-explorer/pipeline/out/reference
           git diff --cached --quiet && { echo "no change"; exit 0; }

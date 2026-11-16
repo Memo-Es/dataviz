@@ -4,7 +4,7 @@ markets) next to its connectedness.json, so the code a graph's "Code" menu hands
 exact numbers the explorer ran the library on.
 
 Rebuilt from each dataset's raw snapshot with the same preparation as the build: the demo's cell 6
-for the stock markets (Demo.ipynb, pinned 4cc953f), prepare_* in datasets/sources.py for the rest.
+for the stock markets (Demo.ipynb, pinned 1e47ed8), prepare_* in datasets/sources.py for the rest.
 Each file is checked before it is written: the library's full-sample total on it must equal the
 one in connectedness.json, and the rolling index must match at every window.
 

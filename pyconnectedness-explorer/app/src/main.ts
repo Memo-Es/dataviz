@@ -15,7 +15,7 @@ import "@awesome.me/webawesome/dist/components/option/option.js";
 import "@awesome.me/webawesome/dist/components/dropdown-item/dropdown-item.js";
 import "@awesome.me/webawesome/dist/components/dialog/dialog.js";
 import { type Figure, downloadPng, downloadSvg } from "./export";
-import { type CodeView, pythonFor } from "./code";
+import { type CodeView, pythonFor, pythonForDanube } from "./code";
 import "@awesome.me/webawesome/dist/styles/themes/default.css";
 import { QuadrantChart } from "./charts/quadrants";
 import { RankingChart } from "./charts/ranking";
@@ -26,6 +26,45 @@ import { bandCopy } from "./charts/frequency";
 import { loadUpload, runUpload, saveUpload } from "./upload/upload";
 import { PALETTES, applyPalette, textSafe } from "./palettes";
 import { hueOf as hueOfNow } from "./encoding";
+import { DanubeMap, loadDanube, riverLegendGroups, type DanubeData, type DanubeStation } from "./charts/danube-map";
+
+/** graph 4's state, module-level because it is independent of the Store every other graph
+ * shares (one series, no dataset/measure to switch) -- set once by setUpDanube(), read by
+ * figureFor/codeFor's "danube" branches inside main() */
+let danube: { data: DanubeData; byId: Map<number, DanubeStation>; picked: number; reached: number[] } | null = null;
+
+function danubePickName(id: number): string {
+  return `station ${id} (${danube!.byId.get(id)!.river})`;
+}
+
+function danubeFigure(): Figure {
+  const host = document.getElementById("danube-map")!;
+  const { data, picked } = danube!;
+  return {
+    file: `pyconnectedness-danube-${picked}`,
+    title: "Directed tree for extremes",
+    question: "4 · Where does a shock travel downstream?",
+    tag: 'MaxLinear(…).fit(method="qtree")',
+    sentence: document.getElementById("danube-readout")!.innerText,
+    host,
+    layers: [...host.querySelectorAll<SVGSVGElement>(":scope > svg")],
+    legends: [document.getElementById("danube-legend")!],
+    source: `Source: PyConnectedness (commit ${data.source.commit.slice(0, 7)}), MaxLinear.fit(method="qtree", threshold=${data.method.selection.threshold}, lower=${data.method.selection.lower}). Station coordinates: graphicalExtremes (Asadi, Davison and Engelke, 2015). River lines: Natural Earth. Picked: ${danubePickName(picked)}. Made with PyConnectedness Explorer.`,
+  };
+}
+
+function danubeCode(): string {
+  const { data, picked, byId } = danube!;
+  return pythonForDanube({
+    threshold: data.method.selection.threshold,
+    lower: data.method.selection.lower,
+    selectionSeed: data.method.selection.seed,
+    picked,
+    pickedRiver: byId.get(picked)!.river,
+    root: data.root,
+    edges: data.edges,
+  });
+}
 
 
 /** the demo's two series of the stock data, in words that say what each asks */
@@ -86,6 +125,7 @@ app.innerHTML = `
     <a class="mini-card span-4" href="#frequency" id="mini-freq"></a>
     <!-- not a link: its only place to go would be graph 1 again, which the first card opens -->
     <div class="mini-card mini-static span-3" id="mini-insight"></div>
+    <a class="mini-card span-4" href="#danube" id="mini-danube"></a>
   </section>
 
   <section class="card span-12" id="g1">
@@ -193,6 +233,34 @@ app.innerHTML = `
 
     <section class="card span-5 detail" id="detail"></section>
   </div>
+
+  <!-- graph 4: the directed tree for extremes, on the Upper Danube -->
+  <section class="card span-12" id="g5" hidden>
+    <div class="card-head">
+      <div>
+        <p class="q">4 · Where does a shock travel downstream?</p>
+        <h2>Directed tree for extremes <code class="tag">MaxLinear(…).fit(method="qtree")</code></h2>
+        <p class="sub" id="danube-sub"></p>
+      </div>
+    </div>
+    <div class="readout" id="danube-readout" aria-live="polite"></div>
+    <div class="danube-controls">
+      <wa-select id="danube-pick" class="num" label="Pick a station" value="21"></wa-select>
+      <button class="icon-btn danube-play" id="danube-play" type="button" aria-label="Play: send a shock downstream from the picked station">▶</button>
+      <button class="crumb-btn small" id="danube-reset" type="button">Reset</button>
+    </div>
+    <div class="danube-body">
+      <div class="danube-map-wrap">
+        <div id="danube-map" class="chart-host"></div>
+      </div>
+      <div class="danube-side">
+        <div class="legend" id="danube-legend"></div>
+        <p class="danube-compare" id="danube-compare"></p>
+        <div class="danube-sources" id="danube-sources"></div>
+        <p class="danube-disclaimer">The gauges carry no dates: this is what the model predicts a shock would do, not a replay of a real flood.</p>
+      </div>
+    </div>
+  </section>
 
 </main>
 
@@ -475,11 +543,11 @@ async function main() {
         : ds.id === "stocks"
         ? `Every value on this page was produced by running PyConnectedness's own
           <a href="https://github.com/zstoi/PyConnectedness/blob/main/examples/Demo.ipynb">examples/Demo.ipynb</a>
-          unchanged (commit <code>4cc953f</code>) on Yahoo Finance data, with one extra cell at the end that only
+          unchanged (commit <code>1e47ed8</code>) on Yahoo Finance data, with one extra cell at the end that only
           exports what the demo already made. The run is checked against every number the demo prints.`
         : `The data comes from the ${ds.source} (${ds.api}). Every value on this page is computed by
           PyConnectedness's own functions (<code>static_connectedness</code>, <code>dynamic_connectedness</code>,
-          <code>frequency_connectedness</code>, commit <code>4cc953f</code>) with the authors' demo settings, and checked
+          <code>frequency_connectedness</code>, commit <code>1e47ed8</code>) with the authors' demo settings, and checked
           against the library's own identities.`
     }</p>
     <p>${meta.weeks} ${ds.steps}, ${fmtDate(parseDate(meta.sample[0])!)} to ${fmtDate(parseDate(meta.sample[1])!)}.
@@ -1250,12 +1318,13 @@ ${
   });
   // the overview, or one graph on its own: the address says which (#index, #network, #heatmap),
   // so the browser's back button and a shared link both work
-  type View = "home" | "index" | "network" | "heatmap" | "frequency";
+  type View = "home" | "index" | "network" | "heatmap" | "frequency" | "danube";
   const TITLES: Record<Exclude<View, "home">, string> = {
     index: "Rolling spillover index",
     network: "Connectedness network",
     heatmap: "Spillover heatmap",
     frequency: "Frequency-domain connectedness",
+    danube: "Directed tree for extremes",
   };
   let view: View | null = null;
   let keyboardNav = false;
@@ -1271,6 +1340,9 @@ ${
     $("g2").hidden = v !== "network";
     $("g3").hidden = v !== "heatmap";
     $("g4").hidden = v !== "frequency";
+    $("g5").hidden = v !== "danube";
+    // graph 4 has no window to pick: it isn't the connectedness measures' time dimension
+    $("context").hidden = v === "danube";
     $("g3-row").hidden = v !== "network" && v !== "heatmap";
     $("g3-row").classList.toggle("detail-only", v === "network");
     $("crumb").hidden = v === "home";
@@ -1292,12 +1364,13 @@ ${
 
   // the graph on show as a figure: its chart as drawn (picks included), framed for a report
   const figureFor = (v: Exclude<View, "home">): Figure => {
+    if (v === "danube") return danubeFigure();
     const s = store.get();
     const m = s.measure;
     const frame = model.frame(s);
     const when = (s.window === "t" ? meta.dynamic[m].dates[s.t] : s.window).toLowerCase();
     const source = (fn: string) =>
-      `Source: PyConnectedness (commit 4cc953f), ${fn}, ${mName(m).toLowerCase()}. ${ds.title}, from ${ds.source}. ${frame.label}.${
+      `Source: PyConnectedness (commit 1e47ed8), ${fn}, ${mName(m).toLowerCase()}. ${ds.title}, from ${ds.source}. ${frame.label}.${
         // a pick is named only where it is drawn: on the network and the heatmap
         v === "index" ? "" : s.selected ? ` Picked: ${s.selected}.` : s.pair ? ` Picked: ${s.pair[0]} → ${s.pair[1]}.` : ""
       } Made with PyConnectedness Explorer.`;
@@ -1398,6 +1471,16 @@ ${
   let codeName = "";
   $("code-open").addEventListener("click", () => {
     if (view === "home" || view === null) return;
+    if (view === "danube") {
+      codeText = danubeCode();
+      codeName = "pyconnectedness-danube.py";
+      codeDialog.setAttribute("label", "Python for the directed tree for extremes");
+      $("code-lede").textContent = `The library's own call, on the picked station: ${danubePickName(danube!.picked)}. Run it in a notebook and every number it prints matches the page.`;
+      $("code-block").querySelector("code")!.textContent = codeText;
+      $("code-copy").textContent = "Copy code";
+      codeDialog.open = true;
+      return;
+    }
     const s = store.get();
     codeText = codeFor(view);
     codeName = `pyconnectedness-${view}-${ds.id}-${s.measure}.py`;
@@ -1434,7 +1517,9 @@ ${
     const kind = (ev as CustomEvent<{ item: HTMLElement & { value: string } }>).detail.item.value;
     if (view === "home" || view === null) return;
     const f = figureFor(view);
-    (kind === "svg" ? downloadSvg(f) : downloadPng(f)).catch((e) => console.error("export failed", e));
+    // the map is asked for print (Demo Day flyers): a higher-resolution PNG than the other
+    // graphs' screen/slide default, since it's drawn once and then printed, not just viewed
+    (kind === "svg" ? downloadSvg(f) : downloadPng(f, view === "danube" ? 4 : 2)).catch((e) => console.error("export failed", e));
   });
 
   // controls
@@ -1478,6 +1563,100 @@ ${
     else if (ev.key === "ArrowLeft") step(ev.shiftKey ? -52 : -1);
     else if (ev.key === "Escape") store.set({ selected: null, pair: null });
   });
+
+  await setUpDanube();
+}
+
+/** graph 4: the directed tree for extremes, on the Upper Danube. Independent of every other
+ * graph's dataset/measure -- there is one series, from the library's own examples/data -- so it
+ * loads and wires itself once, outside the Store the other graphs share. */
+async function setUpDanube() {
+  let data: DanubeData;
+  try {
+    data = await loadDanube();
+  } catch (err) {
+    console.error("danube.json failed to load", err);
+    document.getElementById("mini-danube")?.remove();
+    document.getElementById("g5")?.remove();
+    return;
+  }
+
+  const byId = new Map(data.stations.map((s) => [s.id, s]));
+  const defaultPick = data.stations.some((s) => s.id === 21) ? 21 : data.stations[0].id;
+  danube = { data, byId, picked: defaultPick, reached: [] };
+  const pickName = danubePickName;
+
+  const select = document.getElementById("danube-pick") as HTMLElement & { value: string };
+  select.innerHTML = data.stations
+    .map((s) => s.id)
+    .sort((a, b) => a - b)
+    .map((id) => `<wa-option value="${id}">Station ${id} · ${byId.get(id)!.river}${id === data.root ? " (root)" : ""}</wa-option>`)
+    .join("");
+  select.value = String(defaultPick);
+
+  document.getElementById("danube-sub")!.textContent =
+    `Pick a gauge; the model's own tree carries a shock down to where the data says it ends up, the root at station ${data.root}, sized at each step by the max-linear score of the edge it travelled.`;
+
+  const map = new DanubeMap(document.getElementById("danube-map")!, data, (r, p) => {
+    danube!.reached = r;
+    danube!.picked = p;
+    updateReadout();
+  });
+  map.pick(defaultPick);
+
+  function updateReadout() {
+    const chain = danube!.reached;
+    const readout = document.getElementById("danube-readout")!;
+    if (chain.length === 0) {
+      readout.innerHTML = `Picked: <b>${pickName(danube!.picked)}</b>. Press play to send a shock downstream.`;
+      return;
+    }
+    const names = chain.map((id) => `<b>${id}</b> (${byId.get(id)!.river})`);
+    const atRoot = chain[chain.length - 1] === data.root;
+    readout.innerHTML = `From <b>${pickName(danube!.picked)}</b>, the model's tree reaches ${names.join(" → ")}${atRoot ? ", the root" : ""}.`;
+  }
+
+  // the legend: river colours (the page's one colour rule, applied to this graph), the two
+  // marks (edge width = score, picked/reached ring), and the paper's own comparison
+  const groups = riverLegendGroups(data);
+  document.getElementById("danube-legend")!.innerHTML =
+    groups.map((g) => `<span><i class="dot" style="background:${g.color}"></i>${g.group}</span>`).join("") +
+    `<span><i class="taper" style="background:var(--accent)"></i>Line width: the edge's max-linear score</span>` +
+    `<span><i class="dot ring" style="border-color:var(--stone)"></i>The root</span>`;
+
+  const cmp = data.comparison_to_ground_truth;
+  document.getElementById("danube-compare")!.innerHTML =
+    `Checked against the paper's own ground truth (<code>examples/data/danube_network.csv</code>): ` +
+    `<b>${cmp.undirected_matches} of ${cmp.edges_total}</b> links match either way, <b>${cmp.directed_matches} of ${cmp.edges_total}</b> match with direction too ` +
+    `(nSHD ${cmp.metrics.tree.nshd.toFixed(2)}, TPR ${cmp.metrics.tree.tpr.toFixed(2)}).`;
+
+  document.getElementById("danube-sources")!.innerHTML =
+    `<h4>Data sources</h4><ul>
+      <li>PyConnectedness (<a href="https://github.com/zstoi/PyConnectedness" target="_blank" rel="noopener">GitHub</a>, commit <code>${data.source.commit.slice(0, 7)}</code>): the discharge data, the fitted tree and its scores, and the ground-truth comparison.</li>
+      <li>Tran, Buck and Klüppelberg (2024), "Estimating a directed tree for extremes", <i>JRSS B</i> 86(3), 771&ndash;792: the method and the Danube dataset's origin.</li>
+      <li>Station names, coordinates and altitudes: the R package <a href="https://github.com/sebastian-engelke/graphicalextremes" target="_blank" rel="noopener">graphicalExtremes</a> (Asadi, Davison and Engelke, 2015), not from PyConnectedness itself.</li>
+      <li>River lines: <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a> (public domain) where a named river reaches both gauges; a straight line between the two real gauge coordinates otherwise &mdash; see <code>pipeline/datasets/danube/README.md</code> for which is which.</li>
+    </ul>`;
+
+  select.addEventListener("wa-change", () => map.pick(Number(select.value)));
+  const playBtn = document.getElementById("danube-play") as HTMLButtonElement;
+  playBtn.addEventListener("click", () => {
+    if (map.isPlaying) return;
+    playBtn.disabled = true;
+    playBtn.textContent = "⏸";
+    map.play(() => {
+      playBtn.disabled = false;
+      playBtn.textContent = "▶";
+    });
+  });
+  document.getElementById("danube-reset")!.addEventListener("click", () => map.pick(danube!.picked));
+
+  // the mini-card on the overview
+  const miniCmp = `${cmp.undirected_matches}/${cmp.edges_total}`;
+  document.getElementById("mini-danube")!.innerHTML =
+    `<div class="mini-head"><p class="q">4 · Where does a shock travel downstream?</p><span class="mini-open" aria-hidden="true">↗</span></div>
+    <h3>Directed tree for extremes <code class="tag">MaxLinear</code></h3>
+    <p class="mini-num">The model's tree matches the paper's own ground truth on <b>${miniCmp}</b> links</p>`;
 }
 
 main().catch((err) => {

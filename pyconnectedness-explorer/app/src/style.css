@@ -2780,3 +2780,102 @@ wa-dropdown wa-dropdown-item [slot="details"] {
 .code-actions .crumb-btn {
   white-space: nowrap;
 }
+
+/* ---- graph 4: the Danube directed tree for extremes ---- */
+.danube-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 20px;
+  align-items: start;
+}
+
+.danube-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.danube-controls .num {
+  min-width: 170px;
+}
+
+.danube-play {
+  font-size: 15px;
+}
+
+.danube-map-wrap {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+
+.danube-id {
+  font-family: var(--f-sans);
+  pointer-events: none;
+  user-select: none;
+}
+
+.danube-root-label {
+  font-size: 10px;
+  font-weight: 700;
+  fill: var(--secondary);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.danube-stations .hit {
+  cursor: pointer;
+}
+
+.danube-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.danube-side .legend {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.danube-sources {
+  font-size: 12.5px;
+  color: var(--secondary);
+  line-height: 1.5;
+}
+
+.danube-sources h4 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 6px;
+  color: var(--secondary);
+}
+
+.danube-sources ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.danube-disclaimer {
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--secondary);
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.danube-compare {
+  font-size: 12.5px;
+  color: var(--secondary);
+}
+
+@media (max-width: 860px) {
+  .danube-body {
+    grid-template-columns: 1fr;
+  }
+}

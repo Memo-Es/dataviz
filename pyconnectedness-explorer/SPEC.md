@@ -15,7 +15,7 @@ See `CONTEXT.md` for the client questionnaire and the decision it settles: this 
 Every number in the explorer must come from running `examples/Demo.ipynb` exactly as it is in the PyConnectedness repo. Do not port it, refactor it or "clean it up". Run the notebook itself and only add one export cell at the end that reads objects the notebook already created.
 
 - Source: https://github.com/zstoi/PyConnectedness/blob/main/examples/Demo.ipynb
-- Pinned commit: `4cc953f8de24c2af4de2b62cf87bf1e4fc51ba02` (30 Sep 2026, "install pyconnectedness"). It's the latest commit on `main` as of 21 Oct 2026.
+- Pinned commit: `1e47ed87bbb0b6491743d789718707fcf3821462` (16 Nov 2026, "fix qtree"). It's the latest commit on `main` as of that date; moved up from `4cc953f` (30 Sep 2026) to pull in the `causality` module for graph 4. `examples/Demo.ipynb` is unchanged between the two.
 - SHA256 of `examples/Demo.ipynb` at that commit: `b0508dbd2092ac13e60884956983f6fb1b3b729484078720b186e04811ba9789`
 - The pipeline must stop if the hash doesn't match. When the team updates the notebook, bump the commit and the hash on purpose and rerun the validation (section 5).
 
@@ -54,7 +54,7 @@ pyconnectedness-explorer/
   README.md
   SPEC.md                      ← this file
   CONTEXT.md                   ← client questionnaire + decisions
-  vendor/PyConnectedness/      ← git submodule, pinned to 4cc953f
+  vendor/PyConnectedness/      ← git submodule, pinned to 1e47ed8
   pipeline/
     requirements.txt           ← pyconnectedness==0.1.0, yfinance, scipy, nbclient, nbformat, ipykernel
     run_demo.py                ← executes Demo.ipynb unchanged + appends the export cell
@@ -251,7 +251,7 @@ Chart-body colours instead use the library's own defaults: `tab:red` `#d62728` /
 
 ### Footnote copy (fixed)
 
-> Data: weekly closes, highs and lows of 20 stock indices from Yahoo Finance, downloaded on {date}. Computed with PyConnectedness 0.1.0 by running the Demo notebook unchanged (commit 4cc953f). Generalized variance decomposition, VAR(2), 10 week horizon, 200 week rolling window.
+> Data: weekly closes, highs and lows of 20 stock indices from Yahoo Finance, downloaded on {date}. Computed with PyConnectedness 0.1.0 by running the Demo notebook unchanged (commit 1e47ed8). Generalized variance decomposition, VAR(2), 10 week horizon, 200 week rolling window.
 
 ---
 

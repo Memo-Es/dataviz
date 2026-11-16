@@ -248,3 +248,47 @@ it changes.
 `npm run check:insights` recomputes every printed number. It runs on all built-in datasets and on
 synthetic uploads of known shapes (`pipeline/insight_fixtures.py`, run through `run_upload`).
 The Pages deploy runs it before building.
+
+## Graph 4, picked back up: the directed tree for extremes (Danube), Nov 2026
+
+The 4th graph was tabled on Oct 26 because `causality/` was empty. It isn't any more: the
+submodule's upstream `main` added `MaxLinear`, `qtree` and the Danube example data (Miljana's
+request, 16 Nov 2026), so the submodule pin moved from `4cc953f` to `1e47ed8` ("fix qtree") to
+pull it in. `examples/Demo.ipynb` is byte-identical between the two commits, so graphs 1-3 are
+unaffected; `app/src/code.ts`'s `LIB_COMMIT` and the hardcoded commit strings in `app/src/main.ts`
+were updated to match (they don't read the pin automatically -- see the README's "Update it").
+
+This isn't the Klüppelberg-and-Krali layered network the tabled note above describes; it's a
+different method the library landed first (Tran, Buck and Klüppelberg, 2024, root-directed
+trees for river networks specifically). Miljana's request named it directly, with the Danube
+as the example, so that's what got built; the industries layered network stays tabled.
+
+**What the brief didn't say, flagged rather than guessed at:**
+
+- **No reference pictures or paper file actually arrived with the request**, despite the message
+  saying they were attached; only the paper's URL did. The design here follows the existing
+  graphs' conventions (colour, type, pick vs hover, Code/Download) instead of any reference.
+- **Miljana expected picking station 21 to warn station 8 downstream.** It doesn't, on either
+  the paper's ground-truth tree or the library's estimate with the selected threshold: 8 and 21
+  (via 20) are siblings that both feed station 7, not one upstream of the other. Checked both
+  ways, not assumed. The app shows what the model actually says; it does not special-case 8.
+- **Threshold and lower quantile**: no Danube notebook has landed to fix them, so
+  `MaxLinear.select_threshold` chose them (Algorithm 2 of the paper) -- `0.2` and `0.05`, stable
+  across five seeds tried. Reported on the page and in `pipeline/run_danube.py`'s comments.
+- **"Max-linear coefficients" on the edges**: `fit(method="qtree")` doesn't return those (only
+  the "scaling" method does, via `MaxLinearResults.coefs`); its `QTreeResults.scores` (the
+  quantile-to-mean-gap statistic the tree search itself optimises, eq. 7 of the paper) is the
+  only per-edge number it produces, so edges are sized by that instead, on one fixed scale
+  across every pick. A second, scaling-method fit constrained to the estimated tree's order
+  would give literal coefficients instead, if that turns out to matter more than running the one
+  call the brief named.
+- **River lines**: OpenStreetMap (Overpass and Geofabrik both) was blocked by the build
+  environment's network policy; Natural Earth, reachable, doesn't carry the Iller, Lech, Naab
+  (beyond its Waldnaab headwater) or Regen as named lines at 10m. 17 of the 30 edges are real
+  Natural Earth geometry; the rest are straight lines between the two real gauge coordinates,
+  marked as such in the data (`drawn: "straight"`) and in the page's own sources list.
+- **River groupings for colour**: the "colour = region" rule needed a grouping with no more than
+  the palette's eight hues; Saalach (2 stations) shares a colour with Salzach, its larger,
+  adjacent sibling, rather than taking a ninth.
+- **Print export**: the Download menu's PNG renders this graph at 4x instead of the other
+  graphs' 2x, since this one was asked for a print flyer, not a slide.
