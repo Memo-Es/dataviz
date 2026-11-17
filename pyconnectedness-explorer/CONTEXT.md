@@ -292,3 +292,51 @@ as the example, so that's what got built; the industries layered network stays t
   adjacent sibling, rather than taking a ninth.
 - **Print export**: the Download menu's PNG renders this graph at 4x instead of the other
   graphs' 2x, since this one was asked for a print flyer, not a slide.
+
+## Graph 4, round 2: traced rivers, uniform edges, departure marker (Nov 2026)
+
+Miljana's round-2 message named three fixes, with reference images in a Drive folder (the
+team's own R plot, a real-river-map-plus-play-bar direction, and a mood image; 3D still out of
+scope). All three are done:
+
+1. **More traced rivers.** Re-traced edges against Natural Earth with a looser cross-part /
+   cross-record match (see `pipeline/datasets/danube/README.md`), recovering 3 more reaches —
+   17 of 30 traced became **20 of 30**. Checked carefully whether the Europe supplement really
+   carries the Iller, Lech, Naab and Regen, as the request expected: **the Iller, Lech and Regen
+   are genuinely not in it** (every vertex within 20km of each station checked; nearest unrelated
+   river 11–85km away) — only the Naab is, as "Waldnaab." This contradicts what was asked for, so
+   it's flagged here rather than silently matched or faked. The 10 remaining straight reaches are
+   listed in the pipeline README and on the page's own sources list.
+2. **Uniform edge width.** The qtree score sized edges in round 1 (see the bullet above); that's
+   now removed per the request, since the score is a tree-search statistic, not a flood strength.
+   Every edge (and every station dot) renders at one fixed size; the legend's width key is gone;
+   the score stays visible only in the Code snippet's `fit.edges()` output.
+3. **Match count, corrected, and a departure marker.** Re-deriving the directed-match count
+   caught a real bug from round 1: the comparison's directed matches were computed with the
+   ground-truth tuple order reversed, reporting **5 of 30** when the library's own `.compare()`
+   TPR said 22 of 30 all along. Fixed, with a permanent check (`run_danube.py` asserts the two
+   agree; `validate_danube.py` checks the ground-truth tree is itself a real tree) so this can't
+   silently recur. The correct count is **22 of 30 directed, 27 of 30 undirected**. The map now
+   marks, once a pick's full path to the model's root is shown, where that path departs from the
+   real river and draws the real river's own continuation from there to the real outlet (dotted,
+   labelled) — e.g. the pick from station 21 ends at the model's root via 4 → 26, while the real
+   river continues 4 → 3 → 2 → 1 to Passau.
+
+Station 21 stays the default pick with its real, unmodified path; no 21–8 link was added, per
+the request (see the "Miljana expected picking station 21..." bullet above, unchanged by this
+round). The two bullets above this section (river lines, and "max-linear coefficients" sizing)
+describe round 1's choices and are superseded by points 1 and 2 here; left in place as the
+original record rather than rewritten.
+
+**Flagged, not stated in the round-2 message:**
+
+- The root label on the map was renamed from "root" to "model's root" (it already said this
+  informally in the intro text) so it reads as the model's own estimate, not a claim about the
+  Danube's real outlet, now that the page also draws the real river's path alongside it.
+- The departure marker is drawn only once the picked station's animation (or the static view)
+  has reached the model's root — showing the correction after the model's own answer, not
+  instead of it or before it's finished.
+- Round 1 also sized the picked/reached station dots by score (a bigger dot for a bigger score),
+  not just the edges. The request named only edge width, but the same reasoning applies, so dot
+  radius was fixed too (9px picked/reached, 6px dormant) rather than left as a second, unasked-for
+  place the score still drove size on the map.

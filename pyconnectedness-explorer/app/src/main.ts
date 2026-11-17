@@ -1595,7 +1595,7 @@ async function setUpDanube() {
   select.value = String(defaultPick);
 
   document.getElementById("danube-sub")!.textContent =
-    `Pick a gauge; the model's own tree carries a shock down to where the data says it ends up, the root at station ${data.root}, sized at each step by the max-linear score of the edge it travelled.`;
+    `Pick a gauge; the model's own tree carries a shock down to where the data says it ends up, the root at station ${data.root}. Every step is drawn the same width — the qtree search score isn't a flood strength, so it isn't used to size anything here (it's still in the Code snippet).`;
 
   const map = new DanubeMap(document.getElementById("danube-map")!, data, (r, p) => {
     danube!.reached = r;
@@ -1616,13 +1616,14 @@ async function setUpDanube() {
     readout.innerHTML = `From <b>${pickName(danube!.picked)}</b>, the model's tree reaches ${names.join(" → ")}${atRoot ? ", the root" : ""}.`;
   }
 
-  // the legend: river colours (the page's one colour rule, applied to this graph), the two
-  // marks (edge width = score, picked/reached ring), and the paper's own comparison
+  // the legend: river colours (the page's one colour rule, applied to this graph), the
+  // model's path and where it stops matching the real river, and the root marker
   const groups = riverLegendGroups(data);
   document.getElementById("danube-legend")!.innerHTML =
     groups.map((g) => `<span><i class="dot" style="background:${g.color}"></i>${g.group}</span>`).join("") +
-    `<span><i class="taper" style="background:var(--accent)"></i>Line width: the edge's max-linear score</span>` +
-    `<span><i class="dot ring" style="border-color:var(--stone)"></i>The root</span>`;
+    `<span><i class="danube-line-swatch"></i>The model's path from the pick</span>` +
+    `<span><i class="danube-line-swatch departure"></i>Where that path and the real river differ: the real river's own continuation</span>` +
+    `<span><i class="dot ring" style="border-color:var(--stone)"></i>The model's root</span>`;
 
   const cmp = data.comparison_to_ground_truth;
   document.getElementById("danube-compare")!.innerHTML =

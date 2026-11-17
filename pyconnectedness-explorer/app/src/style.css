@@ -2874,6 +2874,33 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   color: var(--secondary);
 }
 
+.danube-line-swatch {
+  display: inline-block;
+  width: 22px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  vertical-align: middle;
+}
+
+.danube-line-swatch.departure {
+  background: none;
+  border-top: 2.5px dotted var(--stone);
+  height: 0;
+}
+
+.danube-root-label,
+.danube-departure-label {
+  font-size: 10px;
+  font-weight: 700;
+  fill: var(--secondary);
+  letter-spacing: 0.04em;
+}
+
+.danube-departure-label {
+  text-transform: none;
+}
+
 @media (max-width: 860px) {
   .danube-body {
     grid-template-columns: 1fr;

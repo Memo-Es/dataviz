@@ -37,6 +37,11 @@ OUT = ROOT / "app" / "public" / "data" / "danube"
 SELECT_SEED = 0
 
 
+def _only(items):
+    (item,) = items
+    return item
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
 
@@ -62,11 +67,20 @@ def main():
     true_adj = ground_truth.loc[order, order].to_numpy()
     metrics = fit.compare(true_adj).round(4)
 
-    true_edges = {(order[j], order[i]) for i in range(len(order)) for j in range(len(order)) if true_adj[i, j]}
+    # true_adj[i, j] is truthy for row order[i] -> column order[j] (row causes column, the same
+    # convention danube_network.csv and QTreeResults.adjacency both use -- confirmed directly:
+    # row 21 has its only 1 in column 20, matching the known real edge 21 -> 20). So a true edge
+    # is (cause, effect) = (order[i], order[j]), not the reverse: round 1 had this backwards,
+    # which silently undercounted directed matches (reported "5 of 30"; the library's own
+    # fit.compare() TPR below was unaffected and already said 0.73, i.e. 22 of 30 -- that's the
+    # number that was wrong to not also show).
+    true_edges = {(order[i], order[j]) for i in range(len(order)) for j in range(len(order)) if true_adj[i, j]}
     est_edges = set(zip(edges["cause"].astype(int), edges["effect"].astype(int)))
     undirected = lambda s: {frozenset(e) for e in s}  # noqa: E731
     directed_matches = len(est_edges & true_edges)
     undirected_matches = len(undirected(est_edges) & undirected(true_edges))
+    assert abs(directed_matches / 30 - metrics.loc["tree", "tpr"]) < 5e-4, \
+        "directed_matches should equal the library's own TPR * 30"  # metrics is rounded to 4dp
 
     river_lines = json.loads((REF / "rivers_natural_earth.geojson").read_text())
 
@@ -119,12 +133,23 @@ def main():
             "directed_matches": directed_matches,
             "undirected_matches": undirected_matches,
             "metrics": metrics.to_dict(orient="index"),
+            # the paper's own tree (examples/data/danube_network.csv), so the page can mark
+            # exactly where the estimate's path departs from the real river, not just report a
+            # count. "next" maps each station to the one real downstream neighbour the
+            # ground-truth tree gives it (every station causes exactly one other, except the
+            # real root, which causes none -- found the same way: the one station absent from
+            # "next").
+            "ground_truth_tree": {
+                "root": int(_only(set(order) - {c for c, _ in true_edges})),
+                "next": {str(cause): effect for cause, effect in true_edges},
+            },
         },
         "rivers": river_lines,
     }
 
     (OUT / "danube.json").write_text(json.dumps(out, indent=None, separators=(",", ":")))
-    print(f"root: {fit.root}")
+    print(f"estimated root: {fit.root}  (the paper's real root/outlet is "
+          f"{out['comparison_to_ground_truth']['ground_truth_tree']['root']})")
     print(f"threshold={selection.threshold} lower={selection.lower} (selected, seed={SELECT_SEED})")
     print(f"edges: {len(est_edges)}; directed matches vs ground truth: {directed_matches}/30; "
           f"undirected matches: {undirected_matches}/30")

@@ -69,15 +69,30 @@ reads is already in the repo. It needs the submodule pinned at or after commit `
   stable across five random seeds tried before picking one to run the pipeline with.
 - The estimated tree is checked against the paper's own ground truth,
   `examples/data/danube_network.csv`, with the library's own `.compare()`: 27 of 30 edges match
-  either way, 5 of 30 with direction too. Both numbers are in `danube.json` and on the page.
+  either way, **22 of 30 match with direction too** (TPR 0.7333). Both numbers are in `danube.json`
+  and on the page; the map also marks where the model's own path departs from the real river (e.g.
+  the pick from station 21 ends at station 4 → 26, while the real river continues 4 → 3 → 2 → 1 to
+  Passau), so the page never presents the estimate as the real river.
 - Station names, coordinates and altitudes are **not** in PyConnectedness; they come from the R
   package [graphicalExtremes](https://github.com/sebastian-engelke/graphicalextremes) (Asadi,
   Davison and Engelke, 2015), whose station numbering was confirmed to match the library's 1–31
   by comparing its 30 physical river edges against `danube_network.csv` directly — they are
-  identical, pair for pair. River lines for the map are traced from Natural Earth where a named
-  river reaches both gauges, a straight line between the two real gauges otherwise (OpenStreetMap,
-  the other source considered, was not reachable from the build environment that put this
-  together). See `pipeline/datasets/danube/README.md` for exactly where each file comes from.
+  identical, pair for pair.
+- River lines for the map are traced from Natural Earth's 1:10m rivers (the global file plus its
+  Europe supplement, `ne_10m_rivers_europe`, which the Iller, Lech and Regen were expected to be
+  in) wherever a named river reaches both gauges, including across a river's own split parts and
+  at a tributary's confluence into another named river; a straight line between the two real
+  gauge coordinates where that file truly has nothing. That's 20 of 30 reaches traced, 10 straight
+  — **the Iller, Lech and Regen are genuinely not in either Natural Earth file** (checked against
+  every vertex, named or not, within 20km of each station; the nearest unrelated river is
+  11–85km away), contrary to what was expected of the Europe supplement; the Naab is there, under
+  the name "Waldnaab." OpenStreetMap, the other source considered, was not reachable from the
+  build environment that put this together. See `pipeline/datasets/danube/README.md` for exactly
+  where each file comes from and the full list of straight reaches.
+- Every edge on the map is drawn the same width: the qtree search score (`fit.edges()`'s score
+  column, eq. 7 of the paper) is the statistic the tree search itself optimised over, not a flood
+  magnitude, so nothing on the map is sized by it until the team says what should be. It's still
+  printed in the Code snippet.
 
 ```bash
 cd pipeline

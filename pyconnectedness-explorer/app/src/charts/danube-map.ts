@@ -49,6 +49,10 @@ export interface DanubeData {
     directed_matches: number;
     undirected_matches: number;
     metrics: Record<string, Record<string, number>>;
+    /** the paper's own tree (danube_network.csv): root is the real outlet (Passau), next[s]
+     * the one real downstream neighbour station s has there. Used only to mark where the
+     * model's path stops matching the real river -- never to redraw the model's own path. */
+    ground_truth_tree: { root: number; next: Record<string, number> };
   };
   rivers: GeoJSON.FeatureCollection<GeoJSON.LineString, { from: number; to: number; river: string | null; source: string | null; drawn: "traced" | "straight" }>;
 }
@@ -77,6 +81,11 @@ function css(name: string, fallback: string): string {
   return v || fallback;
 }
 
+/** an unordered pair, as a lookup key for the rivers geojson's {from, to} features */
+function pairKeyOf(a: number, b: number): string {
+  return a < b ? `${a}-${b}` : `${b}-${a}`;
+}
+
 export class DanubeMap {
   private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
   private width = 640;
@@ -84,7 +93,8 @@ export class DanubeMap {
   private data: DanubeData;
   private byId: Map<number, DanubeStation>;
   private parentOf: Map<number, { to: number; score: number } | null>; // one outgoing edge per non-root station
-  private scoreExtent: [number, number];
+  private realNext: Map<number, number>; // the ground-truth tree's one real downstream neighbour
+  private riverByPair: Map<string, GeoJSON.Feature<GeoJSON.LineString, { from: number; to: number }>>;
   private groupColor: d3.ScaleOrdinal<string, string>;
   private projection: d3.GeoProjection;
   private path: d3.GeoPath;
@@ -101,7 +111,12 @@ export class DanubeMap {
     this.byId = new Map(data.stations.map((s) => [s.id, s]));
     this.parentOf = new Map(data.stations.map((s) => [s.id, null]));
     for (const e of data.edges) this.parentOf.set(e.cause, { to: e.effect, score: e.score });
-    this.scoreExtent = d3.extent(data.edges, (e) => e.score) as [number, number];
+    this.realNext = new Map(
+      Object.entries(data.comparison_to_ground_truth.ground_truth_tree.next).map(([k, v]) => [Number(k), v])
+    );
+    this.riverByPair = new Map(
+      data.rivers.features.map((f) => [pairKeyOf(f.properties.from, f.properties.to), f])
+    );
 
     const hues = [1, 2, 3, 4, 5, 6, 7, 8].map((i) => css(`--bead-${i}`, "#888"));
     this.groupColor = d3.scaleOrdinal<string, string>().domain(GROUP_ORDER).range(hues);
@@ -147,6 +162,25 @@ export class DanubeMap {
   private lastPicked: number;
   private lastReached: number[] = [];
 
+  /** the real river's own hops from `from`, continuing to the real root, as one coordinate
+   * list (each hop's traced/straight geometry from the rivers geojson, oriented from->to) */
+  private realContinuation(from: number): GeoJSON.Position[] {
+    const coords: GeoJSON.Position[] = [];
+    let cur = from;
+    const seen = new Set([cur]);
+    for (let guard = 0; guard < this.data.stations.length; guard++) {
+      const next = this.realNext.get(cur);
+      if (next === undefined || seen.has(next)) break;
+      seen.add(next);
+      const feat = this.riverByPair.get(pairKeyOf(cur, next));
+      let hop = feat ? feat.geometry.coordinates.slice() : [[this.byId.get(cur)!.lon, this.byId.get(cur)!.lat], [this.byId.get(next)!.lon, this.byId.get(next)!.lat]];
+      if (feat && feat.properties.from !== cur) hop = hop.slice().reverse();
+      coords.push(...(coords.length ? hop.slice(1) : hop));
+      cur = next;
+    }
+    return coords;
+  }
+
   /** draw the map for a pick, with `reached` (a prefix of the path to the root) highlighted */
   render(picked: number, reached: number[]) {
     this.lastPicked = picked;
@@ -156,9 +190,6 @@ export class DanubeMap {
     const panel = css("--panel", "#fff");
     const accent = css("--accent", "#2b2a27");
     const reachedSet = new Set(reached);
-    const scoreOf = (id: number) => this.parentOf.get(id)?.score ?? 0;
-    const widthScale = d3.scaleSqrt().domain([0, this.scoreExtent[1]]).range([1, 7]);
-    const radiusScale = d3.scaleSqrt().domain([0, this.scoreExtent[1]]).range([5, 11]);
 
     this.svg.selectAll("*").remove();
     const g = this.svg.append("g");
@@ -177,12 +208,17 @@ export class DanubeMap {
       .attr("stroke-linecap", "round");
 
     // the model's estimated path from the pick to the root, one segment per step already
-    // reached, each as wide as its edge's score on one scale across every pick
+    // reached. Every edge the same width: qtree's score is what the tree search itself
+    // optimised over (eq. 7 of the paper), not a flood magnitude -- it stays in the Code
+    // snippet, but nothing on the map is sized by it until the team says what should be.
     const chain = this.path_(picked);
-    const segs: { a: DanubeStation; b: DanubeStation; score: number }[] = [];
+    const segs: { a: DanubeStation; b: DanubeStation }[] = [];
+    let departAt: DanubeStation | null = null;
     for (let i = 0; i < chain.length - 1; i++) {
       if (!reachedSet.has(chain[i + 1].id)) break;
-      segs.push({ a: this.byId.get(chain[i].id)!, b: this.byId.get(chain[i + 1].id)!, score: chain[i + 1].score ?? 0 });
+      segs.push({ a: this.byId.get(chain[i].id)!, b: this.byId.get(chain[i + 1].id)! });
+      // the first step along the shown path where the model's next hop isn't the real river's
+      if (departAt === null && this.realNext.get(chain[i].id) !== chain[i + 1].id) departAt = this.byId.get(chain[i].id)!;
     }
     g.append("g")
       .attr("class", "danube-path")
@@ -194,9 +230,40 @@ export class DanubeMap {
       .attr("x2", (d) => this.projection([d.b.lon, d.b.lat])![0])
       .attr("y2", (d) => this.projection([d.b.lon, d.b.lat])![1])
       .attr("stroke", accent)
-      .attr("stroke-width", (d) => widthScale(d.score))
+      .attr("stroke-width", 3)
       .attr("stroke-linecap", "round")
       .attr("opacity", 0.9);
+
+    // where the model's path departs from the real river: the real river's own continuation,
+    // from there to its real outlet, drawn once the full estimated path to the root is on
+    // screen -- a correction shown after the model's own answer, not instead of it
+    const realRoot = this.data.comparison_to_ground_truth.ground_truth_tree.root;
+    const chainDone = reached.length > 0 && reached[reached.length - 1] === this.data.root;
+    if (departAt && chainDone) {
+      const coords = this.realContinuation(departAt.id);
+      if (coords.length > 1) {
+        g.append("path")
+          .attr("class", "danube-departure")
+          .attr("d", this.path({ type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {} } as d3.GeoPermissibleObjects))
+          .attr("fill", "none")
+          .attr("stroke", ink)
+          .attr("stroke-width", 2.5)
+          .attr("stroke-dasharray", "1,5")
+          .attr("stroke-linecap", "round")
+          .attr("opacity", 0.8);
+        const end = coords[coords.length - 1];
+        const xy = this.projection(end as [number, number])!;
+        // keep the label inside the map even when its endpoint sits near an edge
+        const anchor = xy[0] > this.width * 0.65 ? "end" : xy[0] < this.width * 0.35 ? "start" : "middle";
+        const dx = anchor === "end" ? -8 : anchor === "start" ? 8 : 0;
+        g.append("text")
+          .attr("class", "danube-departure-label")
+          .attr("x", xy[0] + dx)
+          .attr("y", Math.max(xy[1] - 12, 12))
+          .attr("text-anchor", anchor)
+          .text(`real river continues to station ${realRoot}`);
+      }
+    }
 
     // stations: colour is the river (the page's one colour rule), picked/reached get the ink
     // ring that marks a pick on every other graph; everyone else a plain dot with its number
@@ -221,7 +288,7 @@ export class DanubeMap {
 
     stationSel
       .append("circle")
-      .attr("r", (d) => (d.id === picked || reachedSet.has(d.id) ? radiusScale(scoreOf(d.id) || this.scoreExtent[1] * 0.15) : 6))
+      .attr("r", (d) => (d.id === picked || reachedSet.has(d.id) ? 9 : 6))
       .attr("fill", (d) => this.groupColor(RIVER_GROUP[d.river] ?? d.river))
       .attr("fill-opacity", (d) => (d.id === picked || reachedSet.has(d.id) || reached.length === 0 ? 1 : 0.35))
       .attr("stroke", (d) => (d.id === picked ? accent : d.id === this.data.root ? ink : panel))
@@ -233,7 +300,7 @@ export class DanubeMap {
       .attr("class", "danube-root-label")
       .attr("y", -14)
       .attr("text-anchor", "middle")
-      .text("root");
+      .text("model's root");
 
     stationSel
       .append("text")

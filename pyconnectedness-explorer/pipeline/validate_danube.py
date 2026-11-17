@@ -80,6 +80,30 @@ def _(d):
     c = d["comparison_to_ground_truth"]
     assert c["edges_total"] == 30
     assert 0 <= c["directed_matches"] <= c["undirected_matches"] <= 30
+    # this is what caught round 1's reversed-tuple bug (it silently said "5 of 30"): the
+    # library's own TPR, from fit.compare(), must agree with the matches counted here
+    tpr = c["metrics"]["tree"]["tpr"]
+    assert abs(c["directed_matches"] / c["edges_total"] - tpr) < 5e-4, (c["directed_matches"], tpr)
+
+
+@check("ground-truth tree: a real root, and a real next-hop for every other station")
+def _(d):
+    gt = d["comparison_to_ground_truth"]["ground_truth_tree"]
+    ids = {s["id"] for s in d["stations"]}
+    assert gt["root"] in ids
+    nxt = {int(k): v for k, v in gt["next"].items()}
+    assert set(nxt) == ids - {gt["root"]}, (set(nxt), gt["root"])
+    assert set(nxt.values()) <= ids
+    # following "next" from anywhere reaches the real root, with no cycle, in at most d-1 steps
+    for start in ids:
+        cur, seen = start, set()
+        for _ in range(len(ids)):
+            if cur == gt["root"]:
+                break
+            assert cur not in seen, f"cycle reaching real root from {start}"
+            seen.add(cur)
+            cur = nxt[cur]
+        assert cur == gt["root"], f"station {start} never reaches the real root via 'next'"
 
 
 @check("river lines: one per edge, each a LineString of at least 2 points")
