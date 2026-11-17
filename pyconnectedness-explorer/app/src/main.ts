@@ -28,9 +28,10 @@ import { PALETTES, applyPalette, textSafe } from "./palettes";
 import { hueOf as hueOfNow } from "./encoding";
 import { DanubeMap, loadDanube, riverLegendGroups, type DanubeData, type DanubeStation } from "./charts/danube-map";
 
-/** graph 4's state, module-level because it is independent of the Store every other graph
- * shares (one series, no dataset/measure to switch) -- set once by setUpDanube(), read by
- * figureFor/codeFor's "danube" branches inside main() */
+/** Rivers mode's state (the Danube directed tree, its only graph so far), module-level because
+ * it is independent of the Store every connectedness graph shares (one series, no dataset/
+ * measure to switch) -- set once by setUpDanube(), read by figureFor/codeFor's "rivers" branches
+ * inside main() */
 let danube: { data: DanubeData; byId: Map<number, DanubeStation>; picked: number; reached: number[] } | null = null;
 
 function danubePickName(id: number): string {
@@ -1331,13 +1332,13 @@ ${
   });
   // the overview, or one graph on its own: the address says which (#index, #network, #heatmap),
   // so the browser's back button and a shared link both work
-  type View = "home" | "index" | "network" | "heatmap" | "frequency" | "danube";
+  type View = "home" | "index" | "network" | "heatmap" | "frequency" | "rivers";
   const TITLES: Record<Exclude<View, "home">, string> = {
     index: "Rolling spillover index",
     network: "Connectedness network",
     heatmap: "Spillover heatmap",
     frequency: "Frequency-domain connectedness",
-    danube: "Directed tree for extremes",
+    rivers: "Directed tree for extremes",
   };
   let view: View | null = null;
   let keyboardNav = false;
@@ -1353,10 +1354,11 @@ ${
     $("g2").hidden = v !== "network";
     $("g3").hidden = v !== "heatmap";
     $("g4").hidden = v !== "frequency";
-    $("g5").hidden = v !== "danube";
-    // Rivers (Danube) has no window to pick, and none of Connectedness's dataset/measure chrome:
-    // it's a different method over different data, not a 4th connectedness graph with its own tab
-    const rivers = v === "danube";
+    $("g5").hidden = v !== "rivers";
+    // Rivers (Danube, today) has no window to pick, and none of Connectedness's dataset/measure
+    // chrome: it's a different method over different data, not a 4th connectedness graph with
+    // its own tab. The route is "rivers", not "danube" -- the mode can hold other rivers later
+    const rivers = v === "rivers";
     $("context").hidden = rivers;
     $("top").hidden = rivers;
     $("footer").hidden = rivers;
@@ -1373,7 +1375,7 @@ ${
       // keyboard and screen-reader users land where the change happened; a mouse or touch user
       // isn't handed a focus ring they didn't ask for
       if (keyboardNav) {
-        if (v === "home" && from !== "danube") document.getElementById(`mini-${from === "frequency" ? "freq" : from}`)?.focus();
+        if (v === "home" && from !== "rivers") document.getElementById(`mini-${from === "frequency" ? "freq" : from}`)?.focus();
         else if (v === "home") modeSwitch?.querySelector<HTMLElement>('wa-radio[value="connectedness"]')?.focus();
         else $("crumb").querySelector<HTMLElement>(".crumb-back")?.focus();
       }
@@ -1385,12 +1387,12 @@ ${
   // the switch only ever has two destinations: Rivers' one graph, or Connectedness' overview
   document.getElementById("mode-switch")!.addEventListener("change", (ev) => {
     const value = (ev.target as HTMLElement & { value: string }).value;
-    location.hash = value === "rivers" ? "danube" : "";
+    location.hash = value === "rivers" ? value : "";
   });
 
   // the graph on show as a figure: its chart as drawn (picks included), framed for a report
   const figureFor = (v: Exclude<View, "home">): Figure => {
-    if (v === "danube") return danubeFigure();
+    if (v === "rivers") return danubeFigure();
     const s = store.get();
     const m = s.measure;
     const frame = model.frame(s);
@@ -1497,7 +1499,7 @@ ${
   let codeName = "";
   $("code-open").addEventListener("click", () => {
     if (view === "home" || view === null) return;
-    if (view === "danube") {
+    if (view === "rivers") {
       codeText = danubeCode();
       codeName = "pyconnectedness-danube.py";
       codeDialog.setAttribute("label", "Python for the directed tree for extremes");
@@ -1545,7 +1547,7 @@ ${
     const f = figureFor(view);
     // the map is asked for print (Demo Day flyers): a higher-resolution PNG than the other
     // graphs' screen/slide default, since it's drawn once and then printed, not just viewed
-    (kind === "svg" ? downloadSvg(f) : downloadPng(f, view === "danube" ? 4 : 2)).catch((e) => console.error("export failed", e));
+    (kind === "svg" ? downloadSvg(f) : downloadPng(f, view === "rivers" ? 4 : 2)).catch((e) => console.error("export failed", e));
   });
 
   // controls
