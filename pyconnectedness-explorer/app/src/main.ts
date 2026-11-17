@@ -28,10 +28,10 @@ import { PALETTES, applyPalette, textSafe } from "./palettes";
 import { hueOf as hueOfNow } from "./encoding";
 import { DanubeMap, loadDanube, riverLegendGroups, type DanubeData, type DanubeStation } from "./charts/danube-map";
 
-/** Rivers mode's state (the Danube directed tree, its only graph so far), module-level because
- * it is independent of the Store every connectedness graph shares (one series, no dataset/
- * measure to switch) -- set once by setUpDanube(), read by figureFor/codeFor's "rivers" branches
- * inside main() */
+/** Causality mode's state (the Danube directed tree, its only graph so far), module-level
+ * because it is independent of the Store every connectedness graph shares (one series, no
+ * dataset/measure to switch) -- set once by setUpDanube(), read by figureFor/codeFor's
+ * "causality" branches inside main() */
 let danube: { data: DanubeData; byId: Map<number, DanubeStation>; picked: number; reached: number[] } | null = null;
 
 function danubePickName(id: number): string {
@@ -89,7 +89,7 @@ app.innerHTML = `
   <div class="mode-switch-wrap">
     <wa-radio-group id="mode-switch" class="switch" label="Method" orientation="horizontal">
       <wa-radio value="connectedness">Connectedness</wa-radio>
-      <wa-radio value="rivers">Rivers</wa-radio>
+      <wa-radio value="causality">Causality</wa-radio>
     </wa-radio-group>
   </div>
   <div class="topbar-right">
@@ -242,9 +242,9 @@ app.innerHTML = `
     <section class="card span-5 detail" id="detail"></section>
   </div>
 
-  <!-- the Rivers method's one graph so far: the directed tree for extremes, on the Upper Danube.
-       Its own top-level mode (the switch in the topbar), not "graph 4" of Connectedness --
-       Connectedness and Rivers are two unrelated methods over two unrelated kinds of data -->
+  <!-- the Causality method's one graph so far: the directed tree for extremes, on the Upper
+       Danube. Its own top-level mode (the switch in the topbar), not "graph 4" of Connectedness
+       -- Connectedness and Causality are two unrelated methods over two unrelated kinds of data -->
   <section class="card span-12" id="g5" hidden>
     <div class="card-head">
       <div>
@@ -1332,13 +1332,13 @@ ${
   });
   // the overview, or one graph on its own: the address says which (#index, #network, #heatmap),
   // so the browser's back button and a shared link both work
-  type View = "home" | "index" | "network" | "heatmap" | "frequency" | "rivers";
+  type View = "home" | "index" | "network" | "heatmap" | "frequency" | "causality";
   const TITLES: Record<Exclude<View, "home">, string> = {
     index: "Rolling spillover index",
     network: "Connectedness network",
     heatmap: "Spillover heatmap",
     frequency: "Frequency-domain connectedness",
-    rivers: "Directed tree for extremes",
+    causality: "Directed tree for extremes",
   };
   let view: View | null = null;
   let keyboardNav = false;
@@ -1354,28 +1354,29 @@ ${
     $("g2").hidden = v !== "network";
     $("g3").hidden = v !== "heatmap";
     $("g4").hidden = v !== "frequency";
-    $("g5").hidden = v !== "rivers";
-    // Rivers (Danube, today) has no window to pick, and none of Connectedness's dataset/measure
-    // chrome: it's a different method over different data, not a 4th connectedness graph with
-    // its own tab. The route is "rivers", not "danube" -- the mode can hold other rivers later
-    const rivers = v === "rivers";
-    $("context").hidden = rivers;
-    $("top").hidden = rivers;
-    $("footer").hidden = rivers;
+    $("g5").hidden = v !== "causality";
+    // Causality (the Danube directed tree, today) has no window to pick, and none of
+    // Connectedness's dataset/measure chrome: it's a different method over different data, not
+    // a 4th connectedness graph with its own tab. The route is "causality", the method's own
+    // name, not "rivers" or "danube" -- the mode can hold other causal-extremes datasets later
+    const causality = v === "causality";
+    $("context").hidden = causality;
+    $("top").hidden = causality;
+    $("footer").hidden = causality;
     const modeSwitch = document.getElementById("mode-switch") as HTMLElement & { value: string };
-    if (modeSwitch) modeSwitch.value = rivers ? "rivers" : "connectedness";
+    if (modeSwitch) modeSwitch.value = causality ? "causality" : "connectedness";
     $("g3-row").hidden = v !== "network" && v !== "heatmap";
     $("g3-row").classList.toggle("detail-only", v === "network");
     $("crumb").hidden = v === "home";
     $("crumb-here").textContent = v === "home" ? "" : TITLES[v];
-    $("crumb").querySelector<HTMLElement>(".crumb-back")!.textContent = rivers ? "‹ Connectedness" : "‹ All graphs";
+    $("crumb").querySelector<HTMLElement>(".crumb-back")!.textContent = causality ? "‹ Connectedness" : "‹ All graphs";
     document.title = v === "home" ? "PyConnectedness Explorer" : `${TITLES[v]} · PyConnectedness Explorer`;
     if (from !== null && from !== v) {
       scrollTo(0, 0);
       // keyboard and screen-reader users land where the change happened; a mouse or touch user
       // isn't handed a focus ring they didn't ask for
       if (keyboardNav) {
-        if (v === "home" && from !== "rivers") document.getElementById(`mini-${from === "frequency" ? "freq" : from}`)?.focus();
+        if (v === "home" && from !== "causality") document.getElementById(`mini-${from === "frequency" ? "freq" : from}`)?.focus();
         else if (v === "home") modeSwitch?.querySelector<HTMLElement>('wa-radio[value="connectedness"]')?.focus();
         else $("crumb").querySelector<HTMLElement>(".crumb-back")?.focus();
       }
@@ -1384,15 +1385,15 @@ ${
   };
   window.addEventListener("hashchange", applyView);
   applyView();
-  // the switch only ever has two destinations: Rivers' one graph, or Connectedness' overview
+  // the switch only ever has two destinations: Causality's one graph, or Connectedness' overview
   document.getElementById("mode-switch")!.addEventListener("change", (ev) => {
     const value = (ev.target as HTMLElement & { value: string }).value;
-    location.hash = value === "rivers" ? value : "";
+    location.hash = value === "causality" ? value : "";
   });
 
   // the graph on show as a figure: its chart as drawn (picks included), framed for a report
   const figureFor = (v: Exclude<View, "home">): Figure => {
-    if (v === "rivers") return danubeFigure();
+    if (v === "causality") return danubeFigure();
     const s = store.get();
     const m = s.measure;
     const frame = model.frame(s);
@@ -1499,7 +1500,7 @@ ${
   let codeName = "";
   $("code-open").addEventListener("click", () => {
     if (view === "home" || view === null) return;
-    if (view === "rivers") {
+    if (view === "causality") {
       codeText = danubeCode();
       codeName = "pyconnectedness-danube.py";
       codeDialog.setAttribute("label", "Python for the directed tree for extremes");
@@ -1547,7 +1548,7 @@ ${
     const f = figureFor(view);
     // the map is asked for print (Demo Day flyers): a higher-resolution PNG than the other
     // graphs' screen/slide default, since it's drawn once and then printed, not just viewed
-    (kind === "svg" ? downloadSvg(f) : downloadPng(f, view === "rivers" ? 4 : 2)).catch((e) => console.error("export failed", e));
+    (kind === "svg" ? downloadSvg(f) : downloadPng(f, view === "causality" ? 4 : 2)).catch((e) => console.error("export failed", e));
   });
 
   // controls
@@ -1605,7 +1606,7 @@ async function setUpDanube() {
   } catch (err) {
     console.error("danube.json failed to load", err);
     document.getElementById("g5")?.remove();
-    document.getElementById("mode-switch")?.querySelector('wa-radio[value="rivers"]')?.remove();
+    document.getElementById("mode-switch")?.querySelector('wa-radio[value="causality"]')?.remove();
     return;
   }
 

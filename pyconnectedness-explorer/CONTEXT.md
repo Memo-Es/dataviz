@@ -341,7 +341,7 @@ original record rather than rewritten.
   radius was fixed too (9px picked/reached, 6px dormant) rather than left as a second, unasked-for
   place the score still drove size on the map.
 
-## Rivers as its own method, and a quick 3D sketch (Nov 2026)
+## Causality as its own method, and a quick 3D sketch (Nov 2026)
 
 Miljana's Demo Day brief asked for a real map, press-play spreading, and (if possible) a 3D
 river with time passing, then flagged in a follow-up that the Danube page shouldn't sit among
@@ -352,12 +352,23 @@ what that meant concretely from a screenshot of the actual overview: the Danube 
 to and Danube ignores entirely — reading as a 4th connectedness graph that happens to be about
 rivers, not a different method.
 
-Fixed with a global switch in the topbar, **Connectedness / Rivers**, not another mini-card:
+Fixed with a global switch in the topbar, **Connectedness / Causality**, not another mini-card.
+First built it as "Rivers" (the example dataset) at route `#rivers`; renamed to the actual
+method name once it was pointed out that "Rivers" names the application, not the statistics --
+Connectedness is the real term for the Diebold-Yilmaz/Baruník-Křehlík variance-decomposition
+side (graphs 1-3/4), Causality is the real term for Tran, Buck and Klüppelberg's directed-tree/
+max-linear method (the Danube graph) -- an extremal-graphical-models, causal-discovery-for-
+extremes method, nothing to do with rivers specifically. Matches Miljana's own words back in her
+Demo Day brief ("the river case rests on the causality part... while the financial data are
+about connectedness"). Route is now `#causality`, not `#rivers` or `#danube`, so the URL, the
+switch label and the method all say the same thing, and the mode can hold other causal-extremes
+datasets later without another rename.
+
 - Connectedness mode is today's experience minus the Danube tile.
-- Rivers mode is just the directed-tree graph, with none of Connectedness's chrome (the Data
+- Causality mode is just the directed-tree graph, with none of Connectedness's chrome (the Data
   bar, the time-window chips, the "Where the numbers come from" footer) — all hidden, not just
   visually de-emphasised. The "‹ All graphs" crumb-back relabels to "‹ Connectedness" on this
-  page, since there's no multi-graph list to go back to within Rivers.
+  page, since there's no multi-graph list to go back to within Causality.
 - The Danube card's own kicker dropped its "4 ·" prefix (it isn't graph 4 of anything now); the
   same text appears in the exported figure caption and the Code snippet's comment, both updated.
 
