@@ -196,6 +196,7 @@ export class DanubeMap {
     const line = css("--line", "rgba(17,17,17,.14)");
     const panel = css("--panel", "#fff");
     const accent = css("--accent", "#2b2a27");
+    const warn = css("--warn", "#d97706");
     const reachedSet = new Set(reached);
 
     this.svg.selectAll("*").remove();
@@ -240,6 +241,11 @@ export class DanubeMap {
       .attr("stroke-width", 3)
       .attr("stroke-linecap", "round")
       .attr("opacity", 0.9);
+
+    // the next real step downstream, not yet reached: a predictive "this is what's coming"
+    // marker on the model's own path (never a station it doesn't actually reach next) -- what
+    // Miljana asked for as "warning signs at the stations that will be affected next"
+    const warnStation = chain[segs.length + 1] ?? null;
 
     // where the model's path departs from the real river: the real river's own continuation,
     // from there to its real outlet, drawn once the full estimated path to the root is on
@@ -302,6 +308,11 @@ export class DanubeMap {
       .attr("stroke", (d) => (d.id === picked ? accent : d.id === this.data.root ? ink : panel))
       .attr("stroke-width", (d) => (d.id === picked ? 3 : d.id === this.data.root ? 2 : 1.5));
 
+    // real detail per station, on hover/focus: the native browser tooltip, no extra markup
+    stationSel
+      .append("title")
+      .text((d) => `Station ${d.id} · ${d.river}\n${d.altitude_m} m altitude\n${d.lat.toFixed(3)}°N, ${d.lon.toFixed(3)}°E`);
+
     stationSel
       .filter((d) => d.id === this.data.root)
       .append("text")
@@ -309,6 +320,26 @@ export class DanubeMap {
       .attr("y", -14)
       .attr("text-anchor", "middle")
       .text("model's root");
+
+    // the station the model's own path reaches next, not yet flooded: a pulsing ring so a demo
+    // can point at "this one's about to be warned" without claiming it already has been
+    if (warnStation) {
+      const warnSel = stationSel.filter((d) => d.id === warnStation!.id);
+      warnSel
+        .append("circle")
+        .attr("class", "danube-warn-ring")
+        .attr("r", 14)
+        .attr("fill", "none")
+        .attr("stroke", warn)
+        .attr("stroke-width", 2.5);
+      warnSel
+        .append("text")
+        .attr("class", "danube-warn-label")
+        .attr("y", -20)
+        .attr("text-anchor", "middle")
+        .attr("fill", warn)
+        .text("next");
+    }
 
     stationSel
       .append("text")

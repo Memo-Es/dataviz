@@ -48,6 +48,9 @@
   --f-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
   --f-serif: "Source Serif 4", Georgia, serif;
   --f-num: "B612 Mono", ui-monospace, SFMono-Regular, monospace; /* every number on the page */
+  /* status, not data: reserved for "this is coming next," never reused for a series */
+  --warn: #d97706;
+  --warn-ink: #ffffff;
   color-scheme: light;
 }
 
@@ -86,6 +89,8 @@
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.45);
   --shadow-hover: 0 6px 22px rgba(0, 0, 0, 0.35);
   --shadow-lg: 0 14px 36px rgba(0, 0, 0, 0.45);
+  --warn: #fbbf24;
+  --warn-ink: #1c1203;
   color-scheme: dark;
 }
 
@@ -1634,6 +1639,11 @@ svg {
   box-shadow: inset 0 0 0 2.5px var(--bead-1);
 }
 
+.legend .dot.warn-ring {
+  background: transparent;
+  box-shadow: inset 0 0 0 2.5px var(--warn);
+}
+
 .select.small select {
   min-width: 0;
   max-width: 300px;
@@ -2991,6 +3001,30 @@ wa-dropdown wa-dropdown-item [slot="details"] {
 
 .danube-departure-label {
   text-transform: none;
+}
+
+.danube-warn-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.danube-warn-ring {
+  animation: danube-warn-pulse 1.4s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+@keyframes danube-warn-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(1.22); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .danube-warn-ring {
+    animation: none;
+  }
 }
 
 @media (max-width: 860px) {

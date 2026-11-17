@@ -1624,7 +1624,7 @@ async function setUpDanube() {
   select.value = String(defaultPick);
 
   document.getElementById("danube-sub")!.textContent =
-    `Pick a gauge; the model's own tree carries a shock down to where the data says it ends up, the root at station ${data.root}. Every step is drawn the same width — the qtree search score isn't a flood strength, so it isn't used to size anything here (it's still in the Code snippet).`;
+    `Pick a gauge; the model's own tree carries a shock down to where the data says it ends up, the root at station ${data.root}. The pulsing ring marks the next station on that path, so you can point at what's about to be warned before it's actually reached. Every step is drawn the same width — the qtree search score isn't a flood strength, so it isn't used to size anything here (it's still in the Code snippet).`;
 
   const map = new DanubeMap(document.getElementById("danube-map")!, data, (r, p) => {
     danube!.reached = r;
@@ -1652,7 +1652,8 @@ async function setUpDanube() {
     groups.map((g) => `<span><i class="dot" style="background:${g.color}"></i>${g.group}</span>`).join("") +
     `<span><i class="danube-line-swatch"></i>The model's path from the pick</span>` +
     `<span><i class="danube-line-swatch departure"></i>Where that path and the real river differ: the real river's own continuation</span>` +
-    `<span><i class="dot ring" style="border-color:var(--stone)"></i>The model's root</span>`;
+    `<span><i class="dot ring" style="border-color:var(--stone)"></i>The model's root</span>` +
+    `<span><i class="dot warn-ring"></i>The model's own next step, not reached yet</span>`;
 
   const cmp = data.comparison_to_ground_truth;
   document.getElementById("danube-compare")!.innerHTML =
