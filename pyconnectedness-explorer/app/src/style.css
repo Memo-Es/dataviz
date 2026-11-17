@@ -25,6 +25,9 @@
   --accent: #2b2a27; /* the selected state: monochrome ink in every palette (palettes.ts) */
   --accent-wash: rgba(43, 42, 39, 0.08);
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-hover: 0 6px 22px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 14px 36px rgba(0, 0, 0, 0.12);
   --radius: 20px;
   --band-fast: #2f2a78; /* ordinal: one hue, darker = faster */
   --band-mid: #6f67c9;
@@ -80,6 +83,9 @@
   --bead-5: #8b6ad6;
   --bead-6: #e84c97;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.45);
+  --shadow-hover: 0 6px 22px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 14px 36px rgba(0, 0, 0, 0.45);
   color-scheme: dark;
 }
 
@@ -256,7 +262,7 @@ svg .dp {
 .switch wa-radio:state(checked) {
   background: var(--panel);
   color: var(--fg);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-sm);
 }
 
 .switch.small wa-radio {
@@ -2060,7 +2066,7 @@ svg {
 
 .mini-card:hover {
   border-color: var(--axis);
-  box-shadow: 0 6px 22px rgba(20, 30, 40, 0.08);
+  box-shadow: var(--shadow-hover);
 }
 
 .mini-card:focus-visible {
@@ -2429,7 +2435,7 @@ svg {
   --wa-focus-ring-width: 3px;
   --wa-focus-ring-offset: 2px;
   --wa-shadow-m: none;
-  --wa-shadow-l: 0 14px 36px rgba(20, 30, 40, 0.12);
+  --wa-shadow-l: var(--shadow-lg);
 }
 
 /* one focus ring per control: Web Awesome draws its own on these, so the page's doesn't stack */
