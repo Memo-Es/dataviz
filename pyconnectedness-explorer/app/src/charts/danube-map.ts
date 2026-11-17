@@ -101,6 +101,9 @@ export class DanubeMap {
   private playing = false;
   private timer: ReturnType<typeof setInterval> | null = null;
   private reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  private tilted = false;
+  private barsLayer: d3.Selection<HTMLDivElement, unknown, null, undefined>;
+  private barEls = new Map<number, HTMLDivElement>();
 
   constructor(
     private host: HTMLElement,
@@ -122,6 +125,10 @@ export class DanubeMap {
     this.groupColor = d3.scaleOrdinal<string, string>().domain(GROUP_ORDER).range(hues);
 
     this.svg = d3.select(host).append("svg").attr("class", "danube-map");
+    // a flat, screen-aligned layer for the rising bars: a sibling of the svg, not a child of its
+    // tilted transform, so a bar's own CSS height animates normally while still landing on the
+    // tilted floor's real on-screen point (read back from the svg's own screen CTM, below)
+    this.barsLayer = d3.select(host).append("div").attr("class", "danube-bars");
     this.projection = d3.geoMercator();
     this.path = d3.geoPath(this.projection);
     new ResizeObserver(() => {
@@ -274,6 +281,7 @@ export class DanubeMap {
       .data(this.data.stations)
       .join("g")
       .attr("class", "hit")
+      .attr("data-station", (d) => d.id)
       .attr("transform", (d) => `translate(${this.projection([d.lon, d.lat])!.join(",")})`)
       .attr("tabindex", 0)
       .attr("role", "button")
@@ -311,6 +319,56 @@ export class DanubeMap {
       .attr("font-size", (d) => (d.id === picked || reachedSet.has(d.id) ? "10px" : "9px"))
       .attr("font-weight", (d) => (d.id === picked || reachedSet.has(d.id) ? 700 : 500))
       .text((d) => d.id);
+
+    this.syncBars(picked, reached);
+  }
+
+  /** the quick 3D sketch: tilt the flat map into a table-top perspective and, as the shock
+   * reaches each station on the picked chain, rise a bar there -- not sized by score (the same
+   * "nothing here is sized by the qtree score" rule as the flat map), just risen or not */
+  setTilt(on: boolean) {
+    this.tilted = on;
+    this.host.classList.toggle("danube-tilted", on);
+    this.syncBars(this.lastPicked, this.lastReached);
+  }
+
+  private syncBars(picked: number, reached: number[]) {
+    if (!this.tilted) {
+      this.barsLayer.selectAll("*").remove();
+      this.barEls.clear();
+      return;
+    }
+    const chain = this.path_(picked).map((s) => s.id);
+    const reachedSet = new Set(reached);
+    const hostBox = this.host.getBoundingClientRect();
+    // one bar per station on the picked chain (fixed set for this pick, like the flat path);
+    // reusing elements across renders so the CSS height transition plays instead of popping.
+    // Positioned from the station circle's own getBoundingClientRect(), not projection math
+    // re-run through getScreenCTM() -- that matrix doesn't reflect the ancestor's CSS
+    // `perspective`, so a point it computes lands tens of pixels off the real tilted pixel;
+    // the rendered circle's rect is where the browser actually painted it, always correct
+    const chainSet = new Set(chain);
+    for (const [id, el] of this.barEls) if (!chainSet.has(id)) { el.remove(); this.barEls.delete(id); }
+    for (const id of chain) {
+      const s = this.byId.get(id)!;
+      const circle = this.svg.select<SVGCircleElement>(`[data-station="${id}"] circle`).node();
+      let el = this.barEls.get(id);
+      if (!el) {
+        el = this.barsLayer.append("div").attr("class", "danube-bar").node()!;
+        this.barEls.set(id, el);
+      }
+      if (circle) {
+        const r = circle.getBoundingClientRect();
+        const cx = r.left + r.width / 2;
+        const cy = r.top + r.height / 2;
+        // "bottom", not "top": the bar's foot stays planted on the tilted floor's real point
+        // while its CSS height transition grows it upward from there
+        el.style.left = `${cx - hostBox.left}px`;
+        el.style.bottom = `${hostBox.height - (cy - hostBox.top)}px`;
+      }
+      el.classList.toggle("risen", reachedSet.has(id) || id === picked);
+      el.style.background = this.groupColor(RIVER_GROUP[s.river] ?? s.river);
+    }
   }
 
   /** pick a station: stop any run, show it alone (no downstream reached yet) */

@@ -43,7 +43,7 @@ function danubeFigure(): Figure {
   return {
     file: `pyconnectedness-danube-${picked}`,
     title: "Directed tree for extremes",
-    question: "4 · Where does a shock travel downstream?",
+    question: "Where does a shock travel downstream?",
     tag: 'MaxLinear(…).fit(method="qtree")',
     sentence: document.getElementById("danube-readout")!.innerText,
     host,
@@ -82,6 +82,14 @@ app.innerHTML = `
   <div class="brand">
     <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 7 7 24h18z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="16" cy="7" r="4.5" fill="var(--bead-1)"/><circle cx="7" cy="24" r="4.5" fill="var(--bead-2)"/><circle cx="25" cy="24" r="4.5" fill="var(--bead-3)"/></svg>
     <span>PyConnectedness <b>Explorer</b></span>
+  </div>
+  <!-- two unrelated methods on two unrelated kinds of data: this switch, not a card in a list,
+       says which one you're in. Connectedness never touches Danube's data or vice versa -->
+  <div class="mode-switch-wrap">
+    <wa-radio-group id="mode-switch" class="switch" label="Method" orientation="horizontal">
+      <wa-radio value="connectedness">Connectedness</wa-radio>
+      <wa-radio value="rivers">Rivers</wa-radio>
+    </wa-radio-group>
   </div>
   <div class="topbar-right">
     <button class="icon-btn" id="theme" type="button" aria-label="Toggle dark mode"></button>
@@ -125,7 +133,6 @@ app.innerHTML = `
     <a class="mini-card span-4" href="#frequency" id="mini-freq"></a>
     <!-- not a link: its only place to go would be graph 1 again, which the first card opens -->
     <div class="mini-card mini-static span-3" id="mini-insight"></div>
-    <a class="mini-card span-4" href="#danube" id="mini-danube"></a>
   </section>
 
   <section class="card span-12" id="g1">
@@ -234,11 +241,13 @@ app.innerHTML = `
     <section class="card span-5 detail" id="detail"></section>
   </div>
 
-  <!-- graph 4: the directed tree for extremes, on the Upper Danube -->
+  <!-- the Rivers method's one graph so far: the directed tree for extremes, on the Upper Danube.
+       Its own top-level mode (the switch in the topbar), not "graph 4" of Connectedness --
+       Connectedness and Rivers are two unrelated methods over two unrelated kinds of data -->
   <section class="card span-12" id="g5" hidden>
     <div class="card-head">
       <div>
-        <p class="q">4 · Where does a shock travel downstream?</p>
+        <p class="q">Where does a shock travel downstream?</p>
         <h2>Directed tree for extremes <code class="tag">MaxLinear(…).fit(method="qtree")</code></h2>
         <p class="sub" id="danube-sub"></p>
       </div>
@@ -248,6 +257,10 @@ app.innerHTML = `
       <wa-select id="danube-pick" class="num" label="Pick a station" value="21"></wa-select>
       <button class="icon-btn danube-play" id="danube-play" type="button" aria-label="Play: send a shock downstream from the picked station">▶</button>
       <button class="crumb-btn small" id="danube-reset" type="button">Reset</button>
+      <!-- a quick sketch, not a finished view: a CSS tilt and rising bars on the same flat map,
+           nothing re-measured or re-fit. Off by default so the plain map stays the one people see
+           first -->
+      <button class="crumb-btn small danube-3d-toggle" id="danube-3d" type="button" aria-pressed="false">3D sketch</button>
     </div>
     <div class="danube-body">
       <div class="danube-map-wrap">
@@ -1341,19 +1354,27 @@ ${
     $("g3").hidden = v !== "heatmap";
     $("g4").hidden = v !== "frequency";
     $("g5").hidden = v !== "danube";
-    // graph 4 has no window to pick: it isn't the connectedness measures' time dimension
-    $("context").hidden = v === "danube";
+    // Rivers (Danube) has no window to pick, and none of Connectedness's dataset/measure chrome:
+    // it's a different method over different data, not a 4th connectedness graph with its own tab
+    const rivers = v === "danube";
+    $("context").hidden = rivers;
+    $("top").hidden = rivers;
+    $("footer").hidden = rivers;
+    const modeSwitch = document.getElementById("mode-switch") as HTMLElement & { value: string };
+    if (modeSwitch) modeSwitch.value = rivers ? "rivers" : "connectedness";
     $("g3-row").hidden = v !== "network" && v !== "heatmap";
     $("g3-row").classList.toggle("detail-only", v === "network");
     $("crumb").hidden = v === "home";
     $("crumb-here").textContent = v === "home" ? "" : TITLES[v];
+    $("crumb").querySelector<HTMLElement>(".crumb-back")!.textContent = rivers ? "‹ Connectedness" : "‹ All graphs";
     document.title = v === "home" ? "PyConnectedness Explorer" : `${TITLES[v]} · PyConnectedness Explorer`;
     if (from !== null && from !== v) {
       scrollTo(0, 0);
       // keyboard and screen-reader users land where the change happened; a mouse or touch user
       // isn't handed a focus ring they didn't ask for
       if (keyboardNav) {
-        if (v === "home") document.getElementById(`mini-${from === "frequency" ? "freq" : from}`)?.focus();
+        if (v === "home" && from !== "danube") document.getElementById(`mini-${from === "frequency" ? "freq" : from}`)?.focus();
+        else if (v === "home") modeSwitch?.querySelector<HTMLElement>('wa-radio[value="connectedness"]')?.focus();
         else $("crumb").querySelector<HTMLElement>(".crumb-back")?.focus();
       }
     }
@@ -1361,6 +1382,11 @@ ${
   };
   window.addEventListener("hashchange", applyView);
   applyView();
+  // the switch only ever has two destinations: Rivers' one graph, or Connectedness' overview
+  document.getElementById("mode-switch")!.addEventListener("change", (ev) => {
+    const value = (ev.target as HTMLElement & { value: string }).value;
+    location.hash = value === "rivers" ? "danube" : "";
+  });
 
   // the graph on show as a figure: its chart as drawn (picks included), framed for a report
   const figureFor = (v: Exclude<View, "home">): Figure => {
@@ -1576,8 +1602,8 @@ async function setUpDanube() {
     data = await loadDanube();
   } catch (err) {
     console.error("danube.json failed to load", err);
-    document.getElementById("mini-danube")?.remove();
     document.getElementById("g5")?.remove();
+    document.getElementById("mode-switch")?.querySelector('wa-radio[value="rivers"]')?.remove();
     return;
   }
 
@@ -1652,12 +1678,12 @@ async function setUpDanube() {
   });
   document.getElementById("danube-reset")!.addEventListener("click", () => map.pick(danube!.picked));
 
-  // the mini-card on the overview
-  const miniCmp = `${cmp.undirected_matches}/${cmp.edges_total}`;
-  document.getElementById("mini-danube")!.innerHTML =
-    `<div class="mini-head"><p class="q">4 · Where does a shock travel downstream?</p><span class="mini-open" aria-hidden="true">↗</span></div>
-    <h3>Directed tree for extremes <code class="tag">MaxLinear</code></h3>
-    <p class="mini-num">The model's tree matches the paper's own ground truth on <b>${miniCmp}</b> links</p>`;
+  const tiltBtn = document.getElementById("danube-3d") as HTMLButtonElement;
+  tiltBtn.addEventListener("click", () => {
+    const on = tiltBtn.getAttribute("aria-pressed") !== "true";
+    tiltBtn.setAttribute("aria-pressed", String(on));
+    map.setTilt(on);
+  });
 }
 
 main().catch((err) => {

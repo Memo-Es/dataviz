@@ -340,3 +340,36 @@ original record rather than rewritten.
   not just the edges. The request named only edge width, but the same reasoning applies, so dot
   radius was fixed too (9px picked/reached, 6px dormant) rather than left as a second, unasked-for
   place the score still drove size on the map.
+
+## Rivers as its own method, and a quick 3D sketch (Nov 2026)
+
+Miljana's Demo Day brief asked for a real map, press-play spreading, and (if possible) a 3D
+river with time passing, then flagged in a follow-up that the Danube page shouldn't sit among
+the connectedness datasets at all: "the river case rests on the causality part... while the
+financial data are about connectedness... the river page can be fully its own thing." Confirmed
+what that meant concretely from a screenshot of the actual overview: the Danube graph sat as
+"4" in the same grid, under the same "Data: World stock markets ▾" bar that graphs 1–3 answer
+to and Danube ignores entirely — reading as a 4th connectedness graph that happens to be about
+rivers, not a different method.
+
+Fixed with a global switch in the topbar, **Connectedness / Rivers**, not another mini-card:
+- Connectedness mode is today's experience minus the Danube tile.
+- Rivers mode is just the directed-tree graph, with none of Connectedness's chrome (the Data
+  bar, the time-window chips, the "Where the numbers come from" footer) — all hidden, not just
+  visually de-emphasised. The "‹ All graphs" crumb-back relabels to "‹ Connectedness" on this
+  page, since there's no multi-graph list to go back to within Rivers.
+- The Danube card's own kicker dropped its "4 ·" prefix (it isn't graph 4 of anything now); the
+  same text appears in the exported figure caption and the Code snippet's comment, both updated.
+
+For the 3D ask, rather than build the heavier Three.js direction untested, a **quick CSS sketch**
+first: a toggle ("3D sketch") that tilts the existing flat map into a table-top perspective
+(CSS `perspective` + `rotateX` on the svg itself, nothing re-drawn) and rises a bar at each
+station on the picked chain as Play reaches it — same "nothing is sized by the qtree score" rule
+as the flat map's edges, so a bar is risen or not, never scaled by score. One real bug caught
+building it: `getScreenCTM()` on the tilted svg does **not** reflect the ancestor's CSS
+`perspective` (confirmed directly — it returned a point tens of pixels off the station's real
+on-screen position), so bars are positioned from the actual rendered station circle's
+`getBoundingClientRect()` instead, which is always correct since it's where the browser actually
+painted the pixel. Picked, with Miljana, over the fuller 3D-camera direction for this week,
+since it reuses the real map and ships fast; the heavier version stays an option if Demo Day
+needs more than this.

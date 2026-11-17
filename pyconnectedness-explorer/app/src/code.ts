@@ -272,7 +272,7 @@ export interface DanubeCodeContext {
  * notebook has landed in the library to fix them instead -- see README.md at the repo root). */
 export function pythonForDanube(c: DanubeCodeContext): string {
   const lines = [
-    `# 4 · Directed tree for extremes · Danube · picked: station ${c.picked} (${c.pickedRiver})`,
+    `# Directed tree for extremes · Danube · picked: station ${c.picked} (${c.pickedRiver})`,
     "# The PyConnectedness call behind this graph in the explorer, on the library's own example file:",
     `#   ${PIP}`,
     "import pandas as pd",

@@ -211,6 +211,30 @@ svg .dp {
   gap: 10px;
 }
 
+/* the one choice that sits above everything else: which unrelated method you're looking at.
+   Centred regardless of how wide the brand and the theme/colour controls are on either side */
+.mode-switch-wrap {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
+/* too narrow for brand + switch + controls on one line: the switch still has to be reachable
+   (it's the only way to Rivers), so it drops to its own full-width row instead of disappearing */
+@media (max-width: 720px) {
+  .topbar {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+
+  .mode-switch-wrap {
+    order: 3;
+    flex-basis: 100%;
+    justify-content: center;
+  }
+}
+
 /* switches: Web Awesome's radio group (src/ui/segmented.ts; ".seg" is the frequency bar's) in our look -- a pale track, the
    picked option on a panel-coloured pill; the library brings the keyboard and the labelling */
 .switch {
@@ -2816,6 +2840,68 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 12px;
+}
+
+/* the quick 3D sketch: a table-top tilt on the same flat map, nothing re-drawn. The svg itself
+   gets the rotation (its parent supplies the perspective); the bars layer is a flat sibling so
+   each bar's own height transition isn't itself warped by the tilt -- see danube-map.ts syncBars,
+   which reads the svg's real screen CTM so a bar's foot lands exactly on its tilted point */
+#danube-map {
+  position: relative;
+}
+
+#danube-map.danube-tilted {
+  perspective: 1600px;
+  padding-bottom: 36px;
+}
+
+#danube-map.danube-tilted::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: radial-gradient(ellipse 80% 65% at 50% 10%, color-mix(in srgb, var(--accent) 12%, var(--panel)), var(--band) 75%);
+  z-index: 0;
+}
+
+#danube-map.danube-tilted svg.danube-map {
+  position: relative;
+  z-index: 1;
+  transform: rotateX(50deg) scale(0.92);
+  transform-origin: 50% 10%;
+  filter: drop-shadow(0 26px 20px rgba(0, 0, 0, 0.22));
+}
+
+.danube-bars {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.danube-bar {
+  position: absolute;
+  width: 6px;
+  height: 0;
+  border-radius: 3px 3px 1px 1px;
+  transform: translateX(-50%);
+  box-shadow: inset 1.5px 0 0 rgba(255, 255, 255, 0.35), inset -1.5px 0 0 rgba(0, 0, 0, 0.18);
+  transition: height 0.4s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.danube-bar.risen {
+  height: 26px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .danube-bar {
+    transition: none;
+  }
+}
+
+.danube-3d-toggle[aria-pressed="true"] {
+  background: var(--band);
+  border-color: var(--stone);
 }
 
 .danube-id {
