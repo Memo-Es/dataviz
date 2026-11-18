@@ -141,9 +141,14 @@ export class DanubeFlood3D {
     // ratio-scaled rise, not re-run the (bilinear) lookup on every slider move or Play tick
     this.groundZ = this.data.stations.map((s) => elevationAt(relief, s.river_lon, s.river_lat));
 
+    // a permanent label per station, not just a hover tip -- Miljana's own deck names every
+    // city on the terrain, amber or red once it matters. We have no town names (none of her
+    // package's own station CSVs carry one), so the honest equivalent is the plain station
+    // number the flat map already labels its own circles with; state changes its colour and
+    // size instead, the same "activated" idea
     const stations = {
       type: "scatter3d",
-      mode: "markers",
+      mode: "markers+text",
       x: this.data.stations.map((s) => s.river_lon),
       y: this.data.stations.map((s) => s.river_lat),
       z: this.groundZ.map((z) => z + DRAPE_OFFSET_M),
@@ -152,7 +157,13 @@ export class DanubeFlood3D {
         color: this.data.stations.map(() => muted),
         line: { color: this.data.stations.map(() => css("--panel", "#fff")), width: 1.5 },
       },
-      text: this.data.stations.map((s) => `Station ${s.id} · ${s.river}`),
+      text: this.data.stations.map((s) => String(s.id)),
+      textposition: "top center",
+      textfont: {
+        color: this.data.stations.map(() => muted),
+        size: this.data.stations.map(() => 11),
+      },
+      hovertext: this.data.stations.map((s) => `Station ${s.id} · ${s.river}`),
       hoverinfo: "text",
     };
 
@@ -226,7 +237,12 @@ export class DanubeFlood3D {
     );
     const size = this.stationIds.map((id) => 4 + ratioT(ratios[String(id)][day]) * 7);
     const topZ = this.stationIds.map((id, i) => this.groundZ[i] + DRAPE_OFFSET_M + ratioT(ratios[String(id)][day]) * STEM_MAX_M);
-    const text = this.data.stations.map((s, i) => {
+    // the label itself stays the plain station number always -- "activated" means its colour
+    // and size follow the same flooding/warned/normal state as the marker's own ring, not that
+    // it appears or disappears
+    const labelColor = this.stationIds.map((id) => (flooding.has(id) ? ratioColor(RATIO_CEIL) : warned.has(id) ? warn : muted));
+    const labelSize = this.stationIds.map((id) => (flooding.has(id) || warned.has(id) ? 13 : 11));
+    const hovertext = this.data.stations.map((s, i) => {
       const v = ratios[String(s.id)][day];
       const pct = v === null ? "no record this day" : `${v.toFixed(2)}× its usual yearly flood peak`;
       const status = flooding.has(s.id) ? " · above its own peak" : warned.has(s.id) ? " · warned" : "";
@@ -243,7 +259,9 @@ export class DanubeFlood3D {
         "marker.size": [size],
         "marker.line.color": [borderColor],
         z: [topZ],
-        text: [text],
+        "textfont.color": [labelColor],
+        "textfont.size": [labelSize],
+        hovertext: [hovertext],
       } as unknown as Plotly.Data,
       [2]
     );
