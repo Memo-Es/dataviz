@@ -42,6 +42,20 @@ def _only(items):
     return item
 
 
+def _relief():
+    """The real ETOPO1 10-arcminute elevation grid under the tilted map's terrain backdrop --
+    from Miljana's own Demo Day package (`bavaria_relief_10arcmin.csv` there; see README.md).
+    Rows go south (low latitude) to north, matching the CSV; the page flips them when it draws,
+    since its projection puts north at the top.
+    """
+    grid = pd.read_csv(REF / "bavaria_relief_10arcmin.csv", index_col=0)
+    return {
+        "lats": [float(v) for v in grid.index],
+        "lons": [float(c) for c in grid.columns],
+        "elevation_m": grid.astype(int).values.tolist(),
+    }
+
+
 def _floods(stations):
     """Real daily discharge for the 4 named floods, as a ratio to each gauge's own yearly flood
     peak -- 1.0 is a normal yearly flood, 2.0 is twice that. From Miljana's own Demo Day package
@@ -176,6 +190,7 @@ def main():
             },
         },
         "rivers": river_lines,
+        "relief": _relief(),
         "floods": _floods(stations),
     }
 

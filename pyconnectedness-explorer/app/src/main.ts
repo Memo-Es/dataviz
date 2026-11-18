@@ -1735,6 +1735,7 @@ async function setUpDanube() {
       <li>Station names, coordinates and altitudes: the R package <a href="https://github.com/sebastian-engelke/graphicalextremes" target="_blank" rel="noopener">graphicalExtremes</a> (Asadi, Peiman; Davison, Anthony C.; Engelke, Sebastian, 2015), not from PyConnectedness itself.</li>
       <li>River lines: World Data Bank II (public domain) where a named river reaches both gauges; the Iller, Naab, Regen and Saalach drawn as smooth lines through their own gauges and river towns instead, since none of the public river-line sources checked carry those four &mdash; see <code>pipeline/datasets/danube/README.md</code> for which is which.</li>
       <li>Yearly flood threshold and mean flow per gauge: Bavarian Environment Agency (gkd.bayern.de, CC BY 4.0), via graphicalExtremes.</li>
+      <li>The tilted map's terrain: ETOPO1 10' (NOAA, public domain) and Natural Earth 2' shaded relief (public domain), via basemap-data.</li>
     </ul>`;
 
   select.addEventListener("wa-change", () => map.pick(Number(select.value)));

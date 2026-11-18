@@ -50,6 +50,15 @@ export interface DanubeFloodEvent {
 }
 export type DanubeFloods = Record<string, DanubeFloodEvent>;
 
+/** the real ETOPO1 10-arcminute elevation grid under the tilted map's terrain backdrop.
+ * `elevation_m[i][j]` is the mean elevation at `lats[i]`, `lons[j]`; `lats` runs south to
+ * north, matching pipeline/datasets/danube/bavaria_relief_10arcmin.csv. */
+export interface DanubeRelief {
+  lats: number[];
+  lons: number[];
+  elevation_m: number[][];
+}
+
 export interface DanubeData {
   source: { library: string; commit: string; data: string[] };
   method: {
@@ -71,6 +80,7 @@ export interface DanubeData {
     ground_truth_tree: { root: number; next: Record<string, number> };
   };
   rivers: GeoJSON.FeatureCollection<GeoJSON.LineString, { from: number; to: number; river: string | null; source: string | null; drawn: "traced" | "straight" }>;
+  relief: DanubeRelief;
   floods: DanubeFloods;
 }
 
@@ -103,6 +113,40 @@ function pairKeyOf(a: number, b: number): string {
   return a < b ? `${a}-${b}` : `${b}-${a}`;
 }
 
+/** the tilted map's terrain backdrop, painted from the real elevation grid instead of a
+ * hand-picked gradient: one pixel per grid cell (so the browser's own image scaling smooths
+ * it), low elevation at `--band` (the page's own light panel tint) up through the same brown
+ * ramp the sketch always used, high elevation darkest. Flipped so the image's own top is north,
+ * matching the grid's south-to-north row order against the projection's north-is-up screen. */
+function reliefDataUrl(relief: DanubeRelief): string {
+  const { lats, lons, elevation_m } = relief;
+  const rows = lats.length;
+  const cols = lons.length;
+  const canvas = document.createElement("canvas");
+  canvas.width = cols;
+  canvas.height = rows;
+  const ctx = canvas.getContext("2d")!;
+  let min = Infinity;
+  let max = -Infinity;
+  for (const row of elevation_m) for (const v of row) {
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  const ramp = d3
+    .scaleLinear<string>()
+    .domain([0, 0.22, 0.45, 0.7, 1])
+    .range([css("--band", "#e8dcc4"), "#d9c49a", "#b89968", "#8a6f45", "#6b5234"])
+    .interpolate(d3.interpolateRgb);
+  for (let i = 0; i < rows; i++) {
+    const y = rows - 1 - i; // row 0 is the southernmost in the data, the bottom of the image
+    for (let j = 0; j < cols; j++) {
+      ctx.fillStyle = ramp((elevation_m[i][j] - min) / (max - min));
+      ctx.fillRect(j, y, 1, 1);
+    }
+  }
+  return canvas.toDataURL("image/png");
+}
+
 export class DanubeMap {
   private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
   private width = 640;
@@ -119,6 +163,7 @@ export class DanubeMap {
   private timer: ReturnType<typeof setInterval> | null = null;
   private reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   private tilted = false;
+  private reliefUrl: string | null = null; // computed once, lazily, on the first tilt
   private barsLayer: d3.Selection<HTMLDivElement, unknown, null, undefined>;
   private barEls = new Map<number, HTMLDivElement>();
 
@@ -387,6 +432,10 @@ export class DanubeMap {
   setTilt(on: boolean) {
     this.tilted = on;
     this.host.classList.toggle("danube-tilted", on);
+    if (on && !this.reliefUrl) {
+      this.reliefUrl = reliefDataUrl(this.data.relief);
+      this.host.style.setProperty("--danube-relief-image", `url(${this.reliefUrl})`);
+    }
     this.syncBars(this.lastPicked, this.lastReached);
     this.fitTiltedHeight();
   }

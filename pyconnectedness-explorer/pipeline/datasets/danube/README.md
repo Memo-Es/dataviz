@@ -46,6 +46,15 @@ changes against the 9 gauges that are dated correctly). Column 1 (Passau-Achleit
 `run_danube.py` divides each value by that gauge's own `yearly_flood_peak` from `stations.csv`,
 for the Historical floods mode on the page.
 
+## `bavaria_relief_10arcmin.csv`
+
+A 21×34 grid of mean elevation (metres), 10 arc-minutes apart, lon 9.0–14.5 and lat 46.83–50.17
+— wider than the basin's own bounding box, for context around its edges. From the same package
+(`repo/examples/data/bavaria_relief_10arcmin.csv` there): ETOPO1 10' (NOAA, public domain) and
+the Natural Earth 2' shaded relief from `basemap-data` (public domain), averaged onto this
+coarser grid. Grounds the tilted map's terrain backdrop (danube-map.ts's `reliefDataUrl`) in
+real elevation instead of a hand-picked gradient.
+
 ## `rivers.geojson`
 
 One LineString per edge of `danube$flow_edges` (the same 30 pairs as above), for the map
