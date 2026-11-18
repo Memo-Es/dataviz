@@ -88,8 +88,8 @@ app.innerHTML = `
        says which one you're in. Connectedness never touches Danube's data or vice versa -->
   <div class="mode-switch-wrap">
     <wa-radio-group id="mode-switch" class="switch" label="Method" orientation="horizontal">
-      <wa-radio value="connectedness">Connectedness</wa-radio>
-      <wa-radio value="causality">Causality</wa-radio>
+      <wa-radio appearance="button" value="connectedness">Connectedness</wa-radio>
+      <wa-radio appearance="button" value="causality">Causality</wa-radio>
     </wa-radio-group>
   </div>
   <div class="topbar-right">
