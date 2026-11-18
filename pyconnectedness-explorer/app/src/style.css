@@ -2917,6 +2917,11 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 12px;
+  /* the tilted map's rotateX pushes its rendered box well past its own layout box -- without
+     this, nothing clips that overflow, so the whole page's scroll width balloons to fit it and
+     every line of text below wraps later than the screen can actually show, running off the
+     right edge on a phone. Clip it here, the one rounded box it was always meant to stay inside. */
+  overflow: hidden;
 }
 
 /* the quick 3D sketch: a table-top tilt on the same flat map, nothing re-drawn. The svg itself
