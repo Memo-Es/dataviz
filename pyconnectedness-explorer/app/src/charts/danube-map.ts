@@ -138,6 +138,7 @@ export class DanubeMap {
         this.height = Math.round(w * 0.86);
         this.layout();
         this.render(this.lastPicked, this.lastReached);
+        this.fitTiltedHeight();
       }
     }).observe(host);
     this.lastPicked = data.stations.some((s) => s.id === 21) ? 21 : data.stations[0].id;
@@ -361,6 +362,25 @@ export class DanubeMap {
     this.tilted = on;
     this.host.classList.toggle("danube-tilted", on);
     this.syncBars(this.lastPicked, this.lastReached);
+    this.fitTiltedHeight();
+  }
+
+  /** rotateX + perspective foreshorten the tilted map into a real painted footprint far
+   * shorter than the flat layout height #danube-map still reserves (see the measured gap: a
+   * ~290px-tall box holding ~150px of actual content) -- left alone, the card just carries
+   * dead terrain-coloured space below the map. Pull the box in to the real rendered bottom
+   * edge, read back from the svg's own getBoundingClientRect() like syncBars does above (a
+   * screen-CTM recomputation doesn't reflect the ancestor's CSS `perspective` either). Always
+   * resets the margin first so repeated resizes measure from a clean baseline, not one already
+   * carrying the last call's correction. */
+  private fitTiltedHeight() {
+    const svgEl = this.svg.node() as SVGSVGElement;
+    svgEl.style.marginBottom = "";
+    if (!this.tilted) return;
+    const hostBox = this.host.getBoundingClientRect();
+    const svgBox = svgEl.getBoundingClientRect();
+    const slack = hostBox.bottom - svgBox.bottom - 16; // 16px of breathing room below the real content
+    if (slack > 0) svgEl.style.marginBottom = `${-slack}px`;
   }
 
   private syncBars(picked: number, reached: number[]) {
