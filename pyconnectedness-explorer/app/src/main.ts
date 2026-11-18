@@ -253,8 +253,13 @@ app.innerHTML = `
         <h2>Directed tree for extremes <code class="tag">MaxLinear(…).fit(method="qtree")</code></h2>
         <p class="sub" id="danube-sub"></p>
       </div>
-      <!-- the only other thing qtree can run on here: a file you upload, fit live in your
-           browser the same way Connectedness's "Your own file" already does -->
+    </div>
+    <!-- the only other thing qtree can run on here: a file you upload, fit live in your
+         browser the same way Connectedness's "Your own file" already does. A sibling of
+         card-head, not a child of it: card-head stacks under its title on a phone (every
+         other card's own switch does the same), which would otherwise land this between the
+         description paragraph and the readout below, breaking the reading order -->
+    <div class="danube-src-row">
       ${segmented("danube-src", "Data", [["danube", "Danube"], ["own", "Your own file"]], "danube", true)}
     </div>
     <div data-src="danube">

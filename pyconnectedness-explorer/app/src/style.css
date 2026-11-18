@@ -2838,7 +2838,9 @@ wa-dropdown wa-dropdown-item [slot="details"] {
 @media (max-width: 600px) {
   .crumb {
     flex-wrap: wrap;
-    gap: var(--sp-tiny) var(--sp-sm);
+    /* row-gap was --sp-tiny (8px): too tight between two pill rows that read as separate
+       groups -- where you are, and what you can do here -- not one cluster */
+    gap: var(--sp-sm) var(--sp-sm);
   }
   .crumb-tools {
     margin-left: 0;
@@ -2864,12 +2866,19 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   align-items: start;
 }
 
+.danube-src-row {
+  margin-bottom: var(--sp-sm);
+}
+
 .danube-controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--sp-tiny);
-  margin-bottom: var(--sp-tight);
+  /* was --sp-tight (4px): fine between two rows of the same control cluster, too tight for
+     what comes right after it here -- a whole bordered card, which reads as its own block and
+     wants at least the header-to-body rhythm the rest of the page uses, not the tightest one */
+  margin-bottom: var(--sp-sm);
 }
 
 .danube-controls .num {
