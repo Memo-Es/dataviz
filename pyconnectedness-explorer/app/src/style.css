@@ -2900,12 +2900,31 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   padding-bottom: 36px;
 }
 
+/* a terrain backdrop, not a flat tint: the real altitude data puts the Alpine headwaters
+   (Lech, Isar, Iller, Salzach -- 1300-1480m) toward the south of this map and the lower Naab/
+   Regen reaches (500-615m) toward the north, so the shading runs the same way -- rugged and
+   darker south, softer valley tan north -- plus a faint contour-line texture, not a plain tint */
 #danube-map.danube-tilted::before {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: 14px;
-  background: radial-gradient(ellipse 80% 65% at 50% 10%, color-mix(in srgb, var(--accent) 12%, var(--panel)), var(--band) 75%);
+  background:
+    repeating-linear-gradient(
+      35deg,
+      transparent 0px,
+      transparent 14px,
+      color-mix(in srgb, #3d2f1f 14%, transparent) 15px,
+      transparent 16px
+    ),
+    linear-gradient(
+      to top,
+      #6b5234 0%,
+      #8a6f45 30%,
+      #b89968 55%,
+      #d9c49a 78%,
+      var(--band) 100%
+    );
   z-index: 0;
 }
 
@@ -2915,6 +2934,31 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   transform: rotateX(50deg) scale(0.92);
   transform-origin: 50% 10%;
   filter: drop-shadow(0 26px 20px rgba(0, 0, 0, 0.22));
+}
+
+/* rivers read as carved valleys here, not the flat map's quiet context lines -- a soft dark
+   groove behind a blue core, only while tilted (the flat 2D view keeps its own quieter style) */
+#danube-map.danube-tilted .danube-rivers path {
+  stroke: #2f6fa8;
+  stroke-width: 3;
+  filter: drop-shadow(0 1px 0.5px rgba(0, 0, 0, 0.35));
+}
+
+:root[data-theme="dark"] #danube-map.danube-tilted .danube-rivers path {
+  stroke: #5b9bd5;
+}
+
+/* every label drawn over the terrain (station numbers, root/warn/departure text) gets a
+   background-coloured halo here -- the terrain runs dark-brown to light-tan, so no single ink
+   colour stays readable everywhere on it the way it does on the flat map's plain surface */
+#danube-map.danube-tilted .danube-id,
+#danube-map.danube-tilted .danube-root-label,
+#danube-map.danube-tilted .danube-warn-label,
+#danube-map.danube-tilted .danube-departure-label {
+  paint-order: stroke fill;
+  stroke: var(--panel);
+  stroke-width: 3px;
+  stroke-linejoin: round;
 }
 
 .danube-bars {
