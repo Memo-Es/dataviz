@@ -2866,8 +2866,28 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   align-items: start;
 }
 
-.danube-src-row {
+.danube-src-row,
+.danube-scenario-row {
   margin-bottom: var(--sp-sm);
+}
+
+.flood-date-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  margin-bottom: var(--sp-sm);
+}
+
+#flood-slider {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.flood-date-label {
+  min-width: 9ch;
+  font: 500 14px var(--f-sans);
+  color: var(--stone);
+  text-align: right;
 }
 
 .danube-controls {

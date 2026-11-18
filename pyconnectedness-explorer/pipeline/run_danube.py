@@ -42,6 +42,30 @@ def _only(items):
     return item
 
 
+def _floods(stations):
+    """Real daily discharge for the 4 named floods, as a ratio to each gauge's own yearly flood
+    peak -- 1.0 is a normal yearly flood, 2.0 is twice that. From Miljana's own Demo Day package
+    (`danube_flood_events.csv` there): the Bavarian Environment Agency's daily series (CC BY 4.0),
+    via graphicalExtremes, for the days around each of 4 historical floods (1999, 2002, 2005,
+    2013) -- see README.md. Not from PyConnectedness and not model output: this is what actually
+    happened, for comparing against the estimated tree's own shock-propagation animation.
+    """
+    events = pd.read_csv(REF / "danube_flood_events.csv")
+    peaks = stations["yearly_flood_peak"].astype(float)
+    out = {}
+    for event, grp in events.groupby("event"):
+        grp = grp.sort_values("date")
+        out[str(int(event))] = {
+            "dates": grp["date"].tolist(),
+            "ratio": {
+                str(sid): [None if pd.isna(v) else round(float(v) / peaks[sid], 3)
+                           for v in grp[str(sid)]]
+                for sid in stations.index
+            },
+        }
+    return out
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
 
@@ -152,6 +176,7 @@ def main():
             },
         },
         "rivers": river_lines,
+        "floods": _floods(stations),
     }
 
     (OUT / "danube.json").write_text(json.dumps(out, indent=None, separators=(",", ":")))

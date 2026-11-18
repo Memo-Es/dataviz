@@ -33,6 +33,19 @@ load("data/danube.rda")
 write.csv(danube$info[, c("RivNames","Lat","Long","Alt","Area")], "stations.csv")
 ```
 
+## `danube_flood_events.csv`
+
+Daily discharge at every gauge for the days around 4 historical floods (May 1999, Aug 2002, Aug
+2005, Jun 2013) — real data, not model output. From the same package as above
+(`repo/examples/data/danube_flood_events.csv` there), the Bavarian Environment Agency's daily
+series (CC BY 4.0, via graphicalExtremes), re-dated the same way the main daily series was
+(see the package's own README: `graphicalExtremes::danube$data_raw` stores every gauge from
+1900-11-01 regardless of its true start, found instead by cross-correlating day-to-day log
+changes against the 9 gauges that are dated correctly). Column 1 (Passau-Achleiten) ends
+2010-12-31, so it carries no 2013 values — blank in the CSV, `null` in `danube.json`.
+`run_danube.py` divides each value by that gauge's own `yearly_flood_peak` from `stations.csv`,
+for the Historical floods mode on the page.
+
 ## `rivers.geojson`
 
 One LineString per edge of `danube$flow_edges` (the same 30 pairs as above), for the map

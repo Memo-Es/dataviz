@@ -41,6 +41,15 @@ export interface DanubeEdge {
   score: number;
 }
 
+/** one named historical flood: daily discharge at every gauge, as a ratio to that gauge's own
+ * yearly flood peak (1.0 = a normal yearly flood there). `null` where the gauge's own record
+ * doesn't cover that day (see pipeline/datasets/danube/README.md). */
+export interface DanubeFloodEvent {
+  dates: string[];
+  ratio: Record<string, (number | null)[]>;
+}
+export type DanubeFloods = Record<string, DanubeFloodEvent>;
+
 export interface DanubeData {
   source: { library: string; commit: string; data: string[] };
   method: {
@@ -62,6 +71,7 @@ export interface DanubeData {
     ground_truth_tree: { root: number; next: Record<string, number> };
   };
   rivers: GeoJSON.FeatureCollection<GeoJSON.LineString, { from: number; to: number; river: string | null; source: string | null; drawn: "traced" | "straight" }>;
+  floods: DanubeFloods;
 }
 
 export async function loadDanube(): Promise<DanubeData> {
