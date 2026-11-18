@@ -29,6 +29,17 @@
   --shadow-hover: 0 6px 22px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 14px 36px rgba(0, 0, 0, 0.12);
   --radius: 20px;
+  /* one spacing scale -- every chrome gap/margin/padding on the page snaps to one of these
+     instead of its own one-off number. tight: a label and the thing right next to it (an icon,
+     a wrapped line). tiny: one row's own internal gap. sm: between related rows inside one
+     control. md: a header's own internal rhythm. lg/xl: between chrome blocks that don't
+     belong to the same control at all. */
+  --sp-tight: 4px;
+  --sp-tiny: 8px;
+  --sp-sm: 12px;
+  --sp-md: 16px;
+  --sp-lg: 20px;
+  --sp-xl: 24px;
   --band-fast: #2f2a78; /* ordinal: one hue, darker = faster */
   --band-mid: #6f67c9;
   --band-slow: #bdb8ee;
@@ -185,8 +196,8 @@ svg .dp {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 12px max(16px, calc((100vw - 1280px) / 2));
+  gap: var(--sp-md);
+  padding: var(--sp-sm) max(var(--sp-md), calc((100vw - 1280px) / 2));
   background: color-mix(in srgb, var(--bg) 85%, transparent);
   backdrop-filter: saturate(1.4) blur(12px);
   border-bottom: 1px solid var(--line);
@@ -195,7 +206,7 @@ svg .dp {
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-tiny);
   font-size: 15px;
   letter-spacing: -0.01em;
 }
@@ -213,7 +224,7 @@ svg .dp {
 .topbar-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-tiny);
 }
 
 /* the one choice that sits above everything else: which unrelated method you're looking at.
@@ -237,6 +248,21 @@ svg .dp {
     order: 3;
     flex-basis: 100%;
     justify-content: center;
+  }
+
+  /* full-width here, not just its wrapper: on a phone this is the only way to reach Causality,
+     so it gets the same emphasis as a primary row control instead of floating pill-sized in a
+     row that's already full width around it */
+  #mode-switch {
+    width: 100%;
+  }
+
+  #mode-switch::part(form-control-input) {
+    width: 100%;
+  }
+
+  #mode-switch wa-radio {
+    flex: 1;
   }
 }
 
@@ -514,8 +540,11 @@ main {
 /* the first graph's readout: a quiet stat line that belongs to the chart, not a card of its
    own. Values stay below the chart title in size (19px title > 17px values > 12px labels). */
 .readout {
-  margin: 6px 0 4px;
-  padding: 12px 0 14px;
+  /* no margin-top of its own: it always follows .card-head, whose margin-bottom already sets
+     this gap (adjacent margins collapse to the larger one, so a second number here was never
+     doing anything but making the rule harder to read) */
+  margin: 0 0 var(--sp-tight);
+  padding: var(--sp-sm) 0;
   border-top: 1px solid var(--line);
 }
 
@@ -752,7 +781,7 @@ main {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 22px 24px 20px;
+  padding: var(--sp-xl);
   min-width: 0;
 }
 
@@ -772,8 +801,8 @@ main {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 12px;
+  gap: var(--sp-md);
+  margin-bottom: var(--sp-sm);
 }
 
 .card h2 {
@@ -784,7 +813,7 @@ main {
 }
 
 .sub {
-  margin: 4px 0 0;
+  margin: var(--sp-tight) 0 0;
   font-size: 13.5px;
   color: var(--secondary);
   max-width: 720px;
@@ -1299,7 +1328,7 @@ svg {
 
 /* one header system for every graph: question, then the library's name, then what it shows */
 .q {
-  margin: 0 0 4px;
+  margin: 0 0 var(--sp-tight);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -1313,7 +1342,7 @@ svg {
   display: inline-block;
   width: 14px;
   height: 3px;
-  margin-right: 8px;
+  margin-right: var(--sp-tiny);
   vertical-align: 3px;
   border-radius: 2px;
   background: var(--accent);
@@ -2205,15 +2234,18 @@ svg {
 .crumb {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin: 18px 0 2px;
+  gap: var(--sp-sm);
+  /* was 18px 0 2px: the same row read as having a big gap above and almost none below, so
+     "Code"/"Download" sat crammed against the card under them. Both sides are the same kind
+     of gap (chrome row to chrome row) and now use the same value. */
+  margin: var(--sp-lg) 0;
 }
 
 .crumb-back {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  padding: 0 16px;
+  padding: 0 var(--sp-md);
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--panel);
@@ -2235,7 +2267,7 @@ svg {
 .crumb-tools {
   margin-left: auto;
   display: inline-flex;
-  gap: 8px;
+  gap: var(--sp-tiny);
 }
 
 #context {
@@ -2255,7 +2287,7 @@ svg {
 
 .crumb-btn {
   min-height: 44px;
-  padding: 0 18px;
+  padding: 0 var(--sp-md);
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--panel);
@@ -2321,7 +2353,7 @@ svg {
 }
 
 .crumb-btn.small {
-  padding: 0 14px;
+  padding: 0 var(--sp-sm);
   font-size: 13px;
 }
 
@@ -2803,7 +2835,7 @@ wa-dropdown wa-dropdown-item [slot="details"] {
 @media (max-width: 600px) {
   .crumb {
     flex-wrap: wrap;
-    gap: 8px 14px;
+    gap: var(--sp-tiny) var(--sp-sm);
   }
   .crumb-tools {
     margin-left: 0;
@@ -2833,8 +2865,8 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 4px;
+  gap: var(--sp-tiny);
+  margin-bottom: var(--sp-tight);
 }
 
 .danube-controls .num {
