@@ -1701,8 +1701,8 @@ async function setUpDanube() {
   document.getElementById("danube-sources")!.innerHTML =
     `<h4>Data sources</h4><ul>
       <li>PyConnectedness (<a href="https://github.com/zstoi/PyConnectedness" target="_blank" rel="noopener">GitHub</a>, commit <code>${data.source.commit.slice(0, 7)}</code>): the discharge data, the fitted tree and its scores, and the ground-truth comparison.</li>
-      <li>Tran, Buck and Klüppelberg (2024), "Estimating a directed tree for extremes", <i>JRSS B</i> 86(3), 771&ndash;792: the method and the Danube dataset's origin.</li>
-      <li>Station names, coordinates and altitudes: the R package <a href="https://github.com/sebastian-engelke/graphicalextremes" target="_blank" rel="noopener">graphicalExtremes</a> (Asadi, Davison and Engelke, 2015), not from PyConnectedness itself.</li>
+      <li>Tran, Ngoc Mai; Buck, Johannes; Klüppelberg, Claudia (2024), "Estimating a directed tree for extremes", <i>Journal of the Royal Statistical Society Series B</i> 86(3), 771-792: the method and the Danube dataset's origin.</li>
+      <li>Station names, coordinates and altitudes: the R package <a href="https://github.com/sebastian-engelke/graphicalextremes" target="_blank" rel="noopener">graphicalExtremes</a> (Asadi, Peiman; Davison, Anthony C.; Engelke, Sebastian, 2015), not from PyConnectedness itself.</li>
       <li>River lines: World Data Bank II (public domain) where a named river reaches both gauges; the Iller, Naab, Regen and Saalach drawn as smooth lines through their own gauges and river towns instead, since none of the public river-line sources checked carry those four &mdash; see <code>pipeline/datasets/danube/README.md</code> for which is which.</li>
       <li>Yearly flood threshold and mean flow per gauge: Bavarian Environment Agency (gkd.bayern.de, CC BY 4.0), via graphicalExtremes.</li>
     </ul>`;

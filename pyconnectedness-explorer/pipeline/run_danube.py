@@ -1,19 +1,19 @@
 """
-Graph 4: the directed tree for extremes on the Upper Danube (Tran, Buck and Klueppelberg, 2024).
+Graph 4: the directed tree for extremes on the Upper Danube (Tran, Buck and Klüppelberg, 2024).
 
-Needs no network access: every number comes from files already in the repo --
+Needs no network access: every number comes from files already in the repo —
 PyConnectedness's own `examples/data/danube_log_discharges.csv` (the model's input) and
 `danube_network.csv` (the paper's ground-truth tree, used here only to report how close the
 estimate comes), read through the pinned submodule so the exact library code runs. Station
 names, coordinates and the river lines for the map are not something the library carries (its
-two CSVs are unlabelled matrices); `pipeline/datasets/danube/` supplies only that -- see its
+two CSVs are unlabelled matrices); `pipeline/datasets/danube/` supplies only that — see its
 README.md for exactly where each file comes from and how to re-derive it.
 
 Fits `MaxLinear(...).fit(method="qtree")`. The data file is already in natural log scale, so
 `log=False`. The threshold and lower quantile are not fixed by any docstring or example for this
 dataset (no Danube notebook has landed in the library yet), so both are chosen by the library's
 own `MaxLinear.select_threshold` (Algorithm 2 of the paper) rather than its generic defaults
-(threshold=0.8, lower=0.05) -- see README.md at the repo root for why, and what was selected.
+(threshold=0.8, lower=0.05) — see README.md at the repo root for why, and what was selected.
 
     python run_danube.py
 """
@@ -97,7 +97,7 @@ def main():
             "call": 'MaxLinear(danube_log_discharges, transform=None).fit(method="qtree", '
                     f'threshold={selection.threshold}, lower={selection.lower}, log=False)',
             "selection": {
-                "how": "MaxLinear.select_threshold (Algorithm 2 of Tran, Buck and Klueppelberg, 2024): "
+                "how": "MaxLinear.select_threshold (Algorithm 2 of Tran, Buck and Klüppelberg, 2024): "
                        "the threshold/lower whose estimated tree varies least across 100 subsamples",
                 "seed": SELECT_SEED,
                 "threshold": selection.threshold,

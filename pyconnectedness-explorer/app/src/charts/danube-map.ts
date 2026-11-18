@@ -1,23 +1,22 @@
 /**
- * Graph 4: the directed tree for extremes on the Upper Danube (Tran, Buck and Klueppelberg,
- * 2024) -- `MaxLinear(...).fit(method="qtree")`, read straight from
- * public/data/danube/danube.json (pipeline/run_danube.py). Every number -- the tree, the edge
- * scores, the comparison to the paper's ground truth -- is the library's own output; this file
+ * Graph 4: the directed tree for extremes on the Upper Danube (Tran, Buck and Klüppelberg,
+ * 2024) — `MaxLinear(...).fit(method="qtree")`, read straight from
+ * public/data/danube/danube.json (pipeline/run_danube.py). Every number — the tree, the edge
+ * scores, the comparison to the paper's ground truth — is the library's own output; this file
  * only draws it on a map and animates a pick.
  *
  * The tree is root-directed: every station has exactly one path to the root. So "downstream of
  * a pick" is one chain, not a branching spread, and Play reveals that chain one station at a
  * time, each one sized by the score of the edge that carried it (fixed across every pick, so a
- * size means the same thing whichever station is picked -- the rule CONTEXT.md gives for every
+ * size means the same thing whichever station is picked — the rule CONTEXT.md gives for every
  * other graph's scales).
  *
  * The map's river lines are the real network (every edge of the paper's own ground-truth tree,
  * all 30 traced from World Data Bank II where a named river connects the two gauges, or as a
- * smooth hand-drawn line through them otherwise -- see pipeline/datasets/danube/README.md). The
- * animated
- * highlight follows the model's estimated tree instead, which is not always the same edge set;
- * where they differ the highlight still runs along the real river lines' corridor, since the
- * model's edge is still between two real, mapped stations.
+ * smooth hand-drawn line through them otherwise — see pipeline/datasets/danube/README.md). The
+ * animated highlight follows the model's estimated tree instead, which is not always the same
+ * edge set; where they differ the highlight still runs along the real river lines' corridor,
+ * since the model's edge is still between two real, mapped stations.
  */
 import * as d3 from "d3";
 

@@ -283,7 +283,7 @@ export function pythonForDanube(c: DanubeCodeContext): string {
     "model = MaxLinear(X, transform=None)  # transform is unused by method=\"qtree\"",
     "",
     "# threshold and lower are not fixed by any docstring or Danube notebook for this dataset, so",
-    "# they come from the library's own selection (Algorithm 2 of Tran, Buck and Klueppelberg, 2024):",
+    "# they come from the library's own selection (Algorithm 2 of Tran, Buck and Klüppelberg, 2024):",
     `selection = model.select_threshold(log=False, seed=${c.selectionSeed})`,
     `print(round(selection.threshold, 2), round(selection.lower, 2))  # ${c.threshold}, ${c.lower} on the page`,
     "",
