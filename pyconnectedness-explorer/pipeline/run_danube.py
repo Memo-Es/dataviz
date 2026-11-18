@@ -82,7 +82,7 @@ def main():
     assert abs(directed_matches / 30 - metrics.loc["tree", "tpr"]) < 5e-4, \
         "directed_matches should equal the library's own TPR * 30"  # metrics is rounded to 4dp
 
-    river_lines = json.loads((REF / "rivers_natural_earth.geojson").read_text())
+    river_lines = json.loads((REF / "rivers.geojson").read_text())
 
     out = {
         "source": {
@@ -114,6 +114,13 @@ def main():
                 "lat": round(float(row["lat"]), 6),
                 "lon": round(float(row["lon"]), 6),
                 "altitude_m": float(row["altitude_m"]),
+                # the gauge snapped onto rivers.geojson's own traced line, so the station dot
+                # lands exactly on it instead of up to ~0.2km off -- lat/lon above stay the true
+                # gauge position (what the hover detail and every citation should say)
+                "river_lat": round(float(row["river_lat"]), 6),
+                "river_lon": round(float(row["river_lon"]), 6),
+                "yearly_flood_peak": float(row["yearly_flood_peak"]),
+                "mean_flow": float(row["mean_flow"]),
             }
             for idx, row in stations.iterrows()
         ],

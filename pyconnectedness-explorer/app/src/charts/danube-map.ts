@@ -12,8 +12,9 @@
  * other graph's scales).
  *
  * The map's river lines are the real network (every edge of the paper's own ground-truth tree,
- * traced from Natural Earth where a named river reaches both endpoints, a straight line between
- * the two real gauges otherwise -- see pipeline/datasets/danube/README.md). The animated
+ * all 30 traced from World Data Bank II where a named river connects the two gauges, or as a
+ * smooth hand-drawn line through them otherwise -- see pipeline/datasets/danube/README.md). The
+ * animated
  * highlight follows the model's estimated tree instead, which is not always the same edge set;
  * where they differ the highlight still runs along the real river lines' corridor, since the
  * model's edge is still between two real, mapped stations.
@@ -26,6 +27,13 @@ export interface DanubeStation {
   lat: number;
   lon: number;
   altitude_m: number;
+  /** the same gauge snapped onto rivers.geojson's own traced line -- use this to place the
+   * station dot so it lands exactly on the river; lat/lon above stay the true gauge position,
+   * for the hover detail and every citation */
+  river_lat: number;
+  river_lon: number;
+  yearly_flood_peak: number;
+  mean_flow: number;
 }
 
 export interface DanubeEdge {
@@ -162,7 +170,7 @@ export class DanubeMap {
   }
 
   private layout() {
-    const fc = { type: "FeatureCollection", features: this.data.stations.map((s) => ({ type: "Feature", geometry: { type: "Point", coordinates: [s.lon, s.lat] } })) } as GeoJSON.FeatureCollection;
+    const fc = { type: "FeatureCollection", features: this.data.stations.map((s) => ({ type: "Feature", geometry: { type: "Point", coordinates: [s.river_lon, s.river_lat] } })) } as GeoJSON.FeatureCollection;
     this.projection.fitExtent([[36, 20], [this.width - 20, this.height - 20]], fc);
     this.svg.attr("width", this.width).attr("height", this.height).attr("viewBox", `0 0 ${this.width} ${this.height}`);
   }
@@ -181,7 +189,7 @@ export class DanubeMap {
       if (next === undefined || seen.has(next)) break;
       seen.add(next);
       const feat = this.riverByPair.get(pairKeyOf(cur, next));
-      let hop = feat ? feat.geometry.coordinates.slice() : [[this.byId.get(cur)!.lon, this.byId.get(cur)!.lat], [this.byId.get(next)!.lon, this.byId.get(next)!.lat]];
+      let hop = feat ? feat.geometry.coordinates.slice() : [[this.byId.get(cur)!.river_lon, this.byId.get(cur)!.river_lat], [this.byId.get(next)!.river_lon, this.byId.get(next)!.river_lat]];
       if (feat && feat.properties.from !== cur) hop = hop.slice().reverse();
       coords.push(...(coords.length ? hop.slice(1) : hop));
       cur = next;
@@ -234,10 +242,10 @@ export class DanubeMap {
       .selectAll("line")
       .data(segs)
       .join("line")
-      .attr("x1", (d) => this.projection([d.a.lon, d.a.lat])![0])
-      .attr("y1", (d) => this.projection([d.a.lon, d.a.lat])![1])
-      .attr("x2", (d) => this.projection([d.b.lon, d.b.lat])![0])
-      .attr("y2", (d) => this.projection([d.b.lon, d.b.lat])![1])
+      .attr("x1", (d) => this.projection([d.a.river_lon, d.a.river_lat])![0])
+      .attr("y1", (d) => this.projection([d.a.river_lon, d.a.river_lat])![1])
+      .attr("x2", (d) => this.projection([d.b.river_lon, d.b.river_lat])![0])
+      .attr("y2", (d) => this.projection([d.b.river_lon, d.b.river_lat])![1])
       .attr("stroke", accent)
       .attr("stroke-width", 3)
       .attr("stroke-linecap", "round")
@@ -289,7 +297,7 @@ export class DanubeMap {
       .join("g")
       .attr("class", "hit")
       .attr("data-station", (d) => d.id)
-      .attr("transform", (d) => `translate(${this.projection([d.lon, d.lat])!.join(",")})`)
+      .attr("transform", (d) => `translate(${this.projection([d.river_lon, d.river_lat])!.join(",")})`)
       .attr("tabindex", 0)
       .attr("role", "button")
       .attr("aria-label", (d) => `Station ${d.id}, ${d.river}${d.id === this.data.root ? ", the root" : ""}`)
