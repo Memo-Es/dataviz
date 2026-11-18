@@ -118,7 +118,7 @@ function pairKeyOf(a: number, b: number): string {
  * it), low elevation at `--band` (the page's own light panel tint) up through the same brown
  * ramp the sketch always used, high elevation darkest. Flipped so the image's own top is north,
  * matching the grid's south-to-north row order against the projection's north-is-up screen. */
-function reliefDataUrl(relief: DanubeRelief): string {
+export function reliefDataUrl(relief: DanubeRelief): string {
   const { lats, lons, elevation_m } = relief;
   const rows = lats.length;
   const cols = lons.length;

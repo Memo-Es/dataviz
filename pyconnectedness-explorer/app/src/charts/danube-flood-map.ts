@@ -14,7 +14,7 @@
  * `danube.json` for exactly this reason.
  */
 import * as d3 from "d3";
-import type { DanubeData, DanubeStation } from "./danube-map";
+import { reliefDataUrl, type DanubeData, type DanubeStation } from "./danube-map";
 
 function css(name: string, fallback: string): string {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -41,6 +41,10 @@ export class DanubeFloodMap {
   private reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   private lastEvent = "";
   private lastDay = 0;
+  private tilted = false;
+  private reliefUrl: string | null = null; // computed once, lazily, on the first tilt
+  private barsLayer: d3.Selection<HTMLDivElement, unknown, null, undefined>;
+  private barEls = new Map<number, HTMLDivElement>();
 
   constructor(
     private host: HTMLElement,
@@ -52,6 +56,9 @@ export class DanubeFloodMap {
       Object.entries(data.reachability).map(([k, v]) => [Number(k), new Set(v)])
     );
     this.svg = d3.select(host).append("svg").attr("class", "danube-map danube-flood-svg");
+    // a flat, screen-aligned sibling of the svg, same reasoning as DanubeMap's own bars layer:
+    // a bar's CSS height transition shouldn't itself be warped by the tilt
+    this.barsLayer = d3.select(host).append("div").attr("class", "danube-bars");
     this.projection = d3.geoMercator();
     this.path = d3.geoPath(this.projection);
     new ResizeObserver(() => {
@@ -61,6 +68,7 @@ export class DanubeFloodMap {
         this.height = Math.round(w * 0.86);
         this.layout();
         this.render(this.lastEvent, this.lastDay);
+        this.fitTiltedHeight();
       }
     }).observe(host);
     this.layout();
@@ -121,6 +129,7 @@ export class DanubeFloodMap {
       .selectAll("g")
       .data(this.data.stations)
       .join("g")
+      .attr("data-station", (d) => d.id)
       .attr("transform", (d) => {
         const p = this.projection([d.river_lon, d.river_lat]);
         return p ? `translate(${p[0]},${p[1]})` : "";
@@ -145,7 +154,72 @@ export class DanubeFloodMap {
         return `Station ${d.id} · ${d.river}\n${pct}`;
       });
 
+    this.syncBars(event, day);
     this.onStep(event, day);
+  }
+
+  /** the quick 3D sketch, aligned with Miljana's own deck slide for this exact scenario: a
+   * tilted terrain (the same real elevation grid DanubeMap paints) with one column per gauge,
+   * risen and coloured by that day's real ratio -- continuous, not binary, since this is real
+   * magnitude data (not the qtree search score the flat shock-propagation bars deliberately
+   * don't size by) */
+  setTilt(on: boolean) {
+    this.tilted = on;
+    this.host.classList.toggle("danube-tilted", on);
+    if (on && !this.reliefUrl) {
+      this.reliefUrl = reliefDataUrl(this.data.relief);
+      this.host.style.setProperty("--danube-relief-image", `url(${this.reliefUrl})`);
+    }
+    this.syncBars(this.lastEvent, this.lastDay);
+    this.fitTiltedHeight();
+  }
+
+  /** same measured-footprint correction as DanubeMap's own -- see its fitTiltedHeight for why
+   * the layout box has to be pulled in to the real tilted render, not left at its flat height */
+  private fitTiltedHeight() {
+    const svgEl = this.svg.node() as SVGSVGElement;
+    svgEl.style.marginBottom = "";
+    if (!this.tilted) return;
+    const hostBox = this.host.getBoundingClientRect();
+    const svgBox = svgEl.getBoundingClientRect();
+    const slack = hostBox.bottom - svgBox.bottom - 16;
+    if (slack > 0) svgEl.style.marginBottom = `${-slack}px`;
+  }
+
+  private barHeight(ratio: number | null): number {
+    if (ratio === null) return 0;
+    return Math.max(0, Math.min(1, ratio / 2.5)) * 90;
+  }
+
+  private syncBars(event: string, day: number) {
+    if (!this.tilted || !event || !this.data.floods[event]) {
+      this.barsLayer.selectAll("*").remove();
+      this.barEls.clear();
+      return;
+    }
+    const ratios = this.data.floods[event].ratio;
+    const hostBox = this.host.getBoundingClientRect();
+    // one bar per station, every render while tilted -- unlike the shock-propagation chain
+    // (a fixed, small set for a pick), every gauge has a ratio every day, so the set never
+    // changes; same reused-element trick so the CSS height transition plays, not pops
+    for (const s of this.data.stations) {
+      let el = this.barEls.get(s.id);
+      if (!el) {
+        el = this.barsLayer.append("div").attr("class", "danube-bar").node()!;
+        this.barEls.set(s.id, el);
+      }
+      const circle = this.svg.select<SVGCircleElement>(`[data-station="${s.id}"] circle`).node();
+      if (circle) {
+        const r = circle.getBoundingClientRect();
+        const cx = r.left + r.width / 2;
+        const cy = r.top + r.height / 2;
+        el.style.left = `${cx - hostBox.left}px`;
+        el.style.bottom = `${hostBox.height - (cy - hostBox.top)}px`;
+      }
+      const v = ratios[String(s.id)][day];
+      el.style.height = `${this.barHeight(v)}px`;
+      el.style.background = v === null ? css("--muted", "#8a8680") : ratioColor(v);
+    }
   }
 
   play(event: string, lastDay: number, onDone?: () => void) {

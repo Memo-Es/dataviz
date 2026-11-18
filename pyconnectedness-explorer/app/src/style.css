@@ -2960,11 +2960,11 @@ wa-dropdown wa-dropdown-item [slot="details"] {
    gets the rotation (its parent supplies the perspective); the bars layer is a flat sibling so
    each bar's own height transition isn't itself warped by the tilt -- see danube-map.ts syncBars,
    which reads the svg's real screen CTM so a bar's foot lands exactly on its tilted point */
-#danube-map {
+.danube-tilt-host {
   position: relative;
 }
 
-#danube-map.danube-tilted {
+.danube-tilt-host.danube-tilted {
   perspective: 1600px;
   padding-bottom: 36px;
 }
@@ -2975,7 +2975,7 @@ wa-dropdown wa-dropdown-item [slot="details"] {
    lighter toward the north, but now that's what the data says, not an assumed direction. The
    plain gradient below only covers the gap before JS has run once. A faint diagonal texture
    on top either way, not a plain tint. */
-#danube-map.danube-tilted::before {
+.danube-tilt-host.danube-tilted::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -2997,7 +2997,7 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   z-index: 0;
 }
 
-#danube-map.danube-tilted svg.danube-map {
+.danube-tilt-host.danube-tilted svg.danube-map {
   position: relative;
   z-index: 1;
   transform: rotateX(50deg) scale(0.92);
@@ -3007,13 +3007,13 @@ wa-dropdown wa-dropdown-item [slot="details"] {
 
 /* rivers read as carved valleys here, not the flat map's quiet context lines -- a soft dark
    groove behind a blue core, only while tilted (the flat 2D view keeps its own quieter style) */
-#danube-map.danube-tilted .danube-rivers path {
+.danube-tilt-host.danube-tilted .danube-rivers path {
   stroke: #2f6fa8;
   stroke-width: 3;
   filter: drop-shadow(0 1px 0.5px rgba(0, 0, 0, 0.35));
 }
 
-:root[data-theme="dark"] #danube-map.danube-tilted .danube-rivers path {
+:root[data-theme="dark"] .danube-tilt-host.danube-tilted .danube-rivers path {
   stroke: #5b9bd5;
 }
 

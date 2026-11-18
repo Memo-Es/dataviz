@@ -282,7 +282,7 @@ app.innerHTML = `
         </div>
         <div class="danube-body">
           <div class="danube-map-wrap">
-            <div id="danube-map" class="chart-host"></div>
+            <div id="danube-map" class="chart-host danube-tilt-host"></div>
           </div>
           <div class="danube-side">
             <div class="legend" id="danube-legend"></div>
@@ -298,6 +298,11 @@ app.innerHTML = `
           ${segmented("flood-event", "Flood", [["2013", "Jun 2013"], ["2005", "Aug 2005"], ["2002", "Aug 2002"], ["1999", "May 1999"]], "2013", true)}
           <button class="icon-btn danube-play" id="flood-play" type="button" aria-label="Play: replay this flood day by day">▶</button>
           <button class="crumb-btn small" id="flood-reset" type="button">Reset</button>
+          <!-- Miljana's own deck shows this exact scenario (real discharge, a real flood) as a
+               3D terrain with a rising, colour-coded column per gauge -- closer to that than our
+               shock-propagation sketch is to anything in the deck, so the toggle earns its keep
+               here specifically -->
+          <button class="crumb-btn small danube-3d-toggle" id="flood-3d" type="button" aria-pressed="false">3D sketch</button>
         </div>
         <div class="flood-date-row">
           <input type="range" id="flood-slider" min="0" max="11" value="0" step="1" aria-label="Day of the flood" />
@@ -305,7 +310,7 @@ app.innerHTML = `
         </div>
         <div class="danube-body">
           <div class="danube-map-wrap">
-            <div id="flood-map" class="chart-host"></div>
+            <div id="flood-map" class="chart-host danube-tilt-host"></div>
           </div>
           <div class="danube-side">
             <div class="legend" id="flood-legend"></div>
@@ -1822,6 +1827,13 @@ async function setUpDanube() {
       floodMap!.stop();
       resetFloodPlayBtn();
       floodMap!.render(floodEvent(), 0);
+    });
+
+    const floodTiltBtn = document.getElementById("flood-3d") as HTMLButtonElement;
+    floodTiltBtn.addEventListener("click", () => {
+      const on = floodTiltBtn.getAttribute("aria-pressed") !== "true";
+      floodTiltBtn.setAttribute("aria-pressed", String(on));
+      floodMap!.setTilt(on);
     });
 
     document.getElementById("flood-legend")!.innerHTML =
