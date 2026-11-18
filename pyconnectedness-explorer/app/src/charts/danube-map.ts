@@ -301,13 +301,22 @@ export class DanubeMap {
         }
       });
 
+    // root gets its own stroke/label treatment only once the shock has actually arrived --
+    // giving it that weight unconditionally (as before) made it the single most eye-catching
+    // thing on the map from the first frame, before the path had gone anywhere near it, which
+    // read as "the shock already reached the root" even on step one. Before any station is
+    // reached (reached.length === 0, right after a fresh pick), there's nothing to overstate
+    // yet, so it keeps the quiet, always-on label; the moment play starts stepping through
+    // real stations, root goes quiet too until its own turn actually comes.
+    const rootEmphasis = reached.length === 0 || reachedSet.has(this.data.root);
+
     stationSel
       .append("circle")
       .attr("r", (d) => (d.id === picked || reachedSet.has(d.id) ? 9 : 6))
       .attr("fill", (d) => this.groupColor(RIVER_GROUP[d.river] ?? d.river))
       .attr("fill-opacity", (d) => (d.id === picked || reachedSet.has(d.id) || reached.length === 0 ? 1 : 0.35))
-      .attr("stroke", (d) => (d.id === picked ? accent : d.id === this.data.root ? ink : panel))
-      .attr("stroke-width", (d) => (d.id === picked ? 3 : d.id === this.data.root ? 2 : 1.5));
+      .attr("stroke", (d) => (d.id === picked ? accent : d.id === this.data.root && rootEmphasis ? ink : panel))
+      .attr("stroke-width", (d) => (d.id === picked ? 3 : d.id === this.data.root && rootEmphasis ? 2 : 1.5));
 
     // real detail per station, on hover/focus: the native browser tooltip, no extra markup
     stationSel
@@ -317,7 +326,7 @@ export class DanubeMap {
     stationSel
       .filter((d) => d.id === this.data.root)
       .append("text")
-      .attr("class", "danube-root-label")
+      .attr("class", rootEmphasis ? "danube-root-label" : "danube-root-label quiet")
       .attr("y", -14)
       .attr("text-anchor", "middle")
       .text("model's root");

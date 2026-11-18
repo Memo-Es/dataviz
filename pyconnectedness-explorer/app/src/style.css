@@ -3056,6 +3056,18 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   text-transform: uppercase;
 }
 
+/* before the shock has actually reached the root: still labelled for orientation, but no
+   louder than any other station's own number, so it isn't the loudest thing on the map before
+   the path has gone anywhere near it */
+.danube-root-label.quiet {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  fill: var(--muted);
+  opacity: 0.6;
+}
+
 .danube-stations .hit {
   cursor: pointer;
 }
