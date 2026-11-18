@@ -385,6 +385,17 @@ async function main() {
   const names = model.names;
   const meta = data.meta;
   const last = meta.dynamic.returns.dates.length - 1;
+  // the page opens on returns, so loadExplorerData never blocks first paint on the volatility
+  // measure's own fetches -- until they land, meta.*["volatility"] is a same-shaped, all-zero
+  // placeholder (see data.ts's zeroedLike), there to keep *reads* safe, not to be *shown*: switch
+  // to it early enough (this flag starts false) and every chart would flash a flat, meaningless
+  // "all zero" render for real. setMeasure queues the switch instead, applied the moment the
+  // real data is in -- or, if the fetches genuinely failed rather than just not finished yet
+  // (data.pairwise.volatility stays the empty Float32Array(0) sentinel loadExplorerData gives
+  // it either way), refused outright: better to stay on Price moves than show a real toggle
+  // leading to an all-zero chart presented as if it were real.
+  let volatilityIsReady = false;
+  data.volatilityReady.then(() => (volatilityIsReady = true));
 
   let theme: State["theme"] = "light";
   try {
@@ -442,6 +453,14 @@ async function main() {
   };
   // shared by the top bar's toggle and the timeline's end labels
   const setMeasure = (measure: Measure) => {
+    if (measure === "volatility" && !volatilityIsReady) {
+      data.volatilityReady.then(() => setMeasure(measure));
+      return;
+    }
+    if (measure === "volatility" && data.pairwise.volatility.length === 0) {
+      console.error(`${ds.id}: volatility data failed to load; staying on returns`);
+      return;
+    }
     const w = store.get().window;
     // volatility has no "last 200 weeks" static block in the notebook
     store.set({ measure, window: measure === "volatility" && w === "last200" ? "full" : w });
