@@ -74,6 +74,9 @@ export interface ExplorerData {
   meta: ConnectednessMeta;
   k: number;
   pairwise: Record<Measure, Float32Array>; // flat T*k*k, row-major, [t][i][j] = i sends to j
+  /** resolves once pairwise.volatility has the real array -- Promise.resolve() wherever it's
+   * already loaded (an upload, or a dataset with no volatility series at all) */
+  volatilityReady: Promise<void>;
 }
 
 const DATA_BASE = `${import.meta.env.BASE_URL}data/`;
@@ -107,27 +110,40 @@ export async function loadDatasets(): Promise<Dataset[]> {
   return r.json();
 }
 
+/** `volatilityReady` resolves once `data.pairwise.volatility` has the real array -- until then
+ * it's an empty Float32Array(0). The page opens on "Price moves" (returns), so there's no
+ * reason the first paint has to wait on a 2nd 2MB file the default view doesn't read; the
+ * volatility fetch starts in parallel but is never awaited by loadExplorerData itself. Call
+ * .then() on volatilityReady to refresh anything already showing Turbulence when it lands. */
 export async function loadExplorerData(ds: Dataset): Promise<ExplorerData> {
   const base = `${DATA_BASE}${ds.dir}`;
   const hasVol = "volatility" in ds.measures;
-  const [meta, returnsBuf, volBuf] = await Promise.all([
+  const [meta, returnsBuf] = await Promise.all([
     fetch(`${base}connectedness.json`).then((r) => {
       if (!r.ok) throw new Error(`${ds.id}/connectedness.json: ${r.status}`);
       return r.json() as Promise<ConnectednessMeta>;
     }),
     fetch(`${base}pairwise_returns.f32`).then((r) => r.arrayBuffer()),
-    hasVol ? fetch(`${base}pairwise_volatility.f32`).then((r) => r.arrayBuffer()) : Promise.resolve(new ArrayBuffer(0)),
   ]);
 
   const k = meta.names.length;
-  return {
+  const data: ExplorerData = {
     meta,
     k,
     pairwise: {
       returns: new Float32Array(returnsBuf),
-      volatility: new Float32Array(volBuf),
+      volatility: new Float32Array(0),
     },
+    volatilityReady: Promise.resolve(),
   };
+  if (hasVol) {
+    data.volatilityReady = fetch(`${base}pairwise_volatility.f32`)
+      .then((r) => r.arrayBuffer())
+      .then((buf) => {
+        data.pairwise.volatility = new Float32Array(buf);
+      });
+  }
+  return data;
 }
 
 /** Pairwise net matrix at rolling window index t, as a k x k array of arrays. */

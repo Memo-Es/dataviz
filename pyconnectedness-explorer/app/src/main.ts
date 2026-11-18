@@ -587,6 +587,9 @@ async function main() {
     pickedWidth = Math.ceil(widest + 2 * 13 + 2 + 2);
   };
   document.fonts.ready.then(() => render(store.get()));
+  // volatility loads in the background (see loadExplorerData): if someone's already looking at
+  // Turbulence by the time it lands, refresh so they're not stuck on the empty placeholder
+  data.volatilityReady.then(() => render(store.get()));
 
   const render = (s: State) => {
     const frameKey = `${s.measure}|${s.window}|${s.t}`;

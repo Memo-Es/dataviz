@@ -2854,6 +2854,26 @@ wa-dropdown wa-dropdown-item [slot="details"] {
 
 .danube-controls .num::part(combobox) {
   min-height: 44px;
+  padding: 0 16px 0 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--stone);
+  font: 500 15px var(--f-sans);
+}
+
+.danube-controls .num::part(display-input) {
+  color: var(--stone);
+  font: 500 15px var(--f-sans);
+}
+
+.danube-controls .num::part(listbox) {
+  font-family: var(--f-sans);
+}
+
+.danube-controls .num wa-option {
+  color: var(--stone);
+  font-size: 14px;
 }
 
 .danube-play {

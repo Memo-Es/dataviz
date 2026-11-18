@@ -96,6 +96,7 @@ export async function loadUpload(): Promise<{ ds: Dataset; data: ExplorerData; r
       meta,
       k: meta.names.length,
       pairwise: { returns: new Float32Array(rec.cube), volatility: new Float32Array(0) },
+      volatilityReady: Promise.resolve(),
     };
     return { ds, data, rec };
   } catch {
