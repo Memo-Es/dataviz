@@ -23,10 +23,11 @@ import { HeatmapChart } from "./charts/heatmap";
 import { HeatmapGridChart } from "./charts/heatmap-grid";
 import { sparkline } from "./charts/sparkline";
 import { bandCopy } from "./charts/frequency";
-import { loadUpload, runUpload, saveUpload } from "./upload/upload";
+import { type AbstractTreeData, loadUpload, loadUploadCausality, runUpload, runUploadCausality, saveUpload, saveUploadCausality } from "./upload/upload";
 import { PALETTES, applyPalette, textSafe } from "./palettes";
 import { hueOf as hueOfNow } from "./encoding";
 import { DanubeMap, loadDanube, riverLegendGroups, type DanubeData, type DanubeStation } from "./charts/danube-map";
+import { AbstractTree } from "./charts/abstract-tree";
 
 /** Causality mode's state (the Danube directed tree, its only graph so far), module-level
  * because it is independent of the Store every connectedness graph shares (one series, no
@@ -252,26 +253,53 @@ app.innerHTML = `
         <h2>Directed tree for extremes <code class="tag">MaxLinear(…).fit(method="qtree")</code></h2>
         <p class="sub" id="danube-sub"></p>
       </div>
+      <!-- the only other thing qtree can run on here: a file you upload, fit live in your
+           browser the same way Connectedness's "Your own file" already does -->
+      ${segmented("danube-src", "Data", [["danube", "Danube"], ["own", "Your own file"]], "danube", true)}
     </div>
-    <div class="readout" id="danube-readout" aria-live="polite"></div>
-    <div class="danube-controls">
-      <wa-select id="danube-pick" class="num" label="Pick a station" value="21"></wa-select>
-      <button class="icon-btn danube-play" id="danube-play" type="button" aria-label="Play: send a shock downstream from the picked station">▶</button>
-      <button class="crumb-btn small" id="danube-reset" type="button">Reset</button>
-      <!-- a quick sketch, not a finished view: a CSS tilt and rising bars on the same flat map,
-           nothing re-measured or re-fit. Off by default so the plain map stays the one people see
-           first -->
-      <button class="crumb-btn small danube-3d-toggle" id="danube-3d" type="button" aria-pressed="false">3D sketch</button>
-    </div>
-    <div class="danube-body">
-      <div class="danube-map-wrap">
-        <div id="danube-map" class="chart-host"></div>
+    <div data-src="danube">
+      <div class="readout" id="danube-readout" aria-live="polite"></div>
+      <div class="danube-controls">
+        <wa-select id="danube-pick" class="num" label="Pick a station" value="21"></wa-select>
+        <button class="icon-btn danube-play" id="danube-play" type="button" aria-label="Play: send a shock downstream from the picked station">▶</button>
+        <button class="crumb-btn small" id="danube-reset" type="button">Reset</button>
+        <!-- a quick sketch, not a finished view: a CSS tilt and rising bars on the same flat map,
+             nothing re-measured or re-fit. Off by default so the plain map stays the one people see
+             first -->
+        <button class="crumb-btn small danube-3d-toggle" id="danube-3d" type="button" aria-pressed="false">3D sketch</button>
       </div>
-      <div class="danube-side">
-        <div class="legend" id="danube-legend"></div>
-        <p class="danube-compare" id="danube-compare"></p>
-        <div class="danube-sources" id="danube-sources"></div>
-        <p class="danube-disclaimer">The gauges carry no dates: this is what the model predicts a shock would do, not a replay of a real flood.</p>
+      <div class="danube-body">
+        <div class="danube-map-wrap">
+          <div id="danube-map" class="chart-host"></div>
+        </div>
+        <div class="danube-side">
+          <div class="legend" id="danube-legend"></div>
+          <p class="danube-compare" id="danube-compare"></p>
+          <div class="danube-sources" id="danube-sources"></div>
+          <p class="danube-disclaimer">The gauges carry no dates: this is what the model predicts a shock would do, not a replay of a real flood.</p>
+        </div>
+      </div>
+    </div>
+    <div data-src="own" hidden>
+      <div class="data-ctl-group" id="at-upload-pick">
+        <label class="file-btn">
+          <input type="file" id="at-file" accept=".csv,text/csv" />
+          <span id="at-file-label">Choose a CSV</span>
+        </label>
+        <p class="data-caption" id="at-status">A column per station, positive values (e.g. discharges) -- no date column needed. Runs live in your browser; nothing is uploaded anywhere.</p>
+      </div>
+      <div id="at-result" hidden>
+        <div class="readout" id="at-readout" aria-live="polite"></div>
+        <div class="danube-controls">
+          <wa-select id="at-pick" class="num" label="Pick a station"></wa-select>
+          <button class="icon-btn danube-play" id="at-play" type="button" aria-label="Play: send a shock downstream from the picked station">▶</button>
+          <button class="crumb-btn small" id="at-reset" type="button">Reset</button>
+        </div>
+        <div class="danube-map-wrap">
+          <div id="at-host" class="chart-host"></div>
+        </div>
+        <p class="danube-disclaimer" id="at-method"></p>
+        <p class="danube-disclaimer">An abstract tree, not a map: there are no real-world coordinates for an uploaded file's stations, so this is laid out by the fitted tree's own structure, root at top.</p>
       </div>
     </div>
   </section>
@@ -1597,6 +1625,7 @@ ${
   });
 
   await setUpDanube();
+  setUpAbstractTree();
 }
 
 /** graph 4: the directed tree for extremes, on the Upper Danube. Independent of every other
@@ -1690,6 +1719,115 @@ async function setUpDanube() {
     const on = tiltBtn.getAttribute("aria-pressed") !== "true";
     tiltBtn.setAttribute("aria-pressed", String(on));
     map.setTilt(on);
+  });
+}
+
+/** Causality's other data source: a file you upload, fit live in the browser (the same qtree
+ * method the Danube map runs, via the same Pyodide worker Connectedness's own upload uses) and
+ * drawn as an abstract tree -- there's no real geography for an arbitrary file's stations. Wholly
+ * independent of setUpDanube(): switching the card-head toggle just shows or hides each block. */
+function setUpAbstractTree() {
+  const g5 = document.getElementById("g5");
+  if (!g5) return; // danube.json failed to load; setUpDanube already removed the whole card
+
+  const show = (src: string) => {
+    setSegment(document.getElementById("danube-src")!, src);
+    g5.querySelectorAll<HTMLElement>("[data-src]").forEach((el) => (el.hidden = el.dataset.src !== src));
+  };
+  onSegment(document.getElementById("danube-src")!, show);
+
+  let tree: AbstractTree | null = null;
+
+  const wireTree = (data: AbstractTreeData) => {
+    const select = document.getElementById("at-pick") as HTMLElement & { value: string };
+    select.innerHTML = data.names
+      .slice()
+      .sort()
+      .map((id) => `<wa-option value="${id}">${id}${id === data.root ? " (root)" : ""}</wa-option>`)
+      .join("");
+    const defaultPick = data.names.find((n) => n !== data.root) ?? data.root;
+    select.value = defaultPick;
+
+    const readout = document.getElementById("at-readout")!;
+    const updateReadout = (reached: string[], picked: string) => {
+      if (reached.length === 0) {
+        readout.innerHTML = `Picked: <b>station ${picked}</b>. Press play to send a shock downstream.`;
+        return;
+      }
+      const names = reached.map((id) => `<b>${id}</b>`);
+      const atRoot = reached[reached.length - 1] === data.root;
+      readout.innerHTML = `From <b>station ${picked}</b>, the model's tree reaches ${names.join(" → ")}${atRoot ? ", the root" : ""}.`;
+    };
+
+    document.getElementById("at-method")!.textContent =
+      `Fitted in your browser: ${data.method.call}. Nothing left your computer.`;
+
+    tree?.stop();
+    const host = document.getElementById("at-host")!;
+    host.innerHTML = "";
+    tree = new AbstractTree(host, data, updateReadout);
+    tree.pick(defaultPick);
+
+    select.addEventListener("wa-change", () => tree!.pick(select.value));
+    const playBtn = document.getElementById("at-play") as HTMLButtonElement;
+    playBtn.replaceWith(playBtn.cloneNode(true)); // drop any listener from a previous file
+    const freshPlayBtn = document.getElementById("at-play") as HTMLButtonElement;
+    freshPlayBtn.addEventListener("click", () => {
+      if (tree!.isPlaying) return;
+      freshPlayBtn.disabled = true;
+      freshPlayBtn.textContent = "⏸";
+      tree!.play(() => {
+        freshPlayBtn.disabled = false;
+        freshPlayBtn.textContent = "▶";
+      });
+    });
+    const resetBtn = document.getElementById("at-reset") as HTMLButtonElement;
+    resetBtn.replaceWith(resetBtn.cloneNode(true));
+    document.getElementById("at-reset")!.addEventListener("click", () => tree!.pick(select.value));
+  };
+
+  loadUploadCausality().then((own) => {
+    if (!own) return;
+    document.getElementById("at-file-label")!.textContent = "Choose another CSV";
+    document.getElementById("at-result")!.hidden = false;
+    wireTree(own.data);
+  });
+
+  let file: File | null = null;
+  let busy = false;
+  const status = document.getElementById("at-status")!;
+  const hint = "A column per station, positive values (e.g. discharges) -- no date column needed. Runs live in your browser; nothing is uploaded anywhere.";
+  const run = async () => {
+    if (!file || busy) return;
+    busy = true;
+    document.getElementById("at-upload-pick")!.classList.add("busy");
+    const t0 = performance.now();
+    let stage = "";
+    const tick = () => {
+      status.innerHTML = `<span class="spin" aria-hidden="true"></span>${stage}… <span class="num">${Math.round((performance.now() - t0) / 1000)}</span> s`;
+    };
+    const timer = window.setInterval(tick, 500);
+    try {
+      const rec = await runUploadCausality(await file.text(), file.name, (text) => {
+        stage = text;
+        tick();
+      });
+      await saveUploadCausality(rec);
+      status.textContent = hint;
+      document.getElementById("at-file-label")!.textContent = "Choose another CSV";
+      document.getElementById("at-result")!.hidden = false;
+      wireTree(JSON.parse(rec.meta));
+    } catch (err) {
+      status.innerHTML = `<span class="err">${(err as Error).message}</span> ${hint}`;
+    } finally {
+      window.clearInterval(timer);
+      busy = false;
+      document.getElementById("at-upload-pick")!.classList.remove("busy");
+    }
+  };
+  document.getElementById("at-file")!.addEventListener("change", (ev) => {
+    file = (ev.target as HTMLInputElement).files?.[0] ?? null;
+    if (file) run();
   });
 }
 

@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 
 from pyconnectedness import dynamic_connectedness, frequency_connectedness, static_connectedness
+from pyconnectedness.causality import MaxLinear
 
 DEMO_MODEL = {"horizon": 10, "method": "generalized", "lags": 2}
 FREQ = {"horizon": 100, "periods": (5, 20)}  # the library's defaults, as in export_cell.py
@@ -159,3 +160,72 @@ def run_upload(text: str, kind: str, name: str) -> tuple[str, bytes, str, int]:
     meta, cube = compute(X, window, step + "s", "upload")
     meta["upload"] = {"name": name, "kind": kind}
     return json.dumps(meta, separators=(",", ":")), cube.tobytes(), step, window
+
+
+# ---------------------------------------------------------------------------------------------
+# your own file -- Causality (MaxLinear.fit(method="qtree"), as run_danube.py runs on the built-in
+# Danube dataset). An uploaded file has no station coordinates or river geometry -- those come
+# from graphicalExtremes/Natural Earth specifically for the Danube gauges, not from the library
+# itself -- so the app draws this one as an abstract tree, not a map. See AbstractTree in
+# src/charts/abstract-tree.ts.
+# ---------------------------------------------------------------------------------------------
+# qtree's own select_threshold already costs 900 tree fits (9 thresholds x 100 subsamples); more
+# than MAX_SERIES columns or a few thousand rows would make that too slow for a browser tab
+MIN_ROWS_CAUSALITY = 50
+
+
+def read_upload_causality(text: str) -> pd.DataFrame:
+    """A CSV of positive values (e.g. river discharges), one column per station -- the same shape
+    as the library's own examples/data/danube_log_discharges.csv, which has no date column at
+    all: qtree scores pairwise extremal co-occurrence, not a time axis. A leading date-like
+    column is common in real discharge files though, so it's dropped if found rather than
+    required absent."""
+    df = pd.read_csv(io.StringIO(text))
+    first = df.iloc[:, 0]
+    # only even consider a leading column a date if pandas didn't already read it as plain
+    # numbers: to_datetime on an int/float column treats the values as a nanosecond epoch and
+    # "succeeds" on anything, so checking it on an already-numeric column would misfire on
+    # ordinary data (e.g. small integer station ids) and silently drop a real column
+    if df.shape[1] >= 2 and first.dtype == object and pd.to_datetime(first, errors="coerce").notna().mean() > 0.9:
+        df = df.iloc[:, 1:]
+    df = df.apply(pd.to_numeric, errors="coerce")
+    df = df.loc[:, df.notna().mean() > 0.5]
+    df = df.dropna()
+    if df.shape[1] < 3:
+        raise ValueError("Need at least three numeric columns (stations) to fit a tree.")
+    if df.shape[1] > MAX_SERIES:
+        raise ValueError(f"{df.shape[1]} columns: keep it to {MAX_SERIES} or fewer.")
+    if (df <= 0).any().any():
+        raise ValueError("Every value must be a positive discharge -- not already logged, not a % change.")
+    if len(df) < MIN_ROWS_CAUSALITY:
+        raise ValueError(f"Only {len(df)} complete rows; qtree needs at least {MIN_ROWS_CAUSALITY}.")
+    return df
+
+
+def run_upload_causality(text: str, name: str) -> str:
+    """For the app: an abstract-tree-shaped JSON (root, names, edges+scores) -- no coordinates,
+    rivers or ground-truth comparison, since none of those exist for an arbitrary file."""
+    import json
+
+    X = read_upload_causality(text)
+    model = MaxLinear(X, transform=None)
+    selection = model.select_threshold(log=True, seed=0)
+    fit = model.fit(method="qtree", threshold=selection.threshold, lower=selection.lower, log=True)
+    edges = fit.edges()
+    out = {
+        "name": name,
+        "method": {
+            "call": f'MaxLinear(your_file, transform=None).fit(method="qtree", '
+                    f'threshold={selection.threshold}, lower={selection.lower}, log=True)',
+            "threshold": selection.threshold,
+            "lower": selection.lower,
+        },
+        "root": fit.root,
+        "names": fit.names,
+        "edges": [
+            {"cause": c, "effect": e, "score": None if pd.isna(s) else round(float(s), 6)}
+            for c, e, s in zip(edges["cause"], edges["effect"],
+                                [fit.scores.loc[c, e] for c, e in zip(edges["cause"], edges["effect"])])
+        ],
+    }
+    return json.dumps(out, separators=(",", ":"))

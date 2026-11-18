@@ -8,8 +8,9 @@
 const PYODIDE_URL: string = import.meta.env.VITE_PYODIDE_URL ?? "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/";
 
 export interface RunRequest {
+  mode: "connectedness" | "causality";
   text: string;
-  kind: "levels" | "changes";
+  kind: "levels" | "changes"; // unused when mode is "causality"
   name: string;
   pyBase: string;
 }
@@ -17,6 +18,7 @@ export interface RunRequest {
 export type RunMessage =
   | { type: "stage"; text: string }
   | { type: "done"; meta: string; cube: ArrayBuffer; step: "day" | "week" | "month"; window: number; commit: string }
+  | { type: "done-causality"; meta: string; commit: string }
   | { type: "error"; text: string };
 
 const post = (m: RunMessage, transfer: Transferable[] = []) => (self as unknown as Worker).postMessage(m, transfer);
@@ -57,13 +59,19 @@ import compute
 }
 
 self.onmessage = async (ev: MessageEvent<RunRequest>) => {
-  const { text, kind, name, pyBase } = ev.data;
+  const { mode, text, kind, name, pyBase } = ev.data;
   try {
     const { py, commit } = await boot(pyBase);
-    post({ type: "stage", text: "Running static_connectedness, dynamic_connectedness and frequency_connectedness" });
     py.globals.set("UPLOAD_TEXT", text);
-    py.globals.set("UPLOAD_KIND", kind);
     py.globals.set("UPLOAD_NAME", name);
+    if (mode === "causality") {
+      post({ type: "stage", text: 'Fitting MaxLinear(…).fit(method="qtree") on your file' });
+      const meta: string = await py.runPythonAsync(`compute.run_upload_causality(UPLOAD_TEXT, UPLOAD_NAME)`);
+      post({ type: "done-causality", meta, commit });
+      return;
+    }
+    post({ type: "stage", text: "Running static_connectedness, dynamic_connectedness and frequency_connectedness" });
+    py.globals.set("UPLOAD_KIND", kind);
     const res = await py.runPythonAsync(`
 _meta, _cube, _step, _window = compute.run_upload(UPLOAD_TEXT, UPLOAD_KIND, UPLOAD_NAME)
 open("/tmp/cube.f32", "wb").write(_cube)
