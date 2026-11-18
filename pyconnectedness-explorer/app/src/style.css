@@ -263,6 +263,9 @@ svg .dp {
 
   #mode-switch wa-radio {
     flex: 1;
+    /* the library's own :host is an inline-flex row with no justify-content, so a stretched
+       radio packs its label at the start instead of centering it in the wider box */
+    justify-content: center;
   }
 }
 
