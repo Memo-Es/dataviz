@@ -23,7 +23,9 @@ import pinned  # noqa: F401  (the library from the pinned GitHub submodule)
 import json
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
+from scipy.ndimage import zoom
 
 from pyconnectedness.causality import MaxLinear
 
@@ -42,17 +44,36 @@ def _only(items):
     return item
 
 
-def _relief():
-    """The real ETOPO1 10-arcminute elevation grid under the tilted map's terrain backdrop --
-    from Miljana's own Demo Day package (`bavaria_relief_10arcmin.csv` there; see README.md).
-    Rows go south (low latitude) to north, matching the CSV; the page flips them when it draws,
-    since its projection puts north at the top.
+def _relief(stations):
+    """The real ETOPO1 10-arcminute elevation grid under the tilted map's terrain backdrop and
+    the 3D view -- from Miljana's own Demo Day package (`bavaria_relief_10arcmin.csv` there; see
+    README.md). Rows go south (low latitude) to north, matching the CSV; the flat page's canvas
+    flips them when it draws (its projection puts north at the top), the 3D view does not (a
+    real y-axis, oriented by the camera instead).
+
+    Cropped to the station network's own bounding box plus a margin (the source file reaches a
+    further ~80km south than any gauge, into genuinely high Alps whose real relief -- sharp,
+    closely-spaced ridges -- dominated the 3D view's frame once exaggerated enough to read as
+    terrain at all, crowding out the basin the gauges are actually in). Then cubic-spline
+    upsampled 4x in each direction: at the source 10-arcminute spacing (~18km) that same
+    exaggeration turned every remaining grid step into a visible washboard ridge even in the
+    basin itself. Interpolating more finely adds no information the source grid didn't already
+    have, the way scaling an image up with smoothing does.
     """
     grid = pd.read_csv(REF / "bavaria_relief_10arcmin.csv", index_col=0)
+    margin = 0.4
+    lat_lo, lat_hi = stations["river_lat"].min() - margin, stations["river_lat"].max() + margin
+    lon_lo, lon_hi = stations["river_lon"].min() - margin, stations["river_lon"].max() + margin
+    grid = grid.loc[(grid.index >= lat_lo) & (grid.index <= lat_hi),
+                    (grid.columns.astype(float) >= lon_lo) & (grid.columns.astype(float) <= lon_hi)]
+    lats = grid.index.to_numpy(dtype=float)
+    lons = grid.columns.to_numpy(dtype=float)
+    factor = 4
+    elevation = zoom(grid.to_numpy(dtype=float), factor, order=3)
     return {
-        "lats": [float(v) for v in grid.index],
-        "lons": [float(c) for c in grid.columns],
-        "elevation_m": grid.astype(int).values.tolist(),
+        "lats": np.linspace(lats[0], lats[-1], elevation.shape[0]).tolist(),
+        "lons": np.linspace(lons[0], lons[-1], elevation.shape[1]).tolist(),
+        "elevation_m": [[round(float(v), 1) for v in row] for row in elevation],
     }
 
 
@@ -190,7 +211,7 @@ def main():
             },
         },
         "rivers": river_lines,
-        "relief": _relief(),
+        "relief": _relief(stations),
         "floods": _floods(stations),
     }
 

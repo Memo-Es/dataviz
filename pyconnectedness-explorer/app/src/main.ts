@@ -28,6 +28,7 @@ import { PALETTES, applyPalette, textSafe } from "./palettes";
 import { hueOf as hueOfNow } from "./encoding";
 import { DanubeMap, loadDanube, riverLegendGroups, type DanubeData, type DanubeStation } from "./charts/danube-map";
 import { DanubeFloodMap, ratioColor } from "./charts/danube-flood-map";
+import { DanubeFlood3D } from "./charts/danube-flood-3d";
 import { AbstractTree } from "./charts/abstract-tree";
 
 /** Causality mode's state (the Danube directed tree, its only graph so far), module-level
@@ -299,10 +300,9 @@ app.innerHTML = `
           <button class="icon-btn danube-play" id="flood-play" type="button" aria-label="Play: replay this flood day by day">▶</button>
           <button class="crumb-btn small" id="flood-reset" type="button">Reset</button>
           <!-- Miljana's own deck shows this exact scenario (real discharge, a real flood) as a
-               3D terrain with a rising, colour-coded column per gauge -- closer to that than our
-               shock-propagation sketch is to anything in the deck, so the toggle earns its keep
-               here specifically -->
-          <button class="crumb-btn small danube-3d-toggle" id="flood-3d" type="button" aria-pressed="false">3D sketch</button>
+               genuine 3D terrain -- a real elevation mesh, not a CSS tilt, loaded lazily (it's a
+               real WebGL library) only once this is actually switched on -->
+          <button class="crumb-btn small danube-3d-toggle" id="flood-3d" type="button" aria-pressed="false">3D terrain</button>
         </div>
         <div class="flood-date-row">
           <input type="range" id="flood-slider" min="0" max="11" value="0" step="1" aria-label="Day of the flood" />
@@ -310,7 +310,8 @@ app.innerHTML = `
         </div>
         <div class="danube-body">
           <div class="danube-map-wrap">
-            <div id="flood-map" class="chart-host danube-tilt-host"></div>
+            <div id="flood-map" class="chart-host"></div>
+            <div id="flood-3d-host" class="chart-host flood-3d-host" hidden></div>
           </div>
           <div class="danube-side">
             <div class="legend" id="flood-legend"></div>
@@ -1773,6 +1774,7 @@ async function setUpDanube() {
   onSegment(document.getElementById("danube-scenario")!, showScenario);
 
   let floodMap: DanubeFloodMap | null = null;
+  let flood3D: DanubeFlood3D | null = null;
   const floodPlayBtn = document.getElementById("flood-play") as HTMLButtonElement;
   const floodSlider = document.getElementById("flood-slider") as HTMLInputElement;
   const floodEvent = () => (document.getElementById("flood-event") as HTMLElement & { value: string }).value;
@@ -1802,7 +1804,13 @@ async function setUpDanube() {
 
   function ensureFloodMap() {
     if (floodMap) return;
-    floodMap = new DanubeFloodMap(document.getElementById("flood-map")!, data, (_event, day) => updateFloodReadout(day));
+    // onStep fires on every DanubeFloodMap render -- a manual pick, Reset, or one tick of its
+    // own Play loop alike -- so syncing the (lazily built) 3D view here, not at each call site,
+    // keeps it current through Play too, not just manual slider/button moves
+    floodMap = new DanubeFloodMap(document.getElementById("flood-map")!, data, (event, day) => {
+      updateFloodReadout(day);
+      flood3D?.render(event, day);
+    });
     floodSlider.max = String(floodDates().length - 1);
     floodMap.render(floodEvent(), 0);
 
@@ -1829,11 +1837,24 @@ async function setUpDanube() {
       floodMap!.render(floodEvent(), 0);
     });
 
-    const floodTiltBtn = document.getElementById("flood-3d") as HTMLButtonElement;
-    floodTiltBtn.addEventListener("click", () => {
-      const on = floodTiltBtn.getAttribute("aria-pressed") !== "true";
-      floodTiltBtn.setAttribute("aria-pressed", String(on));
-      floodMap!.setTilt(on);
+    const flood3DHost = document.getElementById("flood-3d-host")!;
+    const floodMapHost = document.getElementById("flood-map")!;
+    const flood3DBtn = document.getElementById("flood-3d") as HTMLButtonElement;
+    flood3DBtn.addEventListener("click", async () => {
+      const on = flood3DBtn.getAttribute("aria-pressed") !== "true";
+      flood3DBtn.setAttribute("aria-pressed", String(on));
+      floodMapHost.hidden = on;
+      flood3DHost.hidden = !on;
+      if (!on) return;
+      if (!flood3D) {
+        flood3DBtn.disabled = true;
+        flood3D = new DanubeFlood3D(flood3DHost, data);
+        await flood3D.render(floodEvent(), Number(floodSlider.value));
+        flood3DBtn.disabled = false;
+      } else {
+        flood3D.resize();
+        await flood3D.render(floodEvent(), Number(floodSlider.value));
+      }
     });
 
     document.getElementById("flood-legend")!.innerHTML =

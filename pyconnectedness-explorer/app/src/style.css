@@ -2956,6 +2956,14 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   overflow: hidden;
 }
 
+/* Plotly fills its container's real box, unlike the flat SVG (sized from its own width/height
+   attrs) -- same aspect as the flat map's own width*0.86 so switching between them doesn't jump
+   the card's height */
+.flood-3d-host {
+  aspect-ratio: 1 / 0.86;
+  border-radius: 14px;
+}
+
 /* the quick 3D sketch: a table-top tilt on the same flat map, nothing re-drawn. The svg itself
    gets the rotation (its parent supplies the perspective); the bars layer is a flat sibling so
    each bar's own height transition isn't itself warped by the tilt -- see danube-map.ts syncBars,

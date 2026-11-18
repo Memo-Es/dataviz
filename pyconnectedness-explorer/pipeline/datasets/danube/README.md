@@ -52,8 +52,18 @@ A 21×34 grid of mean elevation (metres), 10 arc-minutes apart, lon 9.0–14.5 a
 — wider than the basin's own bounding box, for context around its edges. From the same package
 (`repo/examples/data/bavaria_relief_10arcmin.csv` there): ETOPO1 10' (NOAA, public domain) and
 the Natural Earth 2' shaded relief from `basemap-data` (public domain), averaged onto this
-coarser grid. Grounds the tilted map's terrain backdrop (danube-map.ts's `reliefDataUrl`) in
-real elevation instead of a hand-picked gradient.
+coarser grid. Grounds the tilted map's terrain backdrop (danube-map.ts's `reliefDataUrl`) and
+the real 3D view (danube-flood-3d.ts) in real elevation instead of a hand-picked gradient.
+
+`run_danube.py`'s `_relief` crops this to the station network's own bounding box plus a 0.4°
+margin before using it — the file's own wider extent reaches well south of any gauge, into high
+Alps whose real relief (sharp, closely-spaced ridges) dominated the 3D view's frame once
+exaggerated enough to read as terrain at all. It then cubic-spline upsamples the crop 4x in each
+direction: at the source spacing (~18km), that same exaggeration turned every remaining real
+grid step into a visible washboard ridge even inside the basin. Interpolating more finely adds
+no information the source grid didn't already have, the way scaling an image up with smoothing
+does — it does not change what `reliefDataUrl`'s flat backdrop draws, which already smooths via
+the browser's own image scaling regardless of the input grid's resolution.
 
 ## `rivers.geojson`
 
