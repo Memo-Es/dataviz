@@ -2841,6 +2841,21 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   min-width: 170px;
 }
 
+/* same treatment as .ds-select: the label is for screen readers only, not a visible line that
+   makes this control taller than the plain buttons beside it in the same row */
+.danube-controls .num::part(form-control-label) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.danube-controls .num::part(combobox) {
+  min-height: 44px;
+}
+
 .danube-play {
   font-size: 15px;
 }
