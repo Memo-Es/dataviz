@@ -3139,9 +3139,93 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   padding-top: 10px;
 }
 
-.danube-compare {
+/* a quiet text link for a secondary path out of a panel (Danube's own "your own file" escape
+   hatch, and back) -- deliberately not a pill button like crumb-btn: those read as one of
+   several equally-weighted actions, this should read as the other, optional thing */
+.link-btn {
+  display: inline-block;
+  margin-top: var(--sp-sm);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--secondary);
+  font: 500 13px var(--f-sans);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--line);
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  color: var(--fg);
+  text-decoration-color: currentColor;
+}
+
+/* unfolding complexity on demand: a native <details> for anything secondary (sources,
+   methodology, a stability breakdown) that a reader doesn't need to read the chart, only to dig
+   deeper into it. One shared look: a small triangle that rotates open, no custom JS, so it works
+   (and is announced to a screen reader) without any extra wiring. */
+.disclose {
   font-size: 12.5px;
   color: var(--secondary);
+}
+
+.disclose summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+
+.disclose summary::-webkit-details-marker {
+  display: none;
+}
+
+.disclose summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  flex: none;
+  border-left: 4px solid var(--secondary);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform 0.15s ease;
+}
+
+.disclose[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.disclose summary:hover {
+  color: var(--fg);
+}
+
+.disclose summary:hover::before {
+  border-left-color: var(--fg);
+}
+
+/* "Data sources" itself: the label keeps the page's other small-heading look (danube-sources h4
+   used to carry this) even collapsed into a summary */
+.disclose-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.disclose .disclose-body {
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+.disclose .disclose-body ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.disclose .disclose-body p {
+  margin: 0 0 8px;
 }
 
 .danube-line-swatch {

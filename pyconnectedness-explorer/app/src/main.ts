@@ -264,14 +264,11 @@ app.innerHTML = `
     </div>
     <div data-domain="rivers">
     <p class="sub" id="danube-sub"></p>
-    <!-- the only other thing qtree can run on here: a file you upload, fit live in your
-         browser the same way Connectedness's "Your own file" already does. A sibling of
-         card-head, not a child of it: card-head stacks under its title on a phone (every
-         other card's own switch does the same), which would otherwise land this between the
-         description paragraph and the readout below, breaking the reading order -->
-    <div class="danube-src-row">
-      ${segmented("danube-src", "Data", [["danube", "Danube"], ["own", "Your own file"]], "danube", true)}
-    </div>
+    <!-- uploading your own file to fit live (the same qtree call, in your browser) is a power-
+         user escape hatch, not a co-equal choice with the Danube example most readers came for
+         -- so it's a quiet link at the foot of this panel, not a segmented control sharing top
+         billing with it before any real content shows. data-src stays the switch both panels
+         key off; only how it's triggered changed, from a radio group to these two links -->
     <div data-src="danube">
       <!-- a model's shock vs. a real flood: two different claims, so a toggle rather than
            folding the real-flood data into the same Play as something it isn't -->
@@ -295,7 +292,6 @@ app.innerHTML = `
           </div>
           <div class="danube-side">
             <div class="legend" id="danube-legend"></div>
-            <p class="danube-compare" id="danube-compare"></p>
             <div class="danube-sources" id="danube-sources"></div>
             <p class="danube-disclaimer">The gauges carry no dates: this is what the model predicts a shock would do, not a replay of a real flood.</p>
           </div>
@@ -328,8 +324,10 @@ app.innerHTML = `
           </div>
         </div>
       </div>
+      <button class="link-btn" id="danube-try-own" type="button">Try it on your own file &rarr;</button>
     </div>
     <div data-src="own" hidden>
+      <button class="link-btn" id="danube-back-from-own" type="button">&larr; Back to the Danube example</button>
       <div class="data-ctl-group" id="at-upload-pick">
         <label class="file-btn">
           <input type="file" id="at-file" accept=".csv,text/csv" />
@@ -1851,20 +1849,19 @@ async function setUpDanube() {
     `<span><i class="dot warn-ring"></i>The model's own next step, not reached yet</span>`;
 
   const cmp = data.comparison_to_ground_truth;
-  document.getElementById("danube-compare")!.innerHTML =
-    `Checked against the paper's own ground truth (<code>examples/data/danube_network.csv</code>): ` +
-    `<b>${cmp.undirected_matches} of ${cmp.edges_total}</b> links match either way, <b>${cmp.directed_matches} of ${cmp.edges_total}</b> match with direction too ` +
-    `(nSHD ${cmp.metrics.tree.nshd.toFixed(2)}, TPR ${cmp.metrics.tree.tpr.toFixed(2)}).`;
-
-  document.getElementById("danube-sources")!.innerHTML =
-    `<h4>Data sources</h4><ul>
+  document.getElementById("danube-sources")!.innerHTML = sourcesDisclose(
+    `<p>Checked against the paper's own ground truth (<code>examples/data/danube_network.csv</code>): ` +
+      `<b>${cmp.undirected_matches} of ${cmp.edges_total}</b> links match either way, <b>${cmp.directed_matches} of ${cmp.edges_total}</b> match with direction too ` +
+      `(nSHD ${cmp.metrics.tree.nshd.toFixed(2)}, TPR ${cmp.metrics.tree.tpr.toFixed(2)}).</p>` +
+      `<ul>
       <li>PyConnectedness (<a href="https://github.com/zstoi/PyConnectedness" target="_blank" rel="noopener">GitHub</a>, commit <code>${data.source.commit.slice(0, 7)}</code>): the discharge data, the fitted tree and its scores, and the ground-truth comparison.</li>
       <li>Tran, Ngoc Mai; Buck, Johannes; Klüppelberg, Claudia (2024), "Estimating a directed tree for extremes", <i>Journal of the Royal Statistical Society Series B</i> 86(3), 771-792: the method and the Danube dataset's origin.</li>
       <li>Station names, coordinates and altitudes: the R package <a href="https://github.com/sebastian-engelke/graphicalextremes" target="_blank" rel="noopener">graphicalExtremes</a> (Asadi, Peiman; Davison, Anthony C.; Engelke, Sebastian, 2015), not from PyConnectedness itself.</li>
       <li>River lines: World Data Bank II (public domain) where a named river reaches both gauges; the Iller, Naab, Regen and Saalach drawn as smooth lines through their own gauges and river towns instead, since none of the public river-line sources checked carry those four &mdash; see <code>pipeline/datasets/danube/README.md</code> for which is which.</li>
       <li>Yearly flood threshold and mean flow per gauge: Bavarian Environment Agency (gkd.bayern.de, CC BY 4.0), via graphicalExtremes.</li>
       <li>The tilted map's terrain: ETOPO1 10' (NOAA, public domain) and Natural Earth 2' shaded relief (public domain), via basemap-data.</li>
-    </ul>`;
+    </ul>`
+  );
 
   select.addEventListener("wa-change", () => map.pick(Number(select.value)));
   const playBtn = document.getElementById("danube-play") as HTMLButtonElement;
@@ -1984,11 +1981,12 @@ async function setUpDanube() {
       `<span><i class="dot" style="background:${ratioColor(1)}"></i>At its yearly flood peak</span>` +
       `<span><i class="dot" style="background:${ratioColor(2)}"></i>Twice its yearly flood peak or more</span>` +
       `<span><i class="dot warn-ring"></i>Warned: a gauge upstream of it (the model's own estimated tree, above) has already passed its peak</span>`;
-    document.getElementById("flood-sources")!.innerHTML =
-      `<h4>Data sources</h4><ul>
+    document.getElementById("flood-sources")!.innerHTML = sourcesDisclose(
+      `<ul>
         <li>Daily discharge for 4 historical floods (May 1999, Aug 2002, Aug 2005, Jun 2013): Bavarian Environment Agency (gkd.bayern.de, CC BY 4.0), via graphicalExtremes, from Miljana's own Demo Day package.</li>
         <li>"Warned" reuses the estimated tree from Shock propagation above, read on this real data -- not a separate fit.</li>
-      </ul>`;
+      </ul>`
+    );
   }
 }
 
@@ -2000,11 +1998,13 @@ function setUpAbstractTree() {
   const g5 = document.getElementById("g5");
   if (!g5) return; // danube.json failed to load; setUpDanube already removed the whole card
 
+  // a quiet link each way instead of a segmented control sharing top billing with the Danube
+  // example before any of it is even on screen -- see the markup comment above data-src="danube"
   const show = (src: string) => {
-    setSegment(document.getElementById("danube-src")!, src);
     g5.querySelectorAll<HTMLElement>("[data-src]").forEach((el) => (el.hidden = el.dataset.src !== src));
   };
-  onSegment(document.getElementById("danube-src")!, show);
+  document.getElementById("danube-try-own")!.addEventListener("click", () => show("own"));
+  document.getElementById("danube-back-from-own")!.addEventListener("click", () => show("danube"));
 
   let tree: AbstractTree | null = null;
 
@@ -2105,7 +2105,7 @@ function setUpAbstractTree() {
  * omitted, e.g. already a 0-100 percentage) -- the one shared look for every bars-and-numbers
  * readout the three new Causality domains need (first/last share, mean position, tail-mass
  * share), instead of three bespoke SVGs for what is, every time, just a ranked list of numbers. */
-function shareBars(title: string, rows: { label: string; value: number; note?: string }[], max?: number): string {
+function shareBarsRows(rows: { label: string; value: number; note?: string }[], max?: number): string {
   const m = max ?? Math.max(1, ...rows.map((r) => r.value));
   const bars = rows
     .map(
@@ -2115,8 +2115,30 @@ function shareBars(title: string, rows: { label: string; value: number; note?: s
         `<span class="share-bar-value">${r.note ?? r.value.toFixed(0)}</span></div>`
     )
     .join("");
-  return `<h4>${title}</h4><div class="share-bars">${bars}</div>`;
+  return `<div class="share-bars">${bars}</div>`;
 }
+
+/** Vitamin A's own tail-mass bars are the domain's headline finding (what Miljana asked to see),
+ * so they stay in plain sight with a normal heading -- unlike disclose()'s own uses below, this
+ * one is never collapsed. */
+function shareBars(title: string, rows: { label: string; value: number; note?: string }[], max?: number): string {
+  return `<h4>${title}</h4>${shareBarsRows(rows, max)}`;
+}
+
+/** a native, no-JS-required collapse for anything secondary: a reader doesn't need it to read
+ * the chart in front of them, only to check a source or dig into how stable a result is.
+ * Collapsed by default -- "unfold complexity on demand" instead of a wall of numbers no one
+ * asked to see yet (style.css's own .disclose carries the look: a small triangle, nothing else
+ * to build or wire, and a screen reader announces the open/closed state for free). */
+function disclose(summary: string, body: string, labelClass = ""): string {
+  // the summary's own marker is a flex item (so it never wraps away from the text); everything
+  // else needs to be ONE flex item too, wrapped in a span -- a flex container otherwise turns
+  // each of a plain string's mixed text nodes and <b> tags into its own item, which wraps word
+  // by word instead of as a paragraph
+  return `<details class="disclose"><summary><span class="${labelClass}">${summary}</span></summary><div class="disclose-body">${body}</div></details>`;
+}
+
+const sourcesDisclose = (bodyHtml: string) => disclose("Data sources", bodyHtml, "disclose-label");
 
 /** Flights, Heat and Vitamin A: three more examples of the same method (MaxLinear's "scaling"
  * order over a general DAG, not qtree's single tree -- see pipeline/scaling.py), each its own
@@ -2196,19 +2218,23 @@ function setUpCausalityDomains() {
         document.getElementById("flights-legend")!.innerHTML =
           legendHtml() + `<span><i class="danube-line-swatch" style="opacity:.4"></i>The 90 busiest routes (for scale, not model output)</span>`;
         const summary = data.stability.summary;
-        document.getElementById("flights-stability")!.innerHTML = shareBars(
-          `How stable is the order? Share of 21 refits (k_order 100&ndash;500) where each airport came first`,
-          data.names
-            .map((n) => ({ label: n, value: summary[n].first_share * 100 }))
-            .sort((a, b) => b.value - a.value)
-            .slice(0, 8),
-          100
+        const topAirport = data.names.map((n) => ({ n, v: summary[n].first_share })).sort((a, b) => b.v - a.v)[0];
+        document.getElementById("flights-stability")!.innerHTML = disclose(
+          `How stable is this order? <b>${topAirport.n}</b> leads in <b>${Math.round(topAirport.v * 100)}%</b> of 21 refits &mdash; see every airport`,
+          shareBarsRows(
+            data.names
+              .map((n) => ({ label: n, value: summary[n].first_share * 100 }))
+              .sort((a, b) => b.value - a.value)
+              .slice(0, 8),
+            100
+          )
         );
-        document.getElementById("flights-sources")!.innerHTML =
-          `<h4>Data sources</h4><ul>
+        document.getElementById("flights-sources")!.innerHTML = sourcesDisclose(
+          `<ul>
             <li>PyConnectedness (commit <code>${data.source.commit.slice(0, 7)}</code>), MaxLinear.fit(method="scaling"): the causal order and edge coefficients.</li>
             <li>Daily delay minutes: US Bureau of Transportation Statistics (public domain). Airports: OpenFlights (ODbL 1.0). Both via the R package graphicalExtremes, from Miljana's own Demo Day package.</li>
-          </ul>`;
+          </ul>`
+        );
       });
     };
   })();
@@ -2243,18 +2269,22 @@ function setUpCausalityDomains() {
         );
         document.getElementById("heat-legend")!.innerHTML = legendHtml();
         const summary = data.stability.summary;
-        document.getElementById("heat-stability")!.innerHTML = shareBars(
-          `Share of 27 refits (k_order 40&ndash;300) where each region came first or last`,
-          data.regions
-            .map((r) => ({ label: r, value: summary[r].first_share * 100, note: `${(summary[r].first_share * 100).toFixed(0)}% first` }))
-            .sort((a, b) => b.value - a.value),
-          100
+        const topRegion = data.regions.map((r) => ({ r, v: summary[r].first_share })).sort((a, b) => b.v - a.v)[0];
+        document.getElementById("heat-stability")!.innerHTML = disclose(
+          `How stable is this order? <b>${topRegion.r}</b> is first in <b>${Math.round(topRegion.v * 100)}%</b> of 27 refits &mdash; see every region`,
+          shareBarsRows(
+            data.regions
+              .map((r) => ({ label: r, value: summary[r].first_share * 100, note: `${(summary[r].first_share * 100).toFixed(0)}% first` }))
+              .sort((a, b) => b.value - a.value),
+            100
+          )
         );
-        document.getElementById("heat-sources")!.innerHTML =
-          `<h4>Data sources</h4><ul>
+        document.getElementById("heat-sources")!.innerHTML = sourcesDisclose(
+          `<ul>
             <li>PyConnectedness (commit <code>${data.source.commit.slice(0, 7)}</code>), MaxLinear.fit(method="scaling"): the regional causal order.</li>
             <li>Daily maximum temperature, 137 stations, 1990-1993: NOAA (public domain) via the R package STRbook, from Miljana's own Demo Day package.</li>
-          </ul>`;
+          </ul>`
+        );
 
         // the heat domain's own scenario toggle, scoped to just this domain's markup (not
         // g5.querySelectorAll, which would also catch Rivers' own danube-scenario elements)
@@ -2293,8 +2323,9 @@ function setUpCausalityDomains() {
             `<span><i class="dot" style="background:${heatAnomalyColor(-10)}"></i>Well below normal</span>` +
             `<span><i class="dot" style="background:${heatAnomalyColor(0)}"></i>Normal for the day of year</span>` +
             `<span><i class="dot" style="background:${heatAnomalyColor(10)}"></i>Well above normal</span>`;
-          document.getElementById("heat-wave-sources")!.innerHTML =
-            `<h4>Data sources</h4><ul><li>Daily maximum temperature, 137 stations, May 1991: NOAA (public domain) via STRbook, from Miljana's own Demo Day package.</li></ul>`;
+          document.getElementById("heat-wave-sources")!.innerHTML = sourcesDisclose(
+            `<ul><li>Daily maximum temperature, 137 stations, May 1991: NOAA (public domain) via STRbook, from Miljana's own Demo Day package.</li></ul>`
+          );
           const waveBtn = document.getElementById("heat-wave-play") as HTMLButtonElement;
           waveBtn.addEventListener("click", () => {
             if (waveMap!.isPlaying) return;
@@ -2352,11 +2383,12 @@ function setUpCausalityDomains() {
         document.getElementById("vitamin-a-shares")!.innerHTML = shareBars("Where the tail mass of Vitamin A comes from", shares, 100);
         document.getElementById("vitamin-a-check")!.textContent =
           `A check, not a tuned result: Vitamin A's own share of its tail mass is ${(data.method.va_own_share * 100).toFixed(1)}%, about zero -- the method never saw the formula, only the numbers.`;
-        document.getElementById("vitamin-a-sources")!.innerHTML =
-          `<h4>Data sources</h4><ul>
+        document.getElementById("vitamin-a-sources")!.innerHTML = sourcesDisclose(
+          `<ul>
             <li>PyConnectedness (commit <code>${data.source.commit.slice(0, 7)}</code>), MaxLinear.fit(method="scaling"): the causal order and tail-mass shares.</li>
             <li>NHANES 2015-2016 first-day dietary recall (DR1TOT_I), US public domain.</li>
-          </ul>`;
+          </ul>`
+        );
       });
     };
   })();
