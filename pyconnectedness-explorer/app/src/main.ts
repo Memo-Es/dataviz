@@ -31,7 +31,7 @@ import { DanubeFloodMap, ratioColor } from "./charts/danube-flood-map";
 import { DanubeFlood3D } from "./charts/danube-flood-3d";
 import { AbstractTree } from "./charts/abstract-tree";
 import { DagChart, stepColor } from "./charts/dag-chart";
-import { albersUsaLayout, loadFlights, loadHeat, loadVitaminA, pointLayout, type StabilitySummary } from "./charts/causality-domains";
+import { albersUsaLayout, loadFlights, loadHeat, loadVitaminA, pointLayout } from "./charts/causality-domains";
 
 /** Causality mode's state (the Danube directed tree, its only graph so far), module-level
  * because it is independent of the Store every connectedness graph shares (one series, no
