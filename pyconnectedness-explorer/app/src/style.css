@@ -3266,3 +3266,99 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   pointer-events: none;
   user-select: none;
 }
+
+/* ---- Causality's domain switcher (Rivers / Flight delays / Heat waves / Vitamin A) and the
+   shared DAG chart (src/charts/dag-chart.ts) the latter three draw with ---- */
+.causality-domain-row {
+  margin-bottom: var(--sp-md);
+}
+
+.dag-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.dag-routes line {
+  stroke: var(--line);
+  stroke-width: 1px;
+}
+
+.dag-edge {
+  pointer-events: stroke;
+}
+
+.dag-node {
+  cursor: default;
+}
+
+.dag-dot {
+  stroke: var(--panel);
+  stroke-width: 1.5px;
+}
+
+.dag-next {
+  fill: none;
+  stroke: var(--warn);
+  stroke-width: 2.5px;
+  animation: danube-warn-pulse 1.4s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dag-next {
+    animation: none;
+  }
+}
+
+.dag-label {
+  font: 500 10px var(--f-sans);
+  fill: var(--secondary);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* a ranked list of bars for a stability sweep or a tail-mass share -- one shared look instead of
+   three bespoke SVGs (src/main.ts's own shareBars) */
+.share-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.share-bar-row {
+  display: grid;
+  grid-template-columns: 11ch 1fr 4ch;
+  align-items: center;
+  gap: var(--sp-tiny);
+  font: 500 11px var(--f-sans);
+  color: var(--secondary);
+}
+
+.share-bar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-bar-track {
+  height: 6px;
+  background: var(--mid);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.share-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+}
+
+.share-bar-value {
+  text-align: right;
+  font-family: var(--f-num);
+  color: var(--muted);
+}

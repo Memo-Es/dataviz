@@ -387,43 +387,16 @@ DESCRIPTORS = {
         "labels": {k: v[0] for k, v in INDUSTRIES.items()},
         "window": 200,
     },
-    "rivers": {
-        "title": "Rivers",
-        "headline": "How floods travel through the Mississippi river system",
-        "items": "river gauges", "item": "gauge",
-        "source": "US Geological Survey", "api": "USGS Water Services daily values API",
-        "api_url": "https://waterservices.usgs.gov/docs/dv-service/",
-        "step": "week", "steps": "weeks",
-        "series": "each gauge's weekly flow, as how much wetter or drier it is than usual for that week (log)",
-        "built_by": "pipeline/datasets/sources.py, then the library's own functions",
-        "measures": {"returns": "Flow anomaly"},
-        "episodes": {"1993-07-31": "Great Flood of 1993", "2011-05-15": "2011 floods", "2019-06-01": "2019 floods"},
-        "groups": {v[0]: v[1] for v in GAUGES.values()},
-        "group_order": ["Upper Mississippi", "Missouri & Arkansas", "Ohio", "Middle & lower Mississippi"],
-        "labels": {v[0]: f"USGS {k}" for k, v in GAUGES.items()},
-        "window": 200,
-    },
-    "climate": {
-        "title": "European temperatures",
-        "headline": "How heat and cold travel across Europe",
-        "items": "cities", "item": "city",
-        "source": "Open-Meteo, ERA5 reanalysis (Copernicus)", "api": "Open-Meteo Historical Weather API",
-        "api_url": "https://open-meteo.com/en/docs/historical-weather-api",
-        "step": "week", "steps": "weeks",
-        "series": "each city's weekly mean temperature, as °C above or below normal for that week",
-        "built_by": "pipeline/datasets/sources.py, then the library's own functions",
-        "measures": {"returns": "Temperature anomaly"},
-        "episodes": {"2003-08-10": "2003 heatwave", "2010-01-15": "2010 cold winter", "2018-07-27": "2018 heatwave",
-                     "2022-07-19": "2022 heatwave"},
-        "groups": {k: v[2] for k, v in CITIES.items()},
-        "group_order": ["West", "North", "Centre & east", "South"],
-        "labels": {k: f"{v[0]:.1f}°, {v[1]:.1f}°" for k, v in CITIES.items()},
-        "window": 200,
-    },
+    # "rivers" (Mississippi river system, USGS) and "climate" (European temperatures, Open-Meteo)
+    # were removed from Connectedness at Miljana's own request (Demo Day check-in, 18 Nov 2026):
+    # Causality's own Rivers example (the Upper Danube, a different dataset and a different
+    # method -- MaxLinear's directed tree for extremes, not Diebold-Yilmaz connectedness) already
+    # covers river floods, so this section doesn't need its own. fetch_rivers/prepare_rivers and
+    # fetch_climate/prepare_climate below are unused now but left in place rather than deleted --
+    # ordinary dead code, not a dataset anyone can pick on the page.
 }
 
 FETCH = {
     "fx": (fetch_fx, prepare_fx), "yields": (fetch_yields, prepare_yields),
     "crypto": (fetch_crypto, prepare_crypto), "industries": (fetch_industries, prepare_industries),
-    "rivers": (fetch_rivers, prepare_rivers), "climate": (fetch_climate, prepare_climate),
 }

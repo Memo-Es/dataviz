@@ -30,6 +30,8 @@ import { DanubeMap, loadDanube, riverLegendGroups, type DanubeData, type DanubeS
 import { DanubeFloodMap, ratioColor } from "./charts/danube-flood-map";
 import { DanubeFlood3D } from "./charts/danube-flood-3d";
 import { AbstractTree } from "./charts/abstract-tree";
+import { DagChart, stepColor } from "./charts/dag-chart";
+import { albersUsaLayout, loadFlights, loadHeat, loadVitaminA, pointLayout, type StabilitySummary } from "./charts/causality-domains";
 
 /** Causality mode's state (the Danube directed tree, its only graph so far), module-level
  * because it is independent of the Store every connectedness graph shares (one series, no
@@ -251,11 +253,16 @@ app.innerHTML = `
   <section class="card span-12" id="g5" hidden>
     <div class="card-head">
       <div>
-        <p class="q">Where does a shock travel downstream?</p>
-        <h2>Directed tree for extremes <code class="tag">MaxLinear(…).fit(method="qtree")</code></h2>
-        <p class="sub" id="danube-sub"></p>
+        <p class="q">Who moves first, and who follows?</p>
+        <h2>Causality <code class="tag" id="causality-tag">MaxLinear(…).fit(method="qtree")</code></h2>
+        <p class="sub" id="causality-sub">MaxLinear fits a causal order over extreme events, not an average: which place's worst days tend to lead everyone else's. Four examples below, one method.</p>
       </div>
     </div>
+    <div class="causality-domain-row">
+      ${segmented("causality-domain", "Example", [["rivers", "River floods"], ["flights", "Flight delays"], ["heat", "Heat waves"], ["vitamin_a", "Vitamin A"]], "rivers", true)}
+    </div>
+    <div data-domain="rivers">
+    <p class="sub" id="danube-sub"></p>
     <!-- the only other thing qtree can run on here: a file you upload, fit live in your
          browser the same way Connectedness's "Your own file" already does. A sibling of
          card-head, not a child of it: card-head stacks under its title on a phone (every
@@ -341,6 +348,72 @@ app.innerHTML = `
         </div>
         <p class="danube-disclaimer" id="at-method"></p>
         <p class="danube-disclaimer">An abstract tree, not a map: there are no real-world coordinates for an uploaded file's stations, so this is laid out by the fitted tree's own structure, root at top.</p>
+      </div>
+    </div>
+    </div>
+
+    <!-- Flights, Heat and Vitamin A all fit the general-DAG "scaling" method (not qtree's single
+         tree), so all three share dag-chart.ts and this same markup shape: a readout, Play/Reset
+         (Play reveals the causal order one generation at a time, not a single path -- see
+         dag-chart.ts), a chart host, and a side panel with a legend, the stability-sweep bars
+         and sources. Each domain's own JS fills in the chart-specific legend/bars/sources text. -->
+    <div data-domain="flights" hidden>
+      <p class="sub">The 20 busiest US airports, daily total delay minutes (arrivals plus departures), 2010-2013. Which airport's worst delay days tend to lead the others'?</p>
+      <div class="readout" id="flights-readout" aria-live="polite"></div>
+      <div class="danube-controls">
+        <button class="icon-btn danube-play" id="flights-play" type="button" aria-label="Play: reveal the causal order step by step">▶</button>
+        <button class="crumb-btn small" id="flights-reset" type="button">Reset</button>
+      </div>
+      <div class="danube-body">
+        <div class="danube-map-wrap">
+          <div id="flights-map" class="chart-host"></div>
+        </div>
+        <div class="danube-side">
+          <div class="legend" id="flights-legend"></div>
+          <div class="danube-sources" id="flights-stability"></div>
+          <div class="danube-sources" id="flights-sources"></div>
+          <p class="danube-disclaimer">Delay minutes carry no real-world coordinates of their own; airport positions are OpenFlights' published locations, not model output.</p>
+        </div>
+      </div>
+    </div>
+
+    <div data-domain="heat" hidden>
+      <p class="sub">Daily maximum temperature at 137 NOAA stations in the central and eastern US, 1990-1993, grouped into nine regions. Whose heat extremes tend to lead the others', in summer?</p>
+      <div class="readout" id="heat-readout" aria-live="polite"></div>
+      <div class="danube-controls">
+        <button class="icon-btn danube-play" id="heat-play" type="button" aria-label="Play: reveal the causal order step by step">▶</button>
+        <button class="crumb-btn small" id="heat-reset" type="button">Reset</button>
+      </div>
+      <div class="danube-body">
+        <div class="danube-map-wrap">
+          <div id="heat-map" class="chart-host"></div>
+        </div>
+        <div class="danube-side">
+          <div class="legend" id="heat-legend"></div>
+          <div class="danube-sources" id="heat-stability"></div>
+          <div class="danube-sources" id="heat-sources"></div>
+          <p class="danube-disclaimer">The order is exploratory, not fixed: it depends on the search depth (k_order), so the bars on the right show how often each region came first or last across 27 different settings, not a single verdict. Fit on regional means, summer months only; a single station's own order is not stable.</p>
+        </div>
+      </div>
+    </div>
+
+    <div data-domain="vitamin_a" hidden>
+      <p class="sub">First-day dietary recall, NHANES 2015-2016 (8,327 people). A food database computes vitamin A from its sources by a known formula, VA = retinol + beta-carotene/12 + (alpha-carotene + beta-cryptoxanthin)/24 &mdash; a correct method should rediscover that VA comes last, never first.</p>
+      <div class="readout" id="vitamin-a-readout" aria-live="polite"></div>
+      <div class="danube-controls">
+        <button class="icon-btn danube-play" id="vitamin-a-play" type="button" aria-label="Play: reveal the causal order step by step">▶</button>
+        <button class="crumb-btn small" id="vitamin-a-reset" type="button">Reset</button>
+      </div>
+      <div class="danube-body">
+        <div class="danube-map-wrap">
+          <div id="vitamin-a-map" class="chart-host"></div>
+        </div>
+        <div class="danube-side">
+          <div class="legend" id="vitamin-a-legend"></div>
+          <div class="danube-sources" id="vitamin-a-shares"></div>
+          <div class="danube-sources" id="vitamin-a-sources"></div>
+          <p class="danube-disclaimer" id="vitamin-a-check"></p>
+        </div>
       </div>
     </div>
   </section>
@@ -1686,6 +1759,7 @@ ${
 
   await setUpDanube();
   setUpAbstractTree();
+  setUpCausalityDomains();
 }
 
 /** graph 4: the directed tree for extremes, on the Upper Danube. Independent of every other
@@ -1996,6 +2070,196 @@ function setUpAbstractTree() {
     file = (ev.target as HTMLInputElement).files?.[0] ?? null;
     if (file) run();
   });
+}
+
+/** a labelled row per entry, its bar width the share of `max` (or its own value if `max` is
+ * omitted, e.g. already a 0-100 percentage) -- the one shared look for every bars-and-numbers
+ * readout the three new Causality domains need (first/last share, mean position, tail-mass
+ * share), instead of three bespoke SVGs for what is, every time, just a ranked list of numbers. */
+function shareBars(title: string, rows: { label: string; value: number; note?: string }[], max?: number): string {
+  const m = max ?? Math.max(1, ...rows.map((r) => r.value));
+  const bars = rows
+    .map(
+      (r) =>
+        `<div class="share-bar-row"><span class="share-bar-label">${r.label}</span>` +
+        `<span class="share-bar-track"><span class="share-bar-fill" style="width:${Math.max(0, Math.min(100, (r.value / m) * 100)).toFixed(1)}%"></span></span>` +
+        `<span class="share-bar-value">${r.note ?? r.value.toFixed(0)}</span></div>`
+    )
+    .join("");
+  return `<h4>${title}</h4><div class="share-bars">${bars}</div>`;
+}
+
+/** Flights, Heat and Vitamin A: three more examples of the same method (MaxLinear's "scaling"
+ * order over a general DAG, not qtree's single tree -- see pipeline/scaling.py), each its own
+ * `data-domain` pane next to Rivers, switched by the segmented control added in setUpDanube's
+ * markup above. Independent of setUpDanube() and of the Store every Connectedness graph shares,
+ * the same way Rivers itself is -- one fixed series each, nothing to pick a dataset/measure for.
+ * Every domain lazy-loads on first selection, matching ensureFloodMap()'s own pattern, so picking
+ * "River floods" (the default) never pays for the other three. */
+function setUpCausalityDomains() {
+  const g5 = document.getElementById("g5");
+  if (!g5) return; // danube.json failed to load; setUpDanube already removed the whole card
+
+  const TAGS: Record<string, string> = {
+    rivers: 'MaxLinear(…).fit(method="qtree")',
+    flights: 'MaxLinear(…).fit(k=100, k_order=250)',
+    heat: 'MaxLinear(…).fit(k=50, k_order=100)',
+    vitamin_a: 'MaxLinear(…).fit(k=100, k_order=400)',
+  };
+  const ensurers: Partial<Record<string, () => void>> = {};
+  const showDomain = (domain: string) => {
+    setSegment(document.getElementById("causality-domain")!, domain);
+    g5.querySelectorAll<HTMLElement>("[data-domain]").forEach((el) => (el.hidden = el.dataset.domain !== domain));
+    document.getElementById("causality-tag")!.textContent = TAGS[domain] ?? TAGS.rivers;
+    ensurers[domain]?.();
+  };
+  onSegment(document.getElementById("causality-domain")!, showDomain);
+
+  /** wires one Play/Reset pair to a DagChart, generation by generation -- the shared behaviour
+   * across all three domains; only the chart's own data/layout differ per call site. */
+  const wirePlay = (prefix: string, chart: DagChart, readoutFor: (gen: number) => string) => {
+    const readout = document.getElementById(`${prefix}-readout`)!;
+    const playBtn = document.getElementById(`${prefix}-play`) as HTMLButtonElement;
+    chart.onRender = (gen) => (readout.innerHTML = readoutFor(gen));
+    chart.render(-1); // fires onRender once, now that it's wired, so the readout starts in sync
+    playBtn.addEventListener("click", () => {
+      if (chart.isPlaying) return;
+      playBtn.disabled = true;
+      playBtn.textContent = "⏸";
+      chart.play(() => {
+        playBtn.disabled = false;
+        playBtn.textContent = "▶";
+      });
+    });
+    document.getElementById(`${prefix}-reset`)!.addEventListener("click", () => chart.reset());
+  };
+
+  const legendHtml = () =>
+    `<span><i class="dot" style="background:${stepColor(0)}"></i>Earliest in the causal order (a source)</span>` +
+    `<span><i class="dot" style="background:${stepColor(0.5)}"></i>Middle</span>` +
+    `<span><i class="dot" style="background:${stepColor(1)}"></i>Latest (a sink)</span>` +
+    `<span><i class="dot warn-ring"></i>Next generation Play is about to reveal</span>`;
+
+  ensurers.flights = (() => {
+    let chart: DagChart | null = null;
+    return () => {
+      if (chart) return;
+      loadFlights().then((data) => {
+        const byId = new Map(data.airports.map((a) => [a.id, a]));
+        const nodes = data.airports.map((a) => ({ id: a.id, step: a.step, label: a.id, hover: `${a.name}, ${a.city}` }));
+        const layout = albersUsaLayout(data.airports);
+        chart = new DagChart(document.getElementById("flights-map")!, nodes, data.edges, data.generations, layout, (g, pos) => {
+          g.append("g")
+            .attr("class", "dag-routes")
+            .selectAll("line")
+            .data(data.routes.filter((r) => pos.has(r.a) && pos.has(r.b)))
+            .join("line")
+            .attr("x1", (d) => pos.get(d.a)![0])
+            .attr("y1", (d) => pos.get(d.a)![1])
+            .attr("x2", (d) => pos.get(d.b)![0])
+            .attr("y2", (d) => pos.get(d.b)![1]);
+        });
+        wirePlay("flights", chart, (gen) =>
+          gen < 0
+            ? `Sources (step 0): <b>${data.generations[0].join(", ")}</b>. Press play to reveal how far their delays reach.`
+            : `Through step <b>${gen}</b> of ${data.generations.length - 1}: ${data.generations.slice(0, gen + 1).flat().join(", ")}.`
+        );
+        document.getElementById("flights-legend")!.innerHTML =
+          legendHtml() + `<span><i class="danube-line-swatch" style="opacity:.4"></i>The 90 busiest routes (for scale, not model output)</span>`;
+        const summary = data.stability.summary;
+        document.getElementById("flights-stability")!.innerHTML = shareBars(
+          `How stable is the order? Share of 21 refits (k_order 100&ndash;500) where each airport came first`,
+          data.names
+            .map((n) => ({ label: n, value: summary[n].first_share * 100 }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 8),
+          100
+        );
+        document.getElementById("flights-sources")!.innerHTML =
+          `<h4>Data sources</h4><ul>
+            <li>PyConnectedness (commit <code>${data.source.commit.slice(0, 7)}</code>), MaxLinear.fit(method="scaling"): the causal order and edge coefficients.</li>
+            <li>Daily delay minutes: US Bureau of Transportation Statistics (public domain). Airports: OpenFlights (ODbL 1.0). Both via the R package graphicalExtremes, from Miljana's own Demo Day package.</li>
+          </ul>`;
+      });
+    };
+  })();
+
+  ensurers.heat = (() => {
+    let chart: DagChart | null = null;
+    return () => {
+      if (chart) return;
+      loadHeat().then((data) => {
+        const nodes = data.regions.map((r) => ({
+          id: r,
+          step: data.generations.findIndex((g) => g.includes(r)),
+          label: r,
+        }));
+        // one representative point per region (its stations' own centroid), not every station --
+        // the fit is on regional means, so the chart should draw what was actually fit
+        const centroids = new Map<string, { lat: number; lon: number }>();
+        for (const region of data.regions) {
+          const pts = data.stations.filter((s) => s.region === region);
+          if (!pts.length) continue;
+          centroids.set(region, {
+            lat: pts.reduce((a, s) => a + s.lat, 0) / pts.length,
+            lon: pts.reduce((a, s) => a + s.lon, 0) / pts.length,
+          });
+        }
+        const layout = albersUsaLayout(data.regions.filter((r) => centroids.has(r)).map((r) => ({ id: r, ...centroids.get(r)! })));
+        chart = new DagChart(document.getElementById("heat-map")!, nodes, data.edges, data.generations, layout);
+        wirePlay("heat", chart, (gen) =>
+          gen < 0
+            ? `Earliest regions (step 0): <b>${data.generations[0].join(", ")}</b>. Press play to step through the order.`
+            : `Through step <b>${gen}</b> of ${data.generations.length - 1}: ${data.generations.slice(0, gen + 1).flat().join(", ")}.`
+        );
+        document.getElementById("heat-legend")!.innerHTML = legendHtml();
+        const summary = data.stability.summary;
+        document.getElementById("heat-stability")!.innerHTML = shareBars(
+          `Share of 27 refits (k_order 40&ndash;300) where each region came first or last`,
+          data.regions
+            .map((r) => ({ label: r, value: summary[r].first_share * 100, note: `${(summary[r].first_share * 100).toFixed(0)}% first` }))
+            .sort((a, b) => b.value - a.value),
+          100
+        );
+        document.getElementById("heat-sources")!.innerHTML =
+          `<h4>Data sources</h4><ul>
+            <li>PyConnectedness (commit <code>${data.source.commit.slice(0, 7)}</code>), MaxLinear.fit(method="scaling"): the regional causal order.</li>
+            <li>Daily maximum temperature, 137 stations, 1990-1993: NOAA (public domain) via the R package STRbook, from Miljana's own Demo Day package.</li>
+          </ul>`;
+      });
+    };
+  })();
+
+  ensurers.vitamin_a = (() => {
+    let chart: DagChart | null = null;
+    return () => {
+      if (chart) return;
+      loadVitaminA().then((data) => {
+        const nodes = data.nodes.map((n) => ({ id: n.id, step: n.step, label: n.id, hover: n.label }));
+        const layout = pointLayout(data.nodes);
+        chart = new DagChart(document.getElementById("vitamin-a-map")!, nodes, data.edges, data.generations, layout);
+        wirePlay("vitamin-a", chart, (gen) =>
+          gen < 0
+            ? `Earliest (step 0): <b>${data.generations[0].join(", ")}</b>. Press play to watch the order build up to Vitamin A.`
+            : `Through step <b>${gen}</b> of ${data.generations.length - 1}: ${data.generations.slice(0, gen + 1).flat().join(", ")}.`
+        );
+        document.getElementById("vitamin-a-legend")!.innerHTML = legendHtml();
+        const shares = Object.entries(data.tail_mass_share)
+          .map(([id, v]) => ({ label: data.nodes.find((n) => n.id === id)!.label, value: v, note: `${v.toFixed(0)}%` }))
+          .sort((a, b) => b.value - a.value);
+        document.getElementById("vitamin-a-shares")!.innerHTML = shareBars("Where the tail mass of Vitamin A comes from", shares, 100);
+        document.getElementById("vitamin-a-check")!.textContent =
+          `A check, not a tuned result: Vitamin A's own share of its tail mass is ${(data.method.va_own_share * 100).toFixed(1)}%, about zero -- the method never saw the formula, only the numbers.`;
+        document.getElementById("vitamin-a-sources")!.innerHTML =
+          `<h4>Data sources</h4><ul>
+            <li>PyConnectedness (commit <code>${data.source.commit.slice(0, 7)}</code>), MaxLinear.fit(method="scaling"): the causal order and tail-mass shares.</li>
+            <li>NHANES 2015-2016 first-day dietary recall (DR1TOT_I), US public domain.</li>
+          </ul>`;
+      });
+    };
+  })();
+
+  ensurers.rivers = () => {};
 }
 
 main().catch((err) => {
