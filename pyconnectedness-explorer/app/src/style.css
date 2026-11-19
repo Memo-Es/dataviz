@@ -3292,9 +3292,18 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   cursor: default;
 }
 
+.dag-node.pickable {
+  cursor: pointer;
+}
+
 .dag-dot {
   stroke: var(--panel);
   stroke-width: 1.5px;
+}
+
+.dag-node.picked .dag-dot {
+  stroke: var(--accent);
+  stroke-width: 3px;
 }
 
 .dag-next {

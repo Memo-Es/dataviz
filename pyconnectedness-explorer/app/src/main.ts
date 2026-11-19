@@ -31,6 +31,7 @@ import { DanubeFloodMap, ratioColor } from "./charts/danube-flood-map";
 import { DanubeFlood3D } from "./charts/danube-flood-3d";
 import { AbstractTree } from "./charts/abstract-tree";
 import { DagChart, stepColor } from "./charts/dag-chart";
+import { HeatWaveMap, heatAnomalyColor } from "./charts/heat-wave-map";
 import { albersUsaLayout, loadFlights, loadHeat, loadVitaminA, pointLayout } from "./charts/causality-domains";
 
 /** Causality mode's state (the Danube directed tree, its only graph so far), module-level
@@ -379,20 +380,48 @@ app.innerHTML = `
 
     <div data-domain="heat" hidden>
       <p class="sub">Daily maximum temperature at 137 NOAA stations in the central and eastern US, 1990-1993, grouped into nine regions. Whose heat extremes tend to lead the others', in summer?</p>
-      <div class="readout" id="heat-readout" aria-live="polite"></div>
-      <div class="danube-controls">
-        <button class="icon-btn danube-play" id="heat-play" type="button" aria-label="Play: reveal the causal order step by step">▶</button>
-        <button class="crumb-btn small" id="heat-reset" type="button">Reset</button>
+      <!-- a real heat wave vs. the model's causal order: the same split Rivers draws between
+           Shock propagation and Historical floods, and for the same reason -->
+      <div class="danube-scenario-row">
+        ${segmented("heat-scenario", "What to show", [["order", "Causal order"], ["wave", "May 1991 heat wave"]], "order", true)}
       </div>
-      <div class="danube-body">
-        <div class="danube-map-wrap">
-          <div id="heat-map" class="chart-host"></div>
+      <div data-scenario="order">
+        <div class="readout" id="heat-readout" aria-live="polite"></div>
+        <div class="danube-controls">
+          <button class="icon-btn danube-play" id="heat-play" type="button" aria-label="Play: reveal the causal order step by step">▶</button>
+          <button class="crumb-btn small" id="heat-reset" type="button">Reset</button>
         </div>
-        <div class="danube-side">
-          <div class="legend" id="heat-legend"></div>
-          <div class="danube-sources" id="heat-stability"></div>
-          <div class="danube-sources" id="heat-sources"></div>
-          <p class="danube-disclaimer">The order is exploratory, not fixed: it depends on the search depth (k_order), so the bars on the right show how often each region came first or last across 27 different settings, not a single verdict. Fit on regional means, summer months only; a single station's own order is not stable.</p>
+        <div class="danube-body">
+          <div class="danube-map-wrap">
+            <div id="heat-map" class="chart-host"></div>
+          </div>
+          <div class="danube-side">
+            <div class="legend" id="heat-legend"></div>
+            <div class="danube-sources" id="heat-stability"></div>
+            <div class="danube-sources" id="heat-sources"></div>
+            <p class="danube-disclaimer">The order is exploratory, not fixed: it depends on the search depth (k_order), so the bars on the right show how often each region came first or last across 27 different settings, not a single verdict. Fit on regional means, summer months only; a single station's own order is not stable.</p>
+          </div>
+        </div>
+      </div>
+      <div data-scenario="wave" hidden>
+        <div class="readout" id="heat-wave-readout" aria-live="polite"></div>
+        <div class="danube-controls">
+          <button class="icon-btn danube-play" id="heat-wave-play" type="button" aria-label="Play: replay this heat wave day by day">▶</button>
+          <button class="crumb-btn small" id="heat-wave-reset" type="button">Reset</button>
+        </div>
+        <div class="flood-date-row">
+          <input type="range" id="heat-wave-slider" min="0" max="0" value="0" step="1" aria-label="Day of the heat wave" />
+          <span class="flood-date-label" id="heat-wave-date-label"></span>
+        </div>
+        <div class="danube-body">
+          <div class="danube-map-wrap">
+            <div id="heat-wave-map" class="chart-host"></div>
+          </div>
+          <div class="danube-side">
+            <div class="legend" id="heat-wave-legend"></div>
+            <div class="danube-sources" id="heat-wave-sources"></div>
+            <p class="danube-disclaimer">Real daily maximum temperature, not a simulation &mdash; each station's own anomaly against its 31-day-smoothed normal for that day of year. No MaxLinear call reads this data.</p>
+          </div>
         </div>
       </div>
     </div>
@@ -2226,6 +2255,65 @@ function setUpCausalityDomains() {
             <li>PyConnectedness (commit <code>${data.source.commit.slice(0, 7)}</code>), MaxLinear.fit(method="scaling"): the regional causal order.</li>
             <li>Daily maximum temperature, 137 stations, 1990-1993: NOAA (public domain) via the R package STRbook, from Miljana's own Demo Day package.</li>
           </ul>`;
+
+        // the heat domain's own scenario toggle, scoped to just this domain's markup (not
+        // g5.querySelectorAll, which would also catch Rivers' own danube-scenario elements)
+        const heatRoot = document.querySelector<HTMLElement>('[data-domain="heat"]')!;
+        const showHeatScenario = (scenario: string) => {
+          setSegment(document.getElementById("heat-scenario")!, scenario);
+          heatRoot.querySelectorAll<HTMLElement>("[data-scenario]").forEach((el) => (el.hidden = el.dataset.scenario !== scenario));
+          if (scenario === "wave") ensureHeatWave();
+        };
+        onSegment(document.getElementById("heat-scenario")!, showHeatScenario);
+
+        let waveMap: HeatWaveMap | null = null;
+        const waveSlider = document.getElementById("heat-wave-slider") as HTMLInputElement;
+        const lastDay = data.wave.dates.length - 1;
+        const waveReadout = document.getElementById("heat-wave-readout")!;
+        const updateWaveReadout = (day: number) => {
+          document.getElementById("heat-wave-date-label")!.textContent = data.wave.dates[day];
+          waveSlider.value = String(day);
+          const anomalies = data.wave.anomaly_c;
+          let hottest: { id: string; v: number } | null = null;
+          for (const s of data.stations) {
+            const v = anomalies[s.id]?.[day];
+            if (v != null && (hottest === null || v > hottest.v)) hottest = { id: s.id, v };
+          }
+          waveReadout.innerHTML = hottest
+            ? `<b>${data.wave.dates[day]}</b>. Hottest against normal: station <b>${hottest.id}</b>, <b>+${hottest.v.toFixed(1)}°C</b>.`
+            : `<b>${data.wave.dates[day]}</b>.`;
+        };
+
+        function ensureHeatWave() {
+          if (waveMap) return;
+          waveSlider.max = String(lastDay);
+          waveMap = new HeatWaveMap(document.getElementById("heat-wave-map")!, data.stations, data.wave.dates, data.wave.anomaly_c, updateWaveReadout);
+          waveMap.render(0);
+          document.getElementById("heat-wave-legend")!.innerHTML =
+            `<span><i class="dot" style="background:${heatAnomalyColor(-10)}"></i>Well below normal</span>` +
+            `<span><i class="dot" style="background:${heatAnomalyColor(0)}"></i>Normal for the day of year</span>` +
+            `<span><i class="dot" style="background:${heatAnomalyColor(10)}"></i>Well above normal</span>`;
+          document.getElementById("heat-wave-sources")!.innerHTML =
+            `<h4>Data sources</h4><ul><li>Daily maximum temperature, 137 stations, May 1991: NOAA (public domain) via STRbook, from Miljana's own Demo Day package.</li></ul>`;
+          const waveBtn = document.getElementById("heat-wave-play") as HTMLButtonElement;
+          waveBtn.addEventListener("click", () => {
+            if (waveMap!.isPlaying) return;
+            waveBtn.disabled = true;
+            waveBtn.textContent = "⏸";
+            waveMap!.play(() => {
+              waveBtn.disabled = false;
+              waveBtn.textContent = "▶";
+            });
+          });
+          document.getElementById("heat-wave-reset")!.addEventListener("click", () => {
+            waveMap!.stop();
+            waveMap!.render(0);
+          });
+          waveSlider.addEventListener("input", () => {
+            waveMap!.stop();
+            waveMap!.render(Number(waveSlider.value));
+          });
+        }
       });
     };
   })();
@@ -2237,12 +2325,26 @@ function setUpCausalityDomains() {
       loadVitaminA().then((data) => {
         const nodes = data.nodes.map((n) => ({ id: n.id, step: n.step, label: n.id, hover: n.label }));
         const layout = pointLayout(data.nodes);
-        chart = new DagChart(document.getElementById("vitamin-a-map")!, nodes, data.edges, data.generations, layout);
-        wirePlay("vitamin-a", chart, (gen) =>
-          gen < 0
-            ? `Earliest (step 0): <b>${data.generations[0].join(", ")}</b>. Press play to watch the order build up to Vitamin A.`
-            : `Through step <b>${gen}</b> of ${data.generations.length - 1}: ${data.generations.slice(0, gen + 1).flat().join(", ")}.`
-        );
+        // pickable: Miljana's own ask for this one ("let someone choose which variable to see
+        // how it contributes") -- click a node, its path to VA lights up and the readout below
+        // names its tail-mass share; Flights and Heat stay Play-only (see dag-chart.ts)
+        chart = new DagChart(document.getElementById("vitamin-a-map")!, nodes, data.edges, data.generations, layout, undefined, undefined, true);
+        const labelOf = (id: string) => data.nodes.find((n) => n.id === id)!.label;
+        const directEdge = (id: string) => data.edges.find((e) => e.cause === id && e.effect === "VA");
+        wirePlay("vitamin-a", chart, (gen) => {
+          const picked = chart!.picked;
+          if (picked === "VA") return `<b>Vitamin A</b> itself &mdash; the model's own sink; everything else here was picked to reach it. Click it again to clear.`;
+          if (picked) {
+            const share = data.tail_mass_share[picked] ?? 0;
+            const direct = directEdge(picked);
+            const via = direct ? `directly (edge coefficient ${direct.coef.toFixed(2)})` : "indirectly, through the other variables it reaches first";
+            return `<b>${labelOf(picked)}</b> reaches Vitamin A ${via} and accounts for <b>${share.toFixed(0)}%</b> of its tail mass. Click it again, or Reset, to clear.`;
+          }
+          return gen < 0
+            ? `Earliest (step 0): <b>${data.generations[0].join(", ")}</b>. Press play to watch the order build up to Vitamin A, or click any variable to see what it alone reaches.`
+            : `Through step <b>${gen}</b> of ${data.generations.length - 1}: ${data.generations.slice(0, gen + 1).flat().join(", ")}.`;
+        });
+        document.getElementById("vitamin-a-reset")!.addEventListener("click", () => chart!.pick(null));
         document.getElementById("vitamin-a-legend")!.innerHTML = legendHtml();
         const shares = Object.entries(data.tail_mass_share)
           .map(([id, v]) => ({ label: data.nodes.find((n) => n.id === id)!.label, value: v, note: `${v.toFixed(0)}%` }))

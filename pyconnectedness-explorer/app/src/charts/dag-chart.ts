@@ -51,6 +51,7 @@ export class DagChart {
   private reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   private lastRevealed = -1;
   private steps: number;
+  private pickedId: string | null = null;
 
   constructor(
     private host: HTMLElement,
@@ -65,7 +66,17 @@ export class DagChart {
      * in sync with play()'s own interval, without reaching into this class's private timer.
      * Public and settable after construction, since a caller usually wants to pass `this` chart
      * into its own readout closure, which needs the chart to already exist. */
-    public onRender?: (revealedGen: number) => void
+    public onRender?: (revealedGen: number) => void,
+    /** lets a reader click a node to see what it alone reaches, instead of (or alongside) Play's
+     * generation-by-generation story -- Miljana's own ask for Vitamin A ("let someone choose
+     * which variable to see"): click a source, every node and edge downstream of it lights up,
+     * everything else dims, regardless of how much Play has revealed. Off by default (Flights
+     * and Heat stay Play-only; a map full of 20 airports or 9 regions is for the order's own
+     * story, not a per-airport drill-down). */
+    private pickable = false,
+    /** called whenever pick() runs (a click, or a caller picking programmatically), with the
+     * picked id or null once cleared -- same settle-after-construction reasoning as onRender. */
+    public onPick?: (id: string | null) => void
   ) {
     this.steps = generations.length;
     this.svg = d3.select(host).append("svg").attr("class", "dag-chart");
@@ -74,6 +85,33 @@ export class DagChart {
       if (w) this.resize(w);
     }).observe(host);
     this.resize(host.clientWidth || this.width);
+  }
+
+  /** every node reachable from `id` by following cause -> effect edges forward, `id` included --
+   * "what this one source alone reaches," the downstream closure a DAG's generations don't
+   * themselves give (a generation groups everyone at the same step, not one node's own reach). */
+  private downstreamOf(id: string): Set<string> {
+    const reached = new Set([id]);
+    const queue = [id];
+    while (queue.length) {
+      const cur = queue.pop()!;
+      for (const e of this.edges) {
+        if (e.cause === cur && !reached.has(e.effect)) {
+          reached.add(e.effect);
+          queue.push(e.effect);
+        }
+      }
+    }
+    return reached;
+  }
+
+  /** pick a node (its downstream path lights up, overriding Play's own reveal) or clear with
+   * null. A no-op, not an error, if this chart wasn't built with `pickable`. */
+  pick(id: string | null) {
+    if (!this.pickable) return;
+    this.pickedId = id;
+    this.render(this.lastRevealed);
+    this.onPick?.(id);
   }
 
   resize(width: number) {
@@ -87,7 +125,11 @@ export class DagChart {
   render(revealedGen: number) {
     this.lastRevealed = revealedGen;
     const stepOf = new Map(this.nodes.map((n) => [n.id, n.step]));
-    const shown = (id: string) => (stepOf.get(id) ?? 0) <= revealedGen;
+    // picking a node overrides Play's own reveal entirely while it's active: "what this one
+    // reaches" is a different question from "how far has the order gotten", and answering both
+    // at once (e.g. dimming a downstream node Play hasn't reached yet) would misreport the pick
+    const downstream = this.pickedId ? this.downstreamOf(this.pickedId) : null;
+    const shown = (id: string) => (downstream ? downstream.has(id) : (stepOf.get(id) ?? 0) <= revealedGen);
     const muted = css("--muted", "#888");
     const line = css("--line", "rgba(0,0,0,0.1)");
 
@@ -106,9 +148,15 @@ export class DagChart {
       .attr("y1", (d) => this.pos.get(d.cause)![1])
       .attr("x2", (d) => this.pos.get(d.effect)![0])
       .attr("y2", (d) => this.pos.get(d.effect)![1])
-      .attr("stroke", (d) => (shown(d.effect) ? stepColor((stepOf.get(d.cause) ?? 0) / Math.max(1, this.steps - 1)) : line))
+      .attr("stroke", (d) => {
+        // a pick's own highlighted path reads as one thing in one colour (the accent), not
+        // per-edge step colours -- those are for Play's "who's earliest" story, a different
+        // question from "what does this one node reach"
+        if (downstream) return downstream.has(d.cause) ? css("--accent", "#2b2a27") : line;
+        return shown(d.effect) ? stepColor((stepOf.get(d.cause) ?? 0) / Math.max(1, this.steps - 1)) : line;
+      })
       .attr("stroke-width", (d) => Math.max(1, d.coef * 4))
-      .attr("stroke-opacity", (d) => (shown(d.effect) ? 0.75 : 0.25))
+      .attr("stroke-opacity", (d) => (downstream ? downstream.has(d.cause) : shown(d.effect)) ? 0.75 : 0.25)
       .attr("stroke-linecap", "round");
     edgeSel.append("title").text((d) => `${d.cause} → ${d.effect} (coefficient ${d.coef.toFixed(2)})`);
 
@@ -118,8 +166,10 @@ export class DagChart {
       .selectAll("g")
       .data(this.nodes.filter((n) => this.pos.has(n.id)))
       .join("g")
-      .attr("class", "dag-node")
+      .attr("class", (d) => `dag-node${this.pickable ? " pickable" : ""}${d.id === this.pickedId ? " picked" : ""}`)
       .attr("transform", (d) => `translate(${this.pos.get(d.id)![0]},${this.pos.get(d.id)![1]})`);
+
+    if (this.pickable) nodeSel.on("click", (_ev, d) => this.pick(this.pickedId === d.id ? null : d.id));
 
     nodeSel
       .append("circle")
@@ -128,11 +178,12 @@ export class DagChart {
       .attr("fill", (d) => (shown(d.id) ? stepColor(d.step / Math.max(1, this.steps - 1)) : muted))
       .attr("fill-opacity", (d) => (shown(d.id) ? 1 : 0.35));
 
-    nodeSel
-      .filter((d) => d.step === revealedGen + 1)
-      .append("circle")
-      .attr("class", "dag-next")
-      .attr("r", 11);
+    if (!downstream)
+      nodeSel
+        .filter((d) => d.step === revealedGen + 1)
+        .append("circle")
+        .attr("class", "dag-next")
+        .attr("r", 11);
 
     nodeSel
       .append("text")
@@ -142,7 +193,7 @@ export class DagChart {
       .attr("opacity", (d) => (shown(d.id) ? 1 : 0.55))
       .text((d) => d.label);
 
-    nodeSel.append("title").text((d) => d.hover ?? d.label);
+    nodeSel.append("title").text((d) => (this.pickable ? `${d.hover ?? d.label} -- click to see what it reaches` : d.hover ?? d.label));
 
     this.onRender?.(revealedGen);
   }
@@ -180,5 +231,9 @@ export class DagChart {
 
   get isPlaying() {
     return this.playing;
+  }
+
+  get picked() {
+    return this.pickedId;
   }
 }
