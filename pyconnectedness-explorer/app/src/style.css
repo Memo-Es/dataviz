@@ -2194,6 +2194,15 @@ svg {
   min-height: 0;
 }
 
+/* the Causality cards' own mini-chart always has a body paragraph after it -- margin-top:auto
+   (built for Connectedness's own cards, where the chart is the last thing in the card) would
+   push the whole chart+body block down together, leaving the empty space in an odd spot right
+   above the chart instead of trailing normally at the card's own bottom, the way a short text
+   card (mini-insight) already reads */
+.causality-mini-chart {
+  margin-top: 10px;
+}
+
 .mini-chart svg {
   display: block;
   width: 100%;

@@ -76,7 +76,7 @@ async function renderCausalityHome() {
       `<div class="mini-head"><p class="q">${title}</p><span class="mini-open" aria-hidden="true">↗</span></div>
       <h3>${title} <code class="tag">${DOMAIN_TAGS[domain]}</code></h3>
       <p class="mini-num"><b class="num mini-big">${num}</b> <span>${numSub}</span></p>
-      <div class="mini-chart">${chartSvg}</div>
+      <div class="mini-chart causality-mini-chart">${chartSvg}</div>
       <p class="mini-body">${body}</p>`;
   };
 
@@ -379,10 +379,10 @@ app.innerHTML = `
        Connectedness's own Home above -- four examples shown at once, each opening into its own
        full view, instead of a tab that hides three of them until clicked. See renderCausalityHome(). -->
   <section class="home" id="causality-home" aria-label="Causality examples" hidden>
-    <a class="mini-card span-3" href="#causality-rivers" id="mini-causality-rivers"></a>
-    <a class="mini-card span-3" href="#causality-flights" id="mini-causality-flights"></a>
-    <a class="mini-card span-3" href="#causality-heat" id="mini-causality-heat"></a>
-    <a class="mini-card span-3" href="#causality-vitamin_a" id="mini-causality-vitamin_a"></a>
+    <a class="mini-card span-7" href="#causality-rivers" id="mini-causality-rivers"></a>
+    <a class="mini-card span-5" href="#causality-flights" id="mini-causality-flights"></a>
+    <a class="mini-card span-7" href="#causality-heat" id="mini-causality-heat"></a>
+    <a class="mini-card span-5" href="#causality-vitamin_a" id="mini-causality-vitamin_a"></a>
   </section>
 
   <!-- the Causality method's examples, one open at a time -- its own top-level mode (the switch
