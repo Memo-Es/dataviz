@@ -28,15 +28,33 @@ function fitPoints(points: [number, number][]): (p: [number, number]) => [number
   return ([x, y]) => [W / 2 + (x - cx) * s, H / 2 + (y - cy) * s];
 }
 
-/** Flights, Heat, Vitamin A: a small version of the full DagChart's node-link drawing -- every
- * node at its own real layout position, every edge a thin line, coloured by the cause's own
- * causal step (the full chart's own stepColor convention). No labels -- too small to read at a
- * card's size, and the card's headline number already carries the one fact that matters. */
-export function miniDag(nodes: { id: string; step: number }[], edges: { cause: string; effect: string }[], pos: Map<string, [number, number]>, steps: number): string {
+/** Flights, Heat: a small version of the full DagChart's node-link drawing -- every node at its
+ * own real layout position, every edge a thin line, coloured by the cause's own causal step (the
+ * full chart's own stepColor convention). No labels -- too small to read at a card's size, and
+ * the card's headline number already carries the one fact that matters.
+ *
+ * `backdrop` is Flights' own real route network (the full chart's own faint "90 busiest routes"
+ * layer, scale only, not model output) -- drawn first, so Flights reads as a busier real map and
+ * doesn't look like the exact same kind of drawing as Heat's own clean one. */
+export function miniDag(
+  nodes: { id: string; step: number }[],
+  edges: { cause: string; effect: string }[],
+  pos: Map<string, [number, number]>,
+  steps: number,
+  backdrop?: [string, string][]
+): string {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const shown = nodes.filter((n) => pos.has(n.id));
   const fit = fitPoints(shown.map((n) => pos.get(n.id)!));
   const colorOf = (step: number) => stepColor(step / Math.max(1, steps - 1));
+  const back = (backdrop ?? [])
+    .filter(([a, b]) => pos.has(a) && pos.has(b))
+    .map(([a, b]) => {
+      const [ax, ay] = fit(pos.get(a)!);
+      const [bx, by] = fit(pos.get(b)!);
+      return `<line x1="${ax.toFixed(1)}" y1="${ay.toFixed(1)}" x2="${bx.toFixed(1)}" y2="${by.toFixed(1)}" stroke="currentColor" stroke-opacity="0.12"/>`;
+    })
+    .join("");
   const lines = edges
     .filter((e) => pos.has(e.cause) && pos.has(e.effect))
     .map((e) => {
@@ -51,7 +69,7 @@ export function miniDag(nodes: { id: string; step: number }[], edges: { cause: s
       return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.5" fill="${colorOf(n.step)}"/>`;
     })
     .join("");
-  return `<svg viewBox="0 0 ${W} ${H}" aria-hidden="true">${lines}${dots}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" aria-hidden="true">${back}${lines}${dots}</svg>`;
 }
 
 /** Rivers: the fitted tree's real stations, at their own real river-snapped coordinates (the

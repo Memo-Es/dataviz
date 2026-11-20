@@ -107,7 +107,8 @@ async function renderCausalityHome() {
       flights.airports.map((a) => ({ id: a.id, step: a.step })),
       flights.edges,
       albersUsaLayout(flights.airports)(300, 150),
-      flights.generations.length
+      flights.generations.length,
+      flights.routes.map((r) => [r.a, r.b])
     ),
     "20 busiest US airports, daily delay minutes — whose worst days tend to lead the rest."
   );
@@ -136,18 +137,18 @@ async function renderCausalityHome() {
 
   const [topVarId, topVarShare] = Object.entries(va.tail_mass_share).sort((a, b) => b[1] - a[1])[0];
   const topVarLabel = va.nodes.find((n) => n.id === topVarId)!.label;
+  // bars, not another node-link drawing -- the same tail-mass-share bars the full view leads
+  // with, so Vitamin A's card reads as its own kind of thing next to the other three's maps
+  const vaShares = Object.entries(va.tail_mass_share)
+    .map(([id, v]) => ({ label: va.nodes.find((n) => n.id === id)!.label, value: v, note: `${v.toFixed(0)}%` }))
+    .sort((a, b) => b.value - a.value);
   card(
     "mini-causality-vitamin_a",
     "vitamin_a",
     "Vitamin A",
     `${topVarShare.toFixed(0)}%`,
     `of its tail mass traces to ${topVarLabel}`,
-    miniDag(
-      va.nodes.map((n) => ({ id: n.id, step: n.step })),
-      va.edges,
-      pointLayout(va.nodes)(300, 150),
-      va.generations.length
-    ),
+    shareBarsRows(vaShares, 100),
     "NHANES dietary recall — a known formula says VA must come last; does the method find that on its own?"
   );
 }
