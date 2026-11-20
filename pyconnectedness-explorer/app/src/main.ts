@@ -42,6 +42,88 @@ import { albersUsaLayout, loadFlights, loadHeat, loadVitaminA, pointLayout } fro
  * or Code export describes what the reader is actually looking at. */
 let danube: { data: DanubeData; byId: Map<number, DanubeStation>; event: string; day: number } | null = null;
 
+/** the method call each example's card/header shows -- shared between the dashboard's mini-cards
+ * (renderCausalityHome) and the full view's own tag (showDomain, set up in
+ * setUpCausalityDomains) so the two never drift apart. */
+const DOMAIN_TAGS: Record<string, string> = {
+  rivers: 'MaxLinear(…).fit(method="qtree")',
+  flights: 'MaxLinear(…).fit(k=100, k_order=250)',
+  heat: 'MaxLinear(…).fit(k=50, k_order=100)',
+  vitamin_a: 'MaxLinear(…).fit(k=100, k_order=400)',
+};
+
+/** set by setUpCausalityDomains() once its ensurers/markup exist -- applyView() calls this (via
+ * a module-level handle, the same reason `danube` above is module-level: the setup function and
+ * the router are two separate top-level functions) whenever the route opens one example's full
+ * view. Null until then, so a direct link to e.g. #causality-flights on first load is a harmless
+ * no-op; main()'s own closing applyView() call (after setUpCausalityDomains runs) retries it. */
+let showCausalityDomain: ((domain: string) => void) | null = null;
+
+/** Causality's own overview: a headline stat per example, read straight off each one's already-
+ * fitted data -- no separate "summary" computation, just the same numbers the full view leads
+ * with. Guarded on `danube` (set by setUpDanube, awaited before this can first be reached) so a
+ * direct link to #causality on first load, which can arrive before that finishes, is retried by
+ * main()'s own closing applyView() call rather than rendering with Rivers' card half-missing. */
+let causalityHomeReady = false;
+async function renderCausalityHome() {
+  if (causalityHomeReady || !danube) return;
+  causalityHomeReady = true;
+
+  const card = (id: string, domain: string, title: string, num: string, numSub: string, body: string) => {
+    document.getElementById(id)!.innerHTML =
+      `<div class="mini-head"><p class="q">${title}</p><span class="mini-open" aria-hidden="true">↗</span></div>
+      <h3>${title} <code class="tag">${DOMAIN_TAGS[domain]}</code></h3>
+      <p class="mini-num"><b class="num mini-big">${num}</b> <span>${numSub}</span></p>
+      <p class="mini-body">${body}</p>`;
+  };
+
+  const cmp = danube.data.comparison_to_ground_truth;
+  card(
+    "mini-causality-rivers",
+    "rivers",
+    "River floods",
+    `${cmp.directed_matches}/${cmp.edges_total}`,
+    "edges match the real Upper Danube network, with direction",
+    "Real daily discharge for 4 historical floods, at 31 gauges — which gauge warns which, downstream."
+  );
+
+  const [flights, heat, va] = await Promise.all([loadFlights(), loadHeat(), loadVitaminA()]);
+
+  const topOf = <T extends string>(items: T[], share: (n: T) => number) =>
+    items.map((n) => ({ n, v: share(n) })).sort((a, b) => b.v - a.v)[0];
+
+  const topAirport = topOf(flights.names, (n) => flights.stability.summary[n].first_share);
+  card(
+    "mini-causality-flights",
+    "flights",
+    "Flight delays",
+    `${Math.round(topAirport.v * 100)}%`,
+    `${topAirport.n} leads the causal order, across 21 refits`,
+    "20 busiest US airports, daily delay minutes — whose worst days tend to lead the rest."
+  );
+
+  const topRegion = topOf(heat.regions, (r) => heat.stability.summary[r].first_share);
+  card(
+    "mini-causality-heat",
+    "heat",
+    "Heat waves",
+    `${Math.round(topRegion.v * 100)}%`,
+    `${topRegion.n} comes first, across 27 refits`,
+    "137 NOAA stations, nine US regions — whose heat extremes tend to lead, in summer."
+  );
+
+  const [topVarId, topVarShare] = Object.entries(va.tail_mass_share).sort((a, b) => b[1] - a[1])[0];
+  const topVarLabel = va.nodes.find((n) => n.id === topVarId)!.label;
+  card(
+    "mini-causality-vitamin_a",
+    "vitamin_a",
+    "Vitamin A",
+    `${topVarShare.toFixed(0)}%`,
+    `of its tail mass traces to ${topVarLabel}`,
+    "NHANES dietary recall — a known formula says VA must come last; does the method find that on its own?"
+  );
+}
+
 function danubePickName(id: number): string {
   return `station ${id} (${danube!.byId.get(id)!.river})`;
 }
@@ -130,8 +212,9 @@ app.innerHTML = `
   <!-- an expanded graph: the way back to the overview, and what's on show -->
   <nav class="crumb" id="crumb" aria-label="Where you are" hidden>
     <a href="#" class="crumb-back">‹ All graphs</a><span class="crumb-here" id="crumb-here"></span>
-    <span class="crumb-tools">
-      <!-- the library calls behind the graph, for what's on screen: to run, check or build on -->
+    <span class="crumb-tools" id="crumb-tools">
+      <!-- the library calls behind the graph, for what's on screen: to run, check or build on
+           -- hidden for a causality domain that has no export wired yet (see applyView) -->
       <button class="crumb-btn" id="code-open" type="button" aria-haspopup="dialog">Code</button>
       <!-- the graph as a figure for a report, with whatever is picked still highlighted -->
       <wa-dropdown id="export" placement="bottom-end">
@@ -264,19 +347,27 @@ app.innerHTML = `
     <section class="card span-5 detail" id="detail"></section>
   </div>
 
-  <!-- the Causality method's one graph so far: the directed tree for extremes, on the Upper
-       Danube. Its own top-level mode (the switch in the topbar), not "graph 4" of Connectedness
-       -- Connectedness and Causality are two unrelated methods over two unrelated kinds of data -->
+  <!-- Causality's landing: one card per example, the same overview-then-drill-down pattern as
+       Connectedness's own Home above -- four examples shown at once, each opening into its own
+       full view, instead of a tab that hides three of them until clicked. See renderCausalityHome(). -->
+  <section class="home" id="causality-home" aria-label="Causality examples" hidden>
+    <a class="mini-card span-3" href="#causality-rivers" id="mini-causality-rivers"></a>
+    <a class="mini-card span-3" href="#causality-flights" id="mini-causality-flights"></a>
+    <a class="mini-card span-3" href="#causality-heat" id="mini-causality-heat"></a>
+    <a class="mini-card span-3" href="#causality-vitamin_a" id="mini-causality-vitamin_a"></a>
+  </section>
+
+  <!-- the Causality method's examples, one open at a time -- its own top-level mode (the switch
+       in the topbar), not "graph 4" of Connectedness -- Connectedness and Causality are two
+       unrelated methods over two unrelated kinds of data. Which data-domain pane shows is set
+       by applyView() from the route (#causality-rivers etc.), not a tab inside this card. -->
   <section class="card span-12" id="g5" hidden>
     <div class="card-head">
       <div>
         <p class="q">Who moves first, and who follows?</p>
         <h2>Causality <code class="tag" id="causality-tag">MaxLinear(…).fit(method="qtree")</code></h2>
-        <p class="sub" id="causality-sub">MaxLinear fits a causal order over extreme events, not an average: which place's worst days tend to lead everyone else's. Four examples below, one method.</p>
+        <p class="sub" id="causality-sub">MaxLinear fits a causal order over extreme events, not an average: which place's worst days tend to lead everyone else's.</p>
       </div>
-    </div>
-    <div class="causality-domain-row">
-      ${segmented("causality-domain", "Example", [["rivers", "River floods"], ["flights", "Flight delays"], ["heat", "Heat waves"], ["vitamin_a", "Vitamin A"]], "rivers", true)}
     </div>
     <div data-domain="rivers">
     <p class="sub" id="danube-sub"></p>
@@ -1513,13 +1604,27 @@ ${
   });
   // the overview, or one graph on its own: the address says which (#index, #network, #heatmap),
   // so the browser's back button and a shared link both work
-  type View = "home" | "index" | "network" | "heatmap" | "frequency" | "causality";
+  type View =
+    | "home"
+    | "index"
+    | "network"
+    | "heatmap"
+    | "frequency"
+    | "causality"
+    | "causality-rivers"
+    | "causality-flights"
+    | "causality-heat"
+    | "causality-vitamin_a";
   const TITLES: Record<Exclude<View, "home">, string> = {
     index: "Rolling spillover index",
     network: "Connectedness network",
     heatmap: "Spillover heatmap",
     frequency: "Frequency-domain connectedness",
-    causality: "Directed tree for extremes",
+    causality: "Causality",
+    "causality-rivers": "River floods",
+    "causality-flights": "Flight delays",
+    "causality-heat": "Heat waves",
+    "causality-vitamin_a": "Vitamin A",
   };
   let view: View | null = null;
   let keyboardNav = false;
@@ -1530,35 +1635,48 @@ ${
     const v: View = h in TITLES ? (h as View) : "home";
     const from = view;
     view = v;
+    // "causality" is now the method's own overview (one card per example, like Connectedness's
+    // own Home above it); "causality-rivers" etc. are each example's own full view, reached by
+    // opening a card -- not a segmented tab that hides the other three until clicked.
+    const causalityDomain = v.startsWith("causality-") ? v.slice("causality-".length) : null;
+    const causalityAny = v === "causality" || causalityDomain !== null;
     $("home").hidden = v !== "home";
     $("g1").hidden = v !== "index";
     $("g2").hidden = v !== "network";
     $("g3").hidden = v !== "heatmap";
     $("g4").hidden = v !== "frequency";
-    $("g5").hidden = v !== "causality";
-    // Causality (the Danube directed tree, today) has no window to pick, and none of
-    // Connectedness's dataset/measure chrome: it's a different method over different data, not
-    // a 4th connectedness graph with its own tab. The route is "causality", the method's own
-    // name, not "rivers" or "danube" -- the mode can hold other causal-extremes datasets later
-    const causality = v === "causality";
-    $("context").hidden = causality;
-    $("top").hidden = causality;
-    $("footer").hidden = causality;
+    $("causality-home").hidden = v !== "causality";
+    $("g5").hidden = causalityDomain === null;
+    if (v === "causality") renderCausalityHome();
+    else if (causalityDomain) showCausalityDomain?.(causalityDomain);
+    // Causality has no window to pick, and none of Connectedness's dataset/measure chrome: it's
+    // a different method over different data, not a 4th connectedness graph with its own tab.
+    $("context").hidden = causalityAny;
+    $("top").hidden = causalityAny;
+    $("footer").hidden = causalityAny;
     const modeSwitch = document.getElementById("mode-switch") as HTMLElement & { value: string };
-    if (modeSwitch) modeSwitch.value = causality ? "causality" : "connectedness";
+    if (modeSwitch) modeSwitch.value = causalityAny ? "causality" : "connectedness";
     $("g3-row").hidden = v !== "network" && v !== "heatmap";
     $("g3-row").classList.toggle("detail-only", v === "network");
-    $("crumb").hidden = v === "home";
-    $("crumb-here").textContent = v === "home" ? "" : TITLES[v];
-    $("crumb").querySelector<HTMLElement>(".crumb-back")!.textContent = causality ? "‹ Connectedness" : "‹ All graphs";
+    // the overview routes (home, causality) need no way back -- the top bar's mode switch and
+    // Connectedness's own Home already are that; only a single opened example does
+    $("crumb").hidden = v === "home" || v === "causality";
+    $("crumb-here").textContent = v === "home" || v === "causality" ? "" : TITLES[v];
+    $("crumb").querySelector<HTMLElement>(".crumb-back")!.textContent = causalityDomain ? "‹ All examples" : "‹ All graphs";
+    $("crumb").querySelector<HTMLAnchorElement>(".crumb-back")!.href = causalityDomain ? "#causality" : "#";
+    // Flights, Heat and Vitamin A have no Figure/Code export wired yet (see figureFor/codeFor) --
+    // hide the tools rather than let them export the wrong thing
+    $("crumb-tools").hidden = causalityDomain !== null && causalityDomain !== "rivers";
     document.title = v === "home" ? "PyConnectedness Explorer" : `${TITLES[v]} · PyConnectedness Explorer`;
     if (from !== null && from !== v) {
       scrollTo(0, 0);
       // keyboard and screen-reader users land where the change happened; a mouse or touch user
       // isn't handed a focus ring they didn't ask for
       if (keyboardNav) {
-        if (v === "home" && from !== "causality") document.getElementById(`mini-${from === "frequency" ? "freq" : from}`)?.focus();
+        const fromCausalityDomain = typeof from === "string" && from.startsWith("causality-");
+        if (v === "home" && from !== "causality" && !fromCausalityDomain) document.getElementById(`mini-${from === "frequency" ? "freq" : from}`)?.focus();
         else if (v === "home") modeSwitch?.querySelector<HTMLElement>('wa-radio[value="connectedness"]')?.focus();
+        else if (v === "causality" && fromCausalityDomain) document.getElementById(`mini-${from}`)?.focus();
         else $("crumb").querySelector<HTMLElement>(".crumb-back")?.focus();
       }
     }
@@ -1574,7 +1692,9 @@ ${
 
   // the graph on show as a figure: its chart as drawn (picks included), framed for a report
   const figureFor = (v: Exclude<View, "home">): Figure => {
-    if (v === "causality") return danubeFigure();
+    // Flights, Heat and Vitamin A have no Figure export wired yet -- applyView() hides the
+    // Download/Code tools on those routes, so this is never actually reached for them
+    if (v === "causality-rivers") return danubeFigure();
     const s = store.get();
     const m = s.measure;
     const frame = model.frame(s);
@@ -1681,7 +1801,7 @@ ${
   let codeName = "";
   $("code-open").addEventListener("click", () => {
     if (view === "home" || view === null) return;
-    if (view === "causality") {
+    if (view === "causality-rivers") {
       codeText = danubeCode();
       codeName = "pyconnectedness-danube.py";
       codeDialog.setAttribute("label", "Python for the directed tree for extremes");
@@ -1691,6 +1811,9 @@ ${
       codeDialog.open = true;
       return;
     }
+    // the dashboard, and Flights/Heat/Vitamin A: no export wired yet -- applyView() hides the
+    // Code/Download tools on those routes, so this is defensive, not expected to fire
+    if (view === "causality" || view === "causality-flights" || view === "causality-heat" || view === "causality-vitamin_a") return;
     const s = store.get();
     codeText = codeFor(view);
     codeName = `pyconnectedness-${view}-${ds.id}-${s.measure}.py`;
@@ -1726,10 +1849,13 @@ ${
   $("export").addEventListener("wa-select", (ev) => {
     const kind = (ev as CustomEvent<{ item: HTMLElement & { value: string } }>).detail.item.value;
     if (view === "home" || view === null) return;
+    // the dashboard, and Flights/Heat/Vitamin A: no export wired yet -- applyView() hides the
+    // Code/Download tools on those routes, so this is defensive, not expected to fire
+    if (view === "causality" || view === "causality-flights" || view === "causality-heat" || view === "causality-vitamin_a") return;
     const f = figureFor(view);
     // the map is asked for print (Demo Day flyers): a higher-resolution PNG than the other
     // graphs' screen/slide default, since it's drawn once and then printed, not just viewed
-    (kind === "svg" ? downloadSvg(f) : downloadPng(f, view === "causality" ? 4 : 2)).catch((e) => console.error("export failed", e));
+    (kind === "svg" ? downloadSvg(f) : downloadPng(f, view === "causality-rivers" ? 4 : 2)).catch((e) => console.error("export failed", e));
   });
 
   // controls
@@ -1777,6 +1903,11 @@ ${
   await setUpDanube();
   setUpAbstractTree();
   setUpCausalityDomains();
+  // a direct link straight to #causality or #causality-flights etc. can be reached before any
+  // of the three setup calls above finish (applyView() already ran once, at main()'s own start)
+  // -- showCausalityDomain and renderCausalityHome() both no-op until their data is ready, so
+  // this retries whichever the current route needs, now that it is
+  applyView();
 }
 
 /** graph 4: the directed tree for extremes, on the Upper Danube. Independent of every other
@@ -1789,6 +1920,7 @@ async function setUpDanube() {
   } catch (err) {
     console.error("danube.json failed to load", err);
     document.getElementById("g5")?.remove();
+    document.getElementById("causality-home")?.remove();
     document.getElementById("mode-switch")?.querySelector('wa-radio[value="causality"]')?.remove();
     return;
   }
@@ -2053,29 +2185,24 @@ const sourcesDisclose = (bodyHtml: string) => disclose("Data sources", bodyHtml,
 
 /** Flights, Heat and Vitamin A: three more examples of the same method (MaxLinear's "scaling"
  * order over a general DAG, not qtree's single tree -- see pipeline/scaling.py), each its own
- * `data-domain` pane next to Rivers, switched by the segmented control added in setUpDanube's
- * markup above. Independent of setUpDanube() and of the Store every Connectedness graph shares,
- * the same way Rivers itself is -- one fixed series each, nothing to pick a dataset/measure for.
- * Every domain lazy-loads on first selection, matching ensureFloodMap()'s own pattern, so picking
- * "River floods" (the default) never pays for the other three. */
+ * `data-domain` pane next to Rivers inside g5, shown one at a time by applyView() (see
+ * showCausalityDomain) as the reader opens that example from the dashboard built by
+ * renderCausalityHome() above -- not a tab inside this card. Independent of setUpDanube() and of
+ * the Store every Connectedness graph shares, the same way Rivers itself is -- one fixed series
+ * each, nothing to pick a dataset/measure for. Every domain lazy-loads on first selection,
+ * matching ensureFloodMap()'s own pattern, so opening "River floods" (the default) never pays
+ * for the other three. */
 function setUpCausalityDomains() {
   const g5 = document.getElementById("g5");
   if (!g5) return; // danube.json failed to load; setUpDanube already removed the whole card
 
-  const TAGS: Record<string, string> = {
-    rivers: 'MaxLinear(…).fit(method="qtree")',
-    flights: 'MaxLinear(…).fit(k=100, k_order=250)',
-    heat: 'MaxLinear(…).fit(k=50, k_order=100)',
-    vitamin_a: 'MaxLinear(…).fit(k=100, k_order=400)',
-  };
   const ensurers: Partial<Record<string, () => void>> = {};
   const showDomain = (domain: string) => {
-    setSegment(document.getElementById("causality-domain")!, domain);
     g5.querySelectorAll<HTMLElement>("[data-domain]").forEach((el) => (el.hidden = el.dataset.domain !== domain));
-    document.getElementById("causality-tag")!.textContent = TAGS[domain] ?? TAGS.rivers;
+    document.getElementById("causality-tag")!.textContent = DOMAIN_TAGS[domain] ?? DOMAIN_TAGS.rivers;
     ensurers[domain]?.();
   };
-  onSegment(document.getElementById("causality-domain")!, showDomain);
+  showCausalityDomain = showDomain;
 
   /** wires one Play/Reset pair to a DagChart, generation by generation -- the shared behaviour
    * across all three domains; only the chart's own data/layout differ per call site. */

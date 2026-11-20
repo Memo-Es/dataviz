@@ -58,9 +58,15 @@ export interface VitaminAData {
   tail_mass_share: Record<string, number>;
 }
 
-export const loadFlights = () => fetchJson<FlightsData>("data/flights/flights.json");
-export const loadHeat = () => fetchJson<HeatData>("data/heat/heat.json");
-export const loadVitaminA = () => fetchJson<VitaminAData>("data/vitamin_a/vitamin_a.json");
+// memoized: both the Causality dashboard's own headline stats (renderCausalityHome, main.ts) and
+// a domain's full view (setUpCausalityDomains's own ensurers) read this data independently, and
+// neither knows if the other already fetched it -- one shared promise per file, not two fetches.
+let flightsP: Promise<FlightsData> | null = null;
+export const loadFlights = () => (flightsP ??= fetchJson<FlightsData>("data/flights/flights.json"));
+let heatP: Promise<HeatData> | null = null;
+export const loadHeat = () => (heatP ??= fetchJson<HeatData>("data/heat/heat.json"));
+let vitaminAP: Promise<VitaminAData> | null = null;
+export const loadVitaminA = () => (vitaminAP ??= fetchJson<VitaminAData>("data/vitamin_a/vitamin_a.json"));
 
 /** d3.geoAlbersUsa, fit to the host like danube-map.ts's own Mercator -- continental US, Alaska
  * and Hawaii each in their own inset, the standard projection for a US-only point map. No state

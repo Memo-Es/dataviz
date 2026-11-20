@@ -3186,12 +3186,9 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   user-select: none;
 }
 
-/* ---- Causality's domain switcher (Rivers / Flight delays / Heat waves / Vitamin A) and the
-   shared DAG chart (src/charts/dag-chart.ts) the latter three draw with ---- */
-.causality-domain-row {
-  margin-bottom: var(--sp-md);
-}
-
+/* ---- the shared DAG chart (src/charts/dag-chart.ts) Flight delays, Heat waves and Vitamin A
+   all draw with (the Causality dashboard itself -- #causality-home -- reuses .home/.mini-card,
+   Connectedness's own Home styling above) ---- */
 .dag-chart {
   display: block;
   width: 100%;
