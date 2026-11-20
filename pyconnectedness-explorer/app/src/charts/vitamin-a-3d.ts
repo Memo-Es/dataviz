@@ -1,24 +1,134 @@
 /**
- * Vitamin A's own 3D view -- what Miljana's deck actually draws for this domain (confirmed from
- * her Demo Day package's own deck/data/vitamin3d.json and deck_build/build_figs.py, not a guess):
- * the same causal order the 2D DagChart reveals generation by generation, laid out once along a
- * z-axis (the causal step -- Vitamin A, the sink, at the bottom; the earliest sources at the
- * top) instead of revealed over Play, with a slow auto-rotating camera and a directional cone
- * arrowhead on every edge. Same node positions, edges and steps the 2D chart draws -- her own
- * hand-placed x/y in run_vitamin_a.py's own output matches her deck's layout exactly, confirmed
- * by comparing the two -- just read once into Plotly's GL3D bundle (loaded lazily, the same
- * pattern as danube-flood-3d.ts) instead of D3's 2D SVG. Colour follows this app's own causal-
- * step convention (stepColor, dag-chart.ts) rather than her deck's bespoke per-nutrient palette,
- * for consistency with the 2D view a reader just came from.
+ * Vitamin A's own 3D view: the same causal order the 2D DagChart reveals generation by
+ * generation, laid out once along a z-axis (Vitamin A, the sink, at the bottom; the earliest
+ * source at the top), drawn as an actual ball-and-stick molecular model -- round spheres at
+ * each variable, round sticks along each edge, a stick's thickness its own edge coefficient --
+ * rather than a thin line-and-cone diagram, per direct steer from a reference photo of a real
+ * molecular model kit. Plotly's scatter3d markers are flat camera-facing sprites, not true
+ * geometry, so the balls and sticks here are real mesh3d solids: a UV-sphere per node, a
+ * capped cylinder per edge, built by hand (standard mesh-generation math, not a library) and
+ * lit like a glossy plastic kit. The scene uses a true 1:1:1 aspect (aspectratio all equal) with
+ * the z-gap between steps baked into the z-coordinates themselves, not into an uneven aspect
+ * ratio -- a sphere built as a true sphere in that coordinate system then renders round from
+ * every angle the auto-rotating camera reaches, which a non-uniform aspectratio would have
+ * broken (it stretches the whole scene per-axis, spheres included).
+ *
+ * Node positions, edges and steps are this app's own already-fetched data (run_vitamin_a.py's
+ * output, the same pointLayout x/y the 2D chart draws), loaded lazily into Plotly's GL3D bundle
+ * (shared chunk with Rivers' own 3D terrain, danube-flood-3d.ts) only once this view is switched
+ * on.
  */
 import type { VitaminAData } from "./causality-domains";
 import { stepColor } from "./dag-chart";
 
 type Plotly3D = typeof import("plotly.js-gl3d-dist-min");
+type Vec3 = [number, number, number];
 
 function css(name: string, fallback: string): string {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   return v || fallback;
+}
+
+function sub(a: Vec3, b: Vec3): Vec3 {
+  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+}
+function cross(a: Vec3, b: Vec3): Vec3 {
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+}
+function norm(a: Vec3): Vec3 {
+  const l = Math.hypot(a[0], a[1], a[2]) || 1;
+  return [a[0] / l, a[1] / l, a[2] / l];
+}
+
+interface Mesh {
+  x: number[];
+  y: number[];
+  z: number[];
+  i: number[];
+  j: number[];
+  k: number[];
+}
+
+/** a UV-sphere, `rings` latitude bands by `segs` longitude slices -- plenty smooth at this
+ * chart's scale (7 nodes), and cheap enough that per-node trace count (for per-node hover text)
+ * is no real cost. */
+function sphereMesh(center: Vec3, r: number, rings = 12, segs = 18): Mesh {
+  const x: number[] = [],
+    y: number[] = [],
+    z: number[] = [];
+  for (let ri = 0; ri <= rings; ri++) {
+    const theta = (Math.PI * ri) / rings;
+    const st = Math.sin(theta),
+      ct = Math.cos(theta);
+    for (let sj = 0; sj <= segs; sj++) {
+      const phi = (2 * Math.PI * sj) / segs;
+      x.push(center[0] + r * st * Math.cos(phi));
+      y.push(center[1] + r * st * Math.sin(phi));
+      z.push(center[2] + r * ct);
+    }
+  }
+  const i: number[] = [],
+    j: number[] = [],
+    k: number[] = [];
+  for (let ri = 0; ri < rings; ri++) {
+    for (let sj = 0; sj < segs; sj++) {
+      const a = ri * (segs + 1) + sj;
+      const b = a + segs + 1;
+      i.push(a, a + 1);
+      j.push(b, b);
+      k.push(a + 1, b + 1);
+    }
+  }
+  return { x, y, z, i, j, k };
+}
+
+/** a capped cylinder from `a` to `b` -- one edge's own "stick", its radius the bond's visual
+ * weight (an edge's own coefficient, the same meaning the 2D chart's line width already carries). */
+function cylinderMesh(a: Vec3, b: Vec3, r: number, segs = 14): Mesh {
+  const axis = norm(sub(b, a));
+  const arbitrary: Vec3 = Math.abs(axis[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+  const u = norm(cross(arbitrary, axis));
+  const v = cross(axis, u);
+  const x: number[] = [],
+    y: number[] = [],
+    z: number[] = [];
+  const ringAt = (p: Vec3) => {
+    for (let s = 0; s < segs; s++) {
+      const ang = (2 * Math.PI * s) / segs;
+      const c = Math.cos(ang) * r,
+        sN = Math.sin(ang) * r;
+      x.push(p[0] + u[0] * c + v[0] * sN);
+      y.push(p[1] + u[1] * c + v[1] * sN);
+      z.push(p[2] + u[2] * c + v[2] * sN);
+    }
+  };
+  ringAt(a);
+  ringAt(b);
+  // two cap centres, appended last (indices 2*segs and 2*segs+1)
+  x.push(a[0], b[0]);
+  y.push(a[1], b[1]);
+  z.push(a[2], b[2]);
+  const capA = 2 * segs;
+  const capB = 2 * segs + 1;
+  const i: number[] = [],
+    j: number[] = [],
+    k: number[] = [];
+  for (let s = 0; s < segs; s++) {
+    const s1 = (s + 1) % segs;
+    const a0 = s,
+      a1 = s1,
+      b0 = segs + s,
+      b1 = segs + s1;
+    // side wall, two triangles per quad
+    i.push(a0, a0);
+    j.push(a1, b1);
+    k.push(b1, b0);
+    // end caps
+    i.push(capA, capB);
+    j.push(a1, b0);
+    k.push(a0, b1);
+  }
+  return { x, y, z, i, j, k };
 }
 
 export class VitaminA3D {
@@ -34,81 +144,80 @@ export class VitaminA3D {
     const Plotly = (this.Plotly ??= (await import("plotly.js-gl3d-dist-min")) as unknown as Plotly3D);
     const { nodes, edges, generations, tail_mass_share } = this.data;
     const steps = generations.length;
-    const z = (step: number) => steps - 1 - step; // the sink (highest step) sits at z=0, sources at the top
+    // the z-gap between steps is baked into the coordinate itself (not an uneven aspectratio,
+    // which would stretch the spheres/sticks into ellipsoids) -- about the same visual spread
+    // as the x/y layout's own -1.3..1.4 range, so steps read as clearly separated "floors"
+    const ZSPACE = 1.15;
+    const zOf = (step: number) => (steps - 1 - step) * ZSPACE;
     const byId = new Map(nodes.map((n) => [n.id, n]));
-    const ink = css("--stone", "#4a4843");
-    const panel = css("--panel", "#fff");
+    const posOf = (id: string): Vec3 => {
+      const n = byId.get(id)!;
+      return [n.x, n.y, zOf(n.step)];
+    };
+    const line = css("--line", "#d8d4cc");
 
+    const lighting = { ambient: 0.5, diffuse: 0.7, specular: 0.55, roughness: 0.35, fresnel: 0.15 };
     const traces: Record<string, unknown>[] = [];
+
+    // sticks first, so the balls read as sitting on top of them
     for (const e of edges) {
-      const a = byId.get(e.cause)!;
-      const b = byId.get(e.effect)!;
-      const az = z(a.step);
-      const bz = z(b.step);
-      const color = stepColor(a.step / Math.max(1, steps - 1));
+      const a = posOf(e.cause);
+      const b = posOf(e.effect);
+      const m = cylinderMesh(a, b, 0.035 + 0.075 * e.coef);
       traces.push({
-        type: "scatter3d",
-        mode: "lines",
-        x: [a.x, b.x],
-        y: [a.y, b.y],
-        z: [az, bz],
-        line: { color, width: 3 + 14 * e.coef },
+        type: "mesh3d",
+        x: m.x,
+        y: m.y,
+        z: m.z,
+        i: m.i,
+        j: m.j,
+        k: m.k,
+        color: line,
+        flatshading: false,
+        lighting,
+        lightposition: { x: 200, y: -200, z: 300 },
         hoverinfo: "text",
-        hovertext: `${a.label} → ${b.label} (coefficient ${e.coef.toFixed(2)})`,
-        showlegend: false,
-      });
-      // a cone arrowhead 80% along the edge, cause -> effect -- the same directional cue her own
-      // deck draws, read in 3D here instead of the 2D chart's own arrow-shaped node glyph
-      const d = [b.x - a.x, b.y - a.y, bz - az];
-      const len = Math.hypot(d[0], d[1], d[2]) || 1;
-      const u = d.map((v) => v / len);
-      const p = [a.x + 0.8 * d[0], a.y + 0.8 * d[1], az + 0.8 * d[2]];
-      traces.push({
-        type: "cone",
-        x: [p[0]],
-        y: [p[1]],
-        z: [p[2]],
-        u: [u[0]],
-        v: [u[1]],
-        w: [u[2]],
-        sizemode: "absolute",
-        sizeref: 0.22,
-        anchor: "center",
-        colorscale: [
-          [0, color],
-          [1, color],
-        ],
-        showscale: false,
-        hoverinfo: "skip",
+        hovertext: `${byId.get(e.cause)!.label} → ${byId.get(e.effect)!.label} (coefficient ${e.coef.toFixed(2)})`,
       });
     }
 
-    const names = nodes.map((n) => n.id);
+    // one mesh3d trace per node (not batched) so each keeps its own hover text; sized by its
+    // own share of Vitamin A's tail mass -- the same number the 2D view's own bars lead with
+    for (const n of nodes) {
+      const r = n.id === "VA" ? 0.26 : 0.14 + (tail_mass_share[n.id] ?? 0) * 0.0022;
+      const m = sphereMesh([n.x, n.y, zOf(n.step)], r);
+      const color = stepColor(n.step / Math.max(1, steps - 1));
+      traces.push({
+        type: "mesh3d",
+        x: m.x,
+        y: m.y,
+        z: m.z,
+        i: m.i,
+        j: m.j,
+        k: m.k,
+        color,
+        flatshading: false,
+        lighting,
+        lightposition: { x: 200, y: -200, z: 300 },
+        hoverinfo: "text",
+        hovertext:
+          n.id === "VA"
+            ? `<b>${n.label}</b> — the model's own sink`
+            : `<b>${n.label}</b> · ${(tail_mass_share[n.id] ?? 0).toFixed(0)}% of Vitamin A's tail mass`,
+      });
+    }
+
+    // labels only -- no markers of its own, so it never competes visually with the spheres above
     traces.push({
       type: "scatter3d",
-      mode: "markers+text",
-      x: names.map((id) => byId.get(id)!.x),
-      y: names.map((id) => byId.get(id)!.y),
-      z: names.map((id) => z(byId.get(id)!.step)),
-      text: names.map((id) => `${byId.get(id)!.step + 1} · ${byId.get(id)!.label}`),
+      mode: "text",
+      x: nodes.map((n) => n.x),
+      y: nodes.map((n) => n.y),
+      z: nodes.map((n) => zOf(n.step) + 0.05),
+      text: nodes.map((n) => `${n.step + 1} · ${n.label}`),
       textposition: "middle right",
-      textfont: { size: 13, color: ink },
-      marker: {
-        // Vitamin A itself drawn larger and open (the sink everything else was picked to reach);
-        // every other node sized by its own share of VA's tail mass -- the same number the 2D
-        // view's own bars lead with, not a separate "how central is this node" measure
-        size: names.map((id) => (id === "VA" ? 20 : 10 + (tail_mass_share[id] ?? 0) * 0.22)),
-        color: names.map((id) => stepColor(byId.get(id)!.step / Math.max(1, steps - 1))),
-        symbol: names.map((id) => (id === "VA" ? "circle-open" : "circle")),
-        line: { color: panel, width: 1.5 },
-      },
-      hovertext: names.map((id) => {
-        const n = byId.get(id)!;
-        return id === "VA"
-          ? `<b>${n.label}</b> — the model's own sink`
-          : `<b>${n.label}</b> · ${(tail_mass_share[id] ?? 0).toFixed(0)}% of Vitamin A's tail mass`;
-      }),
-      hoverinfo: "text",
+      textfont: { size: 13, color: css("--stone", "#4a4843") },
+      hoverinfo: "skip",
       showlegend: false,
     });
 
@@ -122,9 +231,13 @@ export class VitaminA3D {
         xaxis: { visible: false },
         yaxis: { visible: false },
         zaxis: { visible: false },
-        aspectmode: "manual",
-        aspectratio: { x: 1.15, y: 1.15, z: 1.3 },
-        camera: { eye: { x: 1.65, y: -1.45, z: 0.55 }, center: { x: 0, y: 0, z: -0.05 } },
+        // true to the data's own units on every axis -- the spheres/cylinders above are built
+        // as real geometry in this same coordinate system, so only a 1-unit-is-1-unit aspect
+        // keeps them actually round. "cube" (an equal render-space BOX regardless of each
+        // axis's own data range) would still stretch them, since x/y's range here is smaller
+        // than z's own -- "data" is the one mode that scales every axis by the same factor.
+        aspectmode: "data",
+        camera: { eye: { x: 1.9, y: -1.7, z: 0.65 }, center: { x: 0, y: 0, z: 0.1 } },
         dragmode: "orbit",
       },
     };
@@ -137,8 +250,8 @@ export class VitaminA3D {
     this.autorotate();
   }
 
-  // the same slow orbit her own deck uses (deck/index.html's own autorotate()): stop for good on
-  // the first drag/scroll/touch, and never start at all if the reader asked for less motion
+  // the same slow orbit Rivers' own historical reference used: stop for good on the first
+  // drag/scroll/touch, and never start at all if the reader asked for less motion
   private autorotate() {
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const plotted = this.host as unknown as { layout: { scene: { camera: { eye: { x: number; y: number; z: number } } } } };
