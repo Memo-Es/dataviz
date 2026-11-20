@@ -34,6 +34,7 @@ import { AbstractTree } from "./charts/abstract-tree";
 import { DagChart, stepColor } from "./charts/dag-chart";
 import { HeatWaveMap, heatAnomalyColor } from "./charts/heat-wave-map";
 import { albersUsaLayout, loadFlights, loadHeat, loadVitaminA, pointLayout } from "./charts/causality-domains";
+import { miniDag, miniRiverTree } from "./charts/causality-minis";
 
 /** Causality mode's state (the Danube directed tree, its only graph so far), module-level
  * because it is independent of the Store every connectedness graph shares (one series, no
@@ -70,11 +71,12 @@ async function renderCausalityHome() {
   if (causalityHomeReady || !danube) return;
   causalityHomeReady = true;
 
-  const card = (id: string, domain: string, title: string, num: string, numSub: string, body: string) => {
+  const card = (id: string, domain: string, title: string, num: string, numSub: string, chartSvg: string, body: string) => {
     document.getElementById(id)!.innerHTML =
       `<div class="mini-head"><p class="q">${title}</p><span class="mini-open" aria-hidden="true">↗</span></div>
       <h3>${title} <code class="tag">${DOMAIN_TAGS[domain]}</code></h3>
       <p class="mini-num"><b class="num mini-big">${num}</b> <span>${numSub}</span></p>
+      <div class="mini-chart">${chartSvg}</div>
       <p class="mini-body">${body}</p>`;
   };
 
@@ -85,6 +87,7 @@ async function renderCausalityHome() {
     "River floods",
     `${cmp.directed_matches}/${cmp.edges_total}`,
     "edges match the real Upper Danube network, with direction",
+    miniRiverTree(danube.data, readPalette().fg),
     "Real daily discharge for 4 historical floods, at 31 gauges — which gauge warns which, downstream."
   );
 
@@ -100,16 +103,34 @@ async function renderCausalityHome() {
     "Flight delays",
     `${Math.round(topAirport.v * 100)}%`,
     `${topAirport.n} leads the causal order, across 21 refits`,
+    miniDag(
+      flights.airports.map((a) => ({ id: a.id, step: a.step })),
+      flights.edges,
+      albersUsaLayout(flights.airports)(300, 150),
+      flights.generations.length
+    ),
     "20 busiest US airports, daily delay minutes — whose worst days tend to lead the rest."
   );
 
   const topRegion = topOf(heat.regions, (r) => heat.stability.summary[r].first_share);
+  const heatCentroids = new Map<string, { lat: number; lon: number }>();
+  for (const region of heat.regions) {
+    const pts = heat.stations.filter((s) => s.region === region);
+    if (!pts.length) continue;
+    heatCentroids.set(region, { lat: pts.reduce((a, s) => a + s.lat, 0) / pts.length, lon: pts.reduce((a, s) => a + s.lon, 0) / pts.length });
+  }
   card(
     "mini-causality-heat",
     "heat",
     "Heat waves",
     `${Math.round(topRegion.v * 100)}%`,
     `${topRegion.n} comes first, across 27 refits`,
+    miniDag(
+      heat.regions.map((r) => ({ id: r, step: heat.generations.findIndex((g) => g.includes(r)) })),
+      heat.edges,
+      albersUsaLayout(heat.regions.filter((r) => heatCentroids.has(r)).map((r) => ({ id: r, ...heatCentroids.get(r)! })))(300, 150),
+      heat.generations.length
+    ),
     "137 NOAA stations, nine US regions — whose heat extremes tend to lead, in summer."
   );
 
@@ -121,6 +142,12 @@ async function renderCausalityHome() {
     "Vitamin A",
     `${topVarShare.toFixed(0)}%`,
     `of its tail mass traces to ${topVarLabel}`,
+    miniDag(
+      va.nodes.map((n) => ({ id: n.id, step: n.step })),
+      va.edges,
+      pointLayout(va.nodes)(300, 150),
+      va.generations.length
+    ),
     "NHANES dietary recall — a known formula says VA must come last; does the method find that on its own?"
   );
 }
