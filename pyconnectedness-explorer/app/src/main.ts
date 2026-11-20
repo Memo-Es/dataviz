@@ -26,7 +26,7 @@ import { bandCopy } from "./charts/frequency";
 import { type AbstractTreeData, loadUpload, loadUploadCausality, runUpload, runUploadCausality, saveUpload, saveUploadCausality } from "./upload/upload";
 import { PALETTES, applyPalette, textSafe } from "./palettes";
 import { hueOf as hueOfNow } from "./encoding";
-import { DanubeMap, loadDanube, riverLegendGroups, type DanubeData, type DanubeStation } from "./charts/danube-map";
+import { loadDanube, type DanubeData, type DanubeStation } from "./charts/danube-map";
 import { DanubeFloodMap, ratioColor } from "./charts/danube-flood-map";
 import { DanubeFlood3D } from "./charts/danube-flood-3d";
 import { AbstractTree } from "./charts/abstract-tree";
@@ -37,39 +37,55 @@ import { albersUsaLayout, loadFlights, loadHeat, loadVitaminA, pointLayout } fro
 /** Causality mode's state (the Danube directed tree, its only graph so far), module-level
  * because it is independent of the Store every connectedness graph shares (one series, no
  * dataset/measure to switch) -- set once by setUpDanube(), read by figureFor/codeFor's
- * "causality" branches inside main() */
-let danube: { data: DanubeData; byId: Map<number, DanubeStation>; picked: number; reached: number[] } | null = null;
+ * "causality" branches inside main(). `event`/`day` track the flood replay currently on screen
+ * (there is only the one view now, no separate dateless "pick a station" scenario), so a Figure
+ * or Code export describes what the reader is actually looking at. */
+let danube: { data: DanubeData; byId: Map<number, DanubeStation>; event: string; day: number } | null = null;
 
 function danubePickName(id: number): string {
   return `station ${id} (${danube!.byId.get(id)!.river})`;
 }
 
+/** every station at or above its own yearly flood peak on the day currently shown */
+function danubeFlooding(): number[] {
+  const { data, event, day } = danube!;
+  const ratios = data.floods[event].ratio;
+  return data.stations.map((s) => s.id).filter((id) => {
+    const v = ratios[String(id)][day];
+    return v !== null && v >= 1;
+  });
+}
+
 function danubeFigure(): Figure {
-  const host = document.getElementById("danube-map")!;
-  const { data, picked } = danube!;
+  const { data, event, day } = danube!;
+  const on3D = !document.getElementById("flood-3d-host")!.hidden;
+  const host = document.getElementById(on3D ? "flood-3d-host" : "flood-map")!;
+  const date = data.floods[event].dates[day];
   return {
-    file: `pyconnectedness-danube-${picked}`,
+    file: `pyconnectedness-danube-${event}-${date}`,
     title: "Directed tree for extremes",
-    question: "Where does a shock travel downstream?",
+    question: "Which gauges does a real flood warn, downstream?",
     tag: 'MaxLinear(…).fit(method="qtree")',
-    sentence: document.getElementById("danube-readout")!.innerText,
+    sentence: document.getElementById("flood-readout")!.innerText,
     host,
     layers: [...host.querySelectorAll<SVGSVGElement>(":scope > svg")],
-    legends: [document.getElementById("danube-legend")!],
-    source: `Source: PyConnectedness (commit ${data.source.commit.slice(0, 7)}), MaxLinear.fit(method="qtree", threshold=${data.method.selection.threshold}, lower=${data.method.selection.lower}). Station coordinates: graphicalExtremes (Asadi, Davison and Engelke, 2015). River lines: World Data Bank II. Picked: ${danubePickName(picked)}. Made with PyConnectedness Explorer.`,
+    legends: [document.getElementById("flood-legend")!],
+    source: `Source: PyConnectedness (commit ${data.source.commit.slice(0, 7)}), MaxLinear.fit(method="qtree", threshold=${data.method.selection.threshold}, lower=${data.method.selection.lower}), read on real discharge for the ${date} flood. Station coordinates: graphicalExtremes (Asadi, Davison and Engelke, 2015). River lines: World Data Bank II. Made with PyConnectedness Explorer.`,
   };
 }
 
 function danubeCode(): string {
-  const { data, picked, byId } = danube!;
+  const { data, event, day } = danube!;
+  const eventLabel = (document.querySelector(`#flood-event wa-radio[value="${event}"]`)?.textContent ?? event).trim();
   return pythonForDanube({
     threshold: data.method.selection.threshold,
     lower: data.method.selection.lower,
     selectionSeed: data.method.selection.seed,
-    picked,
-    pickedRiver: byId.get(picked)!.river,
     root: data.root,
     edges: data.edges,
+    eventLabel,
+    date: data.floods[event].dates[day],
+    floodingIds: danubeFlooding(),
   });
 }
 
@@ -270,58 +286,32 @@ app.innerHTML = `
          billing with it before any real content shows. data-src stays the switch both panels
          key off; only how it's triggered changed, from a radio group to these two links -->
     <div data-src="danube">
-      <!-- a model's shock vs. a real flood: two different claims, so a toggle rather than
-           folding the real-flood data into the same Play as something it isn't -->
-      <div class="danube-scenario-row">
-        ${segmented("danube-scenario", "What to show", [["shock", "Shock propagation"], ["floods", "Historical floods"]], "shock", true)}
+      <!-- one view now, not a Shock propagation / Historical floods switch -- real daily
+           discharge for 4 named floods, with "warned" (a gauge the fitted tree puts downstream
+           of one already at its own yearly flood peak) carrying the "shock" idea on real data
+           instead of a separate hypothetical pick on a dateless map. One 3D treatment too: the
+           real elevation mesh below, not a CSS tilt -- loaded lazily since it's a real WebGL
+           library, only once actually switched on. -->
+      <div class="readout" id="flood-readout" aria-live="polite"></div>
+      <div class="danube-controls">
+        ${segmented("flood-event", "Flood", [["2013", "Jun 2013"], ["2005", "Aug 2005"], ["2002", "Aug 2002"], ["1999", "May 1999"]], "2013", true)}
+        <button class="icon-btn danube-play" id="flood-play" type="button" aria-label="Play: replay this flood day by day">▶</button>
+        <button class="crumb-btn small" id="flood-reset" type="button">Reset</button>
+        <button class="crumb-btn small danube-3d-toggle" id="flood-3d" type="button" aria-pressed="false">3D terrain</button>
       </div>
-      <div data-scenario="shock">
-        <div class="readout" id="danube-readout" aria-live="polite"></div>
-        <div class="danube-controls">
-          <wa-select id="danube-pick" class="num" label="Pick a station" value="21"></wa-select>
-          <button class="icon-btn danube-play" id="danube-play" type="button" aria-label="Play: send a shock downstream from the picked station">▶</button>
-          <button class="crumb-btn small" id="danube-reset" type="button">Reset</button>
-          <!-- a quick sketch, not a finished view: a CSS tilt and rising bars on the same flat map,
-               nothing re-measured or re-fit. Off by default so the plain map stays the one people see
-               first -->
-          <button class="crumb-btn small danube-3d-toggle" id="danube-3d" type="button" aria-pressed="false">3D sketch</button>
-        </div>
-        <div class="danube-body">
-          <div class="danube-map-wrap">
-            <div id="danube-map" class="chart-host danube-tilt-host"></div>
-          </div>
-          <div class="danube-side">
-            <div class="legend" id="danube-legend"></div>
-            <div class="danube-sources" id="danube-sources"></div>
-            <p class="danube-disclaimer">The gauges carry no dates: this is what the model predicts a shock would do, not a replay of a real flood.</p>
-          </div>
-        </div>
+      <div class="flood-date-row">
+        <input type="range" id="flood-slider" min="0" max="11" value="0" step="1" aria-label="Day of the flood" />
+        <span class="flood-date-label" id="flood-date-label"></span>
       </div>
-      <div data-scenario="floods" hidden>
-        <div class="readout" id="flood-readout" aria-live="polite"></div>
-        <div class="danube-controls">
-          ${segmented("flood-event", "Flood", [["2013", "Jun 2013"], ["2005", "Aug 2005"], ["2002", "Aug 2002"], ["1999", "May 1999"]], "2013", true)}
-          <button class="icon-btn danube-play" id="flood-play" type="button" aria-label="Play: replay this flood day by day">▶</button>
-          <button class="crumb-btn small" id="flood-reset" type="button">Reset</button>
-          <!-- Miljana's own deck shows this exact scenario (real discharge, a real flood) as a
-               genuine 3D terrain -- a real elevation mesh, not a CSS tilt, loaded lazily (it's a
-               real WebGL library) only once this is actually switched on -->
-          <button class="crumb-btn small danube-3d-toggle" id="flood-3d" type="button" aria-pressed="false">3D terrain</button>
+      <div class="danube-body">
+        <div class="danube-map-wrap">
+          <div id="flood-map" class="chart-host"></div>
+          <div id="flood-3d-host" class="chart-host flood-3d-host" hidden></div>
         </div>
-        <div class="flood-date-row">
-          <input type="range" id="flood-slider" min="0" max="11" value="0" step="1" aria-label="Day of the flood" />
-          <span class="flood-date-label" id="flood-date-label"></span>
-        </div>
-        <div class="danube-body">
-          <div class="danube-map-wrap">
-            <div id="flood-map" class="chart-host"></div>
-            <div id="flood-3d-host" class="chart-host flood-3d-host" hidden></div>
-          </div>
-          <div class="danube-side">
-            <div class="legend" id="flood-legend"></div>
-            <div class="danube-sources" id="flood-sources"></div>
-            <p class="danube-disclaimer">Real daily discharge, not a simulation. "Warned" uses the model's own estimated tree (the same one Shock propagation plays through) to mark a gauge the moment a gauge upstream of it first passes its own yearly flood peak.</p>
-          </div>
+        <div class="danube-side">
+          <div class="legend" id="flood-legend"></div>
+          <div class="danube-sources" id="flood-sources"></div>
+          <p class="danube-disclaimer">Real daily discharge, not a simulation. "Warned" uses the model's own estimated tree to mark a gauge the moment a gauge upstream of it first passes its own yearly flood peak.</p>
         </div>
       </div>
       <button class="link-btn" id="danube-try-own" type="button">Try it on your own file &rarr;</button>
@@ -1695,7 +1685,7 @@ ${
       codeText = danubeCode();
       codeName = "pyconnectedness-danube.py";
       codeDialog.setAttribute("label", "Python for the directed tree for extremes");
-      $("code-lede").textContent = `The library's own call, on the picked station: ${danubePickName(danube!.picked)}. Run it in a notebook and every number it prints matches the page.`;
+      $("code-lede").textContent = `The library's own call, on the flood currently shown: ${danube!.data.floods[danube!.event].dates[danube!.day]}. Run it in a notebook and every number it prints matches the page.`;
       $("code-block").querySelector("code")!.textContent = codeText;
       $("code-copy").textContent = "Copy code";
       codeDialog.open = true;
@@ -1804,93 +1794,11 @@ async function setUpDanube() {
   }
 
   const byId = new Map(data.stations.map((s) => [s.id, s]));
-  const defaultPick = data.stations.some((s) => s.id === 21) ? 21 : data.stations[0].id;
-  danube = { data, byId, picked: defaultPick, reached: [] };
+  danube = { data, byId, event: "2013", day: 0 };
   const pickName = danubePickName;
 
-  const select = document.getElementById("danube-pick") as HTMLElement & { value: string };
-  select.innerHTML = data.stations
-    .map((s) => s.id)
-    .sort((a, b) => a - b)
-    .map((id) => `<wa-option value="${id}">Station ${id} · ${byId.get(id)!.river}${id === data.root ? " (root)" : ""}</wa-option>`)
-    .join("");
-  select.value = String(defaultPick);
-
   document.getElementById("danube-sub")!.textContent =
-    `Pick a gauge; the model's own tree carries a shock down to where the data says it ends up, the root at station ${data.root}. The pulsing ring marks the next station on that path, so you can point at what's about to be warned before it's actually reached. Every step is drawn the same width — the qtree search score isn't a flood strength, so it isn't used to size anything here (it's still in the Code snippet).`;
-
-  const map = new DanubeMap(document.getElementById("danube-map")!, data, (r, p) => {
-    danube!.reached = r;
-    danube!.picked = p;
-    updateReadout();
-  });
-  map.pick(defaultPick);
-
-  function updateReadout() {
-    const chain = danube!.reached;
-    const readout = document.getElementById("danube-readout")!;
-    if (chain.length === 0) {
-      readout.innerHTML = `Picked: <b>${pickName(danube!.picked)}</b>. Press play to send a shock downstream.`;
-      return;
-    }
-    const names = chain.map((id) => `<b>${id}</b> (${byId.get(id)!.river})`);
-    const atRoot = chain[chain.length - 1] === data.root;
-    readout.innerHTML = `From <b>${pickName(danube!.picked)}</b>, the model's tree reaches ${names.join(" → ")}${atRoot ? ", the root" : ""}.`;
-  }
-
-  // the legend: river colours (the page's one colour rule, applied to this graph), the
-  // model's path and where it stops matching the real river, and the root marker
-  const groups = riverLegendGroups(data);
-  document.getElementById("danube-legend")!.innerHTML =
-    groups.map((g) => `<span><i class="dot" style="background:${g.color}"></i>${g.group}</span>`).join("") +
-    `<span><i class="danube-line-swatch"></i>The model's path from the pick</span>` +
-    `<span><i class="danube-line-swatch departure"></i>Where that path and the real river differ: the real river's own continuation</span>` +
-    `<span><i class="dot ring" style="border-color:var(--stone)"></i>The model's root</span>` +
-    `<span><i class="dot warn-ring"></i>The model's own next step, not reached yet</span>`;
-
-  const cmp = data.comparison_to_ground_truth;
-  document.getElementById("danube-sources")!.innerHTML = sourcesDisclose(
-    `<p>Checked against the paper's own ground truth (<code>examples/data/danube_network.csv</code>): ` +
-      `<b>${cmp.undirected_matches} of ${cmp.edges_total}</b> links match either way, <b>${cmp.directed_matches} of ${cmp.edges_total}</b> match with direction too ` +
-      `(nSHD ${cmp.metrics.tree.nshd.toFixed(2)}, TPR ${cmp.metrics.tree.tpr.toFixed(2)}).</p>` +
-      `<ul>
-      <li>PyConnectedness (<a href="https://github.com/zstoi/PyConnectedness" target="_blank" rel="noopener">GitHub</a>, commit <code>${data.source.commit.slice(0, 7)}</code>): the discharge data, the fitted tree and its scores, and the ground-truth comparison.</li>
-      <li>Tran, Ngoc Mai; Buck, Johannes; Klüppelberg, Claudia (2024), "Estimating a directed tree for extremes", <i>Journal of the Royal Statistical Society Series B</i> 86(3), 771-792: the method and the Danube dataset's origin.</li>
-      <li>Station names, coordinates and altitudes: the R package <a href="https://github.com/sebastian-engelke/graphicalextremes" target="_blank" rel="noopener">graphicalExtremes</a> (Asadi, Peiman; Davison, Anthony C.; Engelke, Sebastian, 2015), not from PyConnectedness itself.</li>
-      <li>River lines: World Data Bank II (public domain) where a named river reaches both gauges; the Iller, Naab, Regen and Saalach drawn as smooth lines through their own gauges and river towns instead, since none of the public river-line sources checked carry those four &mdash; see <code>pipeline/datasets/danube/README.md</code> for which is which.</li>
-      <li>Yearly flood threshold and mean flow per gauge: Bavarian Environment Agency (gkd.bayern.de, CC BY 4.0), via graphicalExtremes.</li>
-      <li>The tilted map's terrain: ETOPO1 10' (NOAA, public domain) and Natural Earth 2' shaded relief (public domain), via basemap-data.</li>
-    </ul>`
-  );
-
-  select.addEventListener("wa-change", () => map.pick(Number(select.value)));
-  const playBtn = document.getElementById("danube-play") as HTMLButtonElement;
-  playBtn.addEventListener("click", () => {
-    if (map.isPlaying) return;
-    playBtn.disabled = true;
-    playBtn.textContent = "⏸";
-    map.play(() => {
-      playBtn.disabled = false;
-      playBtn.textContent = "▶";
-    });
-  });
-  document.getElementById("danube-reset")!.addEventListener("click", () => map.pick(danube!.picked));
-
-  const tiltBtn = document.getElementById("danube-3d") as HTMLButtonElement;
-  tiltBtn.addEventListener("click", () => {
-    const on = tiltBtn.getAttribute("aria-pressed") !== "true";
-    tiltBtn.setAttribute("aria-pressed", String(on));
-    map.setTilt(on);
-  });
-
-  // a model's shock vs. a real flood: two different claims (see the card above this one),
-  // so a toggle rather than folding the real data into the same Play
-  const showScenario = (scenario: string) => {
-    setSegment(document.getElementById("danube-scenario")!, scenario);
-    document.querySelectorAll<HTMLElement>("#g5 [data-scenario]").forEach((el) => (el.hidden = el.dataset.scenario !== scenario));
-    if (scenario === "floods") ensureFloodMap();
-  };
-  onSegment(document.getElementById("danube-scenario")!, showScenario);
+    `Real daily discharge for 4 historical floods, at the 31 Upper Danube gauges. "Warned" marks a gauge the model's own fitted tree puts downstream of one already at its own yearly flood peak, before its own data actually crosses that line -- the same prediction the tree's edges carry everywhere else on this page, just read on a real flood instead of a hypothetical pick.`;
 
   let floodMap: DanubeFloodMap | null = null;
   let flood3D: DanubeFlood3D | null = null;
@@ -1903,91 +1811,94 @@ async function setUpDanube() {
     floodPlayBtn.textContent = "▶";
   };
 
-  function updateFloodReadout(day: number) {
+  function updateFloodReadout(event: string, day: number) {
+    danube!.event = event;
+    danube!.day = day;
     document.getElementById("flood-date-label")!.textContent = floodDates()[day];
     floodSlider.value = String(day);
-    const ratios = data.floods[floodEvent()].ratio;
-    const flooding = data.stations.filter((s) => {
-      const v = ratios[String(s.id)][day];
-      return v !== null && v >= 1;
-    });
+    const flooding = danubeFlooding();
     const readout = document.getElementById("flood-readout")!;
     const MAX_NAMED = 4;
     readout.innerHTML =
       flooding.length === 0
         ? `<b>${floodDates()[day]}</b>. No gauge above its own yearly flood peak.`
         : flooding.length <= MAX_NAMED
-        ? `<b>${floodDates()[day]}</b>. Above peak: ${flooding.map((s) => pickName(s.id)).join(", ")}.`
+        ? `<b>${floodDates()[day]}</b>. Above peak: ${flooding.map((id) => pickName(id)).join(", ")}.`
         : `<b>${floodDates()[day]}</b>. <b>${flooding.length} of ${data.stations.length}</b> gauges above their own yearly flood peak.`;
   }
 
-  function ensureFloodMap() {
-    if (floodMap) return;
-    // onStep fires on every DanubeFloodMap render -- a manual pick, Reset, or one tick of its
-    // own Play loop alike -- so syncing the (lazily built) 3D view here, not at each call site,
-    // keeps it current through Play too, not just manual slider/button moves
-    floodMap = new DanubeFloodMap(document.getElementById("flood-map")!, data, (event, day) => {
-      updateFloodReadout(day);
-      flood3D?.render(event, day);
-    });
+  // onStep fires on every DanubeFloodMap render -- a manual pick, Reset, or one tick of its
+  // own Play loop alike -- so syncing the (lazily built) 3D view here, not at each call site,
+  // keeps it current through Play too, not just manual slider/button moves
+  floodMap = new DanubeFloodMap(document.getElementById("flood-map")!, data, (event, day) => {
+    updateFloodReadout(event, day);
+    flood3D?.render(event, day);
+  });
+  floodSlider.max = String(floodDates().length - 1);
+  floodMap.render(floodEvent(), 0);
+
+  document.getElementById("flood-event")!.addEventListener("change", () => {
+    floodMap!.stop();
+    resetFloodPlayBtn();
     floodSlider.max = String(floodDates().length - 1);
-    floodMap.render(floodEvent(), 0);
+    floodMap!.render(floodEvent(), 0);
+  });
+  floodSlider.addEventListener("input", () => {
+    floodMap!.stop();
+    resetFloodPlayBtn();
+    floodMap!.render(floodEvent(), Number(floodSlider.value));
+  });
+  floodPlayBtn.addEventListener("click", () => {
+    if (floodMap!.isPlaying()) return;
+    floodPlayBtn.disabled = true;
+    floodPlayBtn.textContent = "⏸";
+    floodMap!.play(floodEvent(), floodDates().length - 1, resetFloodPlayBtn);
+  });
+  document.getElementById("flood-reset")!.addEventListener("click", () => {
+    floodMap!.stop();
+    resetFloodPlayBtn();
+    floodMap!.render(floodEvent(), 0);
+  });
 
-    document.getElementById("flood-event")!.addEventListener("change", () => {
-      floodMap!.stop();
-      resetFloodPlayBtn();
-      floodSlider.max = String(floodDates().length - 1);
-      floodMap!.render(floodEvent(), 0);
-    });
-    floodSlider.addEventListener("input", () => {
-      floodMap!.stop();
-      resetFloodPlayBtn();
-      floodMap!.render(floodEvent(), Number(floodSlider.value));
-    });
-    floodPlayBtn.addEventListener("click", () => {
-      if (floodMap!.isPlaying()) return;
-      floodPlayBtn.disabled = true;
-      floodPlayBtn.textContent = "⏸";
-      floodMap!.play(floodEvent(), floodDates().length - 1, resetFloodPlayBtn);
-    });
-    document.getElementById("flood-reset")!.addEventListener("click", () => {
-      floodMap!.stop();
-      resetFloodPlayBtn();
-      floodMap!.render(floodEvent(), 0);
-    });
+  const flood3DHost = document.getElementById("flood-3d-host")!;
+  const floodMapHost = document.getElementById("flood-map")!;
+  const flood3DBtn = document.getElementById("flood-3d") as HTMLButtonElement;
+  flood3DBtn.addEventListener("click", async () => {
+    const on = flood3DBtn.getAttribute("aria-pressed") !== "true";
+    flood3DBtn.setAttribute("aria-pressed", String(on));
+    floodMapHost.hidden = on;
+    flood3DHost.hidden = !on;
+    if (!on) return;
+    if (!flood3D) {
+      flood3DBtn.disabled = true;
+      flood3D = new DanubeFlood3D(flood3DHost, data);
+      await flood3D.render(floodEvent(), Number(floodSlider.value));
+      flood3DBtn.disabled = false;
+    } else {
+      flood3D.resize();
+      await flood3D.render(floodEvent(), Number(floodSlider.value));
+    }
+  });
 
-    const flood3DHost = document.getElementById("flood-3d-host")!;
-    const floodMapHost = document.getElementById("flood-map")!;
-    const flood3DBtn = document.getElementById("flood-3d") as HTMLButtonElement;
-    flood3DBtn.addEventListener("click", async () => {
-      const on = flood3DBtn.getAttribute("aria-pressed") !== "true";
-      flood3DBtn.setAttribute("aria-pressed", String(on));
-      floodMapHost.hidden = on;
-      flood3DHost.hidden = !on;
-      if (!on) return;
-      if (!flood3D) {
-        flood3DBtn.disabled = true;
-        flood3D = new DanubeFlood3D(flood3DHost, data);
-        await flood3D.render(floodEvent(), Number(floodSlider.value));
-        flood3DBtn.disabled = false;
-      } else {
-        flood3D.resize();
-        await flood3D.render(floodEvent(), Number(floodSlider.value));
-      }
-    });
-
-    document.getElementById("flood-legend")!.innerHTML =
-      `<span><i class="dot" style="background:${ratioColor(0)}"></i>Below its yearly flood peak</span>` +
-      `<span><i class="dot" style="background:${ratioColor(1)}"></i>At its yearly flood peak</span>` +
-      `<span><i class="dot" style="background:${ratioColor(2)}"></i>Twice its yearly flood peak or more</span>` +
-      `<span><i class="dot warn-ring"></i>Warned: a gauge upstream of it (the model's own estimated tree, above) has already passed its peak</span>`;
-    document.getElementById("flood-sources")!.innerHTML = sourcesDisclose(
+  const cmp = data.comparison_to_ground_truth;
+  document.getElementById("flood-legend")!.innerHTML =
+    `<span><i class="dot" style="background:${ratioColor(0)}"></i>Below its yearly flood peak</span>` +
+    `<span><i class="dot" style="background:${ratioColor(1)}"></i>At its yearly flood peak</span>` +
+    `<span><i class="dot" style="background:${ratioColor(2)}"></i>Twice its yearly flood peak or more</span>` +
+    `<span><i class="dot warn-ring"></i>Warned: a gauge upstream of it (the model's own estimated tree) has already passed its peak</span>`;
+  document.getElementById("flood-sources")!.innerHTML = sourcesDisclose(
+    `<p>The fitted tree checked against the paper's own ground truth (<code>examples/data/danube_network.csv</code>): ` +
+      `<b>${cmp.undirected_matches} of ${cmp.edges_total}</b> links match either way, <b>${cmp.directed_matches} of ${cmp.edges_total}</b> match with direction too ` +
+      `(nSHD ${cmp.metrics.tree.nshd.toFixed(2)}, TPR ${cmp.metrics.tree.tpr.toFixed(2)}).</p>` +
       `<ul>
-        <li>Daily discharge for 4 historical floods (May 1999, Aug 2002, Aug 2005, Jun 2013): Bavarian Environment Agency (gkd.bayern.de, CC BY 4.0), via graphicalExtremes, from Miljana's own Demo Day package.</li>
-        <li>"Warned" reuses the estimated tree from Shock propagation above, read on this real data -- not a separate fit.</li>
-      </ul>`
-    );
-  }
+      <li>PyConnectedness (<a href="https://github.com/zstoi/PyConnectedness" target="_blank" rel="noopener">GitHub</a>, commit <code>${data.source.commit.slice(0, 7)}</code>): the fitted tree, its edges, and the ground-truth comparison.</li>
+      <li>Tran, Ngoc Mai; Buck, Johannes; Klüppelberg, Claudia (2024), "Estimating a directed tree for extremes", <i>Journal of the Royal Statistical Society Series B</i> 86(3), 771-792: the method and the Danube dataset's origin.</li>
+      <li>Station names, coordinates and altitudes: the R package <a href="https://github.com/sebastian-engelke/graphicalextremes" target="_blank" rel="noopener">graphicalExtremes</a> (Asadi, Peiman; Davison, Anthony C.; Engelke, Sebastian, 2015), not from PyConnectedness itself.</li>
+      <li>River lines: World Data Bank II (public domain) where a named river reaches both gauges; the Iller, Naab, Regen and Saalach drawn as smooth lines through their own gauges and river towns instead, since none of the public river-line sources checked carry those four &mdash; see <code>pipeline/datasets/danube/README.md</code> for which is which.</li>
+      <li>Daily discharge for 4 historical floods (May 1999, Aug 2002, Aug 2005, Jun 2013) and yearly flood threshold: Bavarian Environment Agency (gkd.bayern.de, CC BY 4.0), via graphicalExtremes, from Miljana's own Demo Day package.</li>
+      <li>The 3D terrain: ETOPO1 10' (NOAA, public domain) and Natural Earth 2' shaded relief (public domain), via basemap-data.</li>
+    </ul>`
+  );
 }
 
 /** Causality's other data source: a file you upload, fit live in the browser (the same qtree

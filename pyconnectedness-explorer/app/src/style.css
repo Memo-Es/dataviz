@@ -2866,7 +2866,6 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   align-items: start;
 }
 
-.danube-src-row,
 .danube-scenario-row {
   margin-bottom: var(--sp-sm);
 }
@@ -2964,136 +2963,9 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   border-radius: 14px;
 }
 
-/* the quick 3D sketch: a table-top tilt on the same flat map, nothing re-drawn. The svg itself
-   gets the rotation (its parent supplies the perspective); the bars layer is a flat sibling so
-   each bar's own height transition isn't itself warped by the tilt -- see danube-map.ts syncBars,
-   which reads the svg's real screen CTM so a bar's foot lands exactly on its tilted point */
-.danube-tilt-host {
-  position: relative;
-}
-
-.danube-tilt-host.danube-tilted {
-  perspective: 1600px;
-  padding-bottom: 36px;
-}
-
-/* a terrain backdrop painted from the real ETOPO1 grid (danube-map.ts's reliefDataUrl, set as
-   --danube-relief-image on first tilt) -- the actual Alpine headwaters (Lech, Isar, Iller,
-   Salzach) do run darker/higher toward the south of this map and the lower Naab/Regen reaches
-   lighter toward the north, but now that's what the data says, not an assumed direction. The
-   plain gradient below only covers the gap before JS has run once. A faint diagonal texture
-   on top either way, not a plain tint. */
-.danube-tilt-host.danube-tilted::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 14px;
-  background-image:
-    repeating-linear-gradient(
-      35deg,
-      transparent 0px,
-      transparent 14px,
-      color-mix(in srgb, #3d2f1f 14%, transparent) 15px,
-      transparent 16px
-    ),
-    var(
-      --danube-relief-image,
-      linear-gradient(to top, #6b5234 0%, #8a6f45 30%, #b89968 55%, #d9c49a 78%, var(--band) 100%)
-    );
-  background-size: auto, 100% 100%;
-  background-repeat: repeat, no-repeat;
-  z-index: 0;
-}
-
-.danube-tilt-host.danube-tilted svg.danube-map {
-  position: relative;
-  z-index: 1;
-  transform: rotateX(50deg) scale(0.92);
-  transform-origin: 50% 10%;
-  filter: drop-shadow(0 26px 20px rgba(0, 0, 0, 0.22));
-}
-
-/* rivers read as carved valleys here, not the flat map's quiet context lines -- a soft dark
-   groove behind a blue core, only while tilted (the flat 2D view keeps its own quieter style) */
-.danube-tilt-host.danube-tilted .danube-rivers path {
-  stroke: #2f6fa8;
-  stroke-width: 3;
-  filter: drop-shadow(0 1px 0.5px rgba(0, 0, 0, 0.35));
-}
-
-:root[data-theme="dark"] .danube-tilt-host.danube-tilted .danube-rivers path {
-  stroke: #5b9bd5;
-}
-
-/* every label drawn over the terrain (station numbers, root/warn/departure text) gets a
-   background-coloured halo here -- the terrain runs dark-brown to light-tan, so no single ink
-   colour stays readable everywhere on it the way it does on the flat map's plain surface */
-#danube-map.danube-tilted .danube-id,
-#danube-map.danube-tilted .danube-root-label,
-#danube-map.danube-tilted .danube-warn-label,
-#danube-map.danube-tilted .danube-departure-label {
-  paint-order: stroke fill;
-  stroke: var(--panel);
-  stroke-width: 3px;
-  stroke-linejoin: round;
-}
-
-.danube-bars {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-}
-
-.danube-bar {
-  position: absolute;
-  width: 6px;
-  height: 0;
-  border-radius: 3px 3px 1px 1px;
-  transform: translateX(-50%);
-  box-shadow: inset 1.5px 0 0 rgba(255, 255, 255, 0.35), inset -1.5px 0 0 rgba(0, 0, 0, 0.18);
-  transition: height 0.4s cubic-bezier(0.2, 0.8, 0.3, 1);
-}
-
-.danube-bar.risen {
-  height: 26px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .danube-bar {
-    transition: none;
-  }
-}
-
 .danube-3d-toggle[aria-pressed="true"] {
   background: var(--band);
   border-color: var(--stone);
-}
-
-.danube-id {
-  font-family: var(--f-sans);
-  pointer-events: none;
-  user-select: none;
-}
-
-.danube-root-label {
-  font-size: 10px;
-  font-weight: 700;
-  fill: var(--secondary);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-/* before the shock has actually reached the root: still labelled for orientation, but no
-   louder than any other station's own number, so it isn't the loudest thing on the map before
-   the path has gone anywhere near it */
-.danube-root-label.quiet {
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: none;
-  fill: var(--muted);
-  opacity: 0.6;
 }
 
 .danube-stations .hit {
@@ -3237,46 +3109,9 @@ wa-dropdown wa-dropdown-item [slot="details"] {
   vertical-align: middle;
 }
 
-.danube-line-swatch.departure {
-  background: none;
-  border-top: 2.5px dotted var(--stone);
-  height: 0;
-}
-
-.danube-root-label,
-.danube-departure-label {
-  font-size: 10px;
-  font-weight: 700;
-  fill: var(--secondary);
-  letter-spacing: 0.04em;
-}
-
-.danube-departure-label {
-  text-transform: none;
-}
-
-.danube-warn-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.danube-warn-ring {
-  animation: danube-warn-pulse 1.4s ease-in-out infinite;
-  transform-origin: center;
-  transform-box: fill-box;
-}
-
 @keyframes danube-warn-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.45; transform: scale(1.22); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .danube-warn-ring {
-    animation: none;
-  }
 }
 
 @media (max-width: 860px) {

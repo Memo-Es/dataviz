@@ -261,10 +261,14 @@ export interface DanubeCodeContext {
   threshold: number;
   lower: number;
   selectionSeed: number;
-  picked: number;
-  pickedRiver: string;
   root: number;
   edges: { cause: number; effect: number; score: number | null }[];
+  /** the flood currently shown on the page, e.g. "Jun 2013" */
+  eventLabel: string;
+  /** the day currently shown, e.g. "2013-06-03" */
+  date: string;
+  /** every gauge at or above its own yearly flood peak on that day */
+  floodingIds: number[];
 }
 
 /** Graph 4's Python: MaxLinear(...).fit(method="qtree"), on the library's own Danube example
@@ -272,7 +276,7 @@ export interface DanubeCodeContext {
  * notebook has landed in the library to fix them instead -- see README.md at the repo root). */
 export function pythonForDanube(c: DanubeCodeContext): string {
   const lines = [
-    `# Directed tree for extremes · Danube · picked: station ${c.picked} (${c.pickedRiver})`,
+    `# Directed tree for extremes · Danube · the ${c.eventLabel} flood, ${c.date}`,
     "# The PyConnectedness call behind this graph in the explorer, on the library's own example file:",
     `#   ${PIP}`,
     "import pandas as pd",
@@ -298,10 +302,16 @@ export function pythonForDanube(c: DanubeCodeContext): string {
     "true_adj = true_network.loc[order, order].to_numpy()",
     "print(fit.compare(true_adj))  # nSHD, FDR, FPR, TPR, for the tree and its reachability",
     "",
-    `# the picked station's path to the root, as drawn on the page`,
-    `reach = fit.reachability`,
-    `downstream = [i for i in reach.columns if reach.loc[str(${c.picked}), i]]`,
-    `print(downstream)`,
+    `# ${c.date}, the ${c.eventLabel} flood: real discharge, from danube_flood_events.csv (not`,
+    "# PyConnectedness's own example file above -- see pipeline/datasets/danube/README.md).",
+    `# \"Warned\" is which other gauges the fitted tree puts downstream of one already flooding,`,
+    "# the same reachability the shock-propagation picks on this page used to use:",
+    `flooding = {${c.floodingIds.join(", ")}}  # at or above its own yearly flood peak on ${c.date}`,
+    "reach = fit.reachability",
+    "warned = set()",
+    "for s in flooding:",
+    "    warned |= {int(i) for i in reach.columns if reach.loc[str(s), i]} - flooding",
+    "print(sorted(warned))",
   ];
   return `${lines.join("\n")}\n`;
 }
