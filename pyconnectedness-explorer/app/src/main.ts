@@ -29,6 +29,7 @@ import { hueOf as hueOfNow } from "./encoding";
 import { loadDanube, type DanubeData, type DanubeStation } from "./charts/danube-map";
 import { DanubeFloodMap, ratioColor } from "./charts/danube-flood-map";
 import { DanubeFlood3D } from "./charts/danube-flood-3d";
+import { VitaminA3D } from "./charts/vitamin-a-3d";
 import { AbstractTree } from "./charts/abstract-tree";
 import { DagChart, stepColor } from "./charts/dag-chart";
 import { HeatWaveMap, heatAnomalyColor } from "./charts/heat-wave-map";
@@ -511,10 +512,15 @@ app.innerHTML = `
       <div class="danube-controls">
         <button class="icon-btn danube-play" id="vitamin-a-play" type="button" aria-label="Play: reveal the causal order step by step">▶</button>
         <button class="crumb-btn small" id="vitamin-a-reset" type="button">Reset</button>
+        <!-- the same real view as Miljana's own deck for this domain: the causal order laid out
+             once along a z-axis (Vitamin A at the bottom), auto-rotating -- loaded lazily, the
+             same pattern as Rivers' own "3D terrain" button -->
+        <button class="crumb-btn small danube-3d-toggle" id="vitamin-a-3d" type="button" aria-pressed="false">3D view</button>
       </div>
       <div class="danube-body">
         <div class="danube-map-wrap">
           <div id="vitamin-a-map" class="chart-host"></div>
+          <div id="vitamin-a-3d-host" class="chart-host flood-3d-host" hidden></div>
         </div>
         <div class="danube-side">
           <div class="legend" id="vitamin-a-legend"></div>
@@ -2427,6 +2433,27 @@ function setUpCausalityDomains() {
             <li>NHANES 2015-2016 first-day dietary recall (DR1TOT_I), US public domain.</li>
           </ul>`
         );
+
+        // the same 3D view Miljana's own deck draws for this domain -- see vitamin-a-3d.ts
+        let va3D: VitaminA3D | null = null;
+        const mapHost = document.getElementById("vitamin-a-map")!;
+        const host3D = document.getElementById("vitamin-a-3d-host")!;
+        const btn3D = document.getElementById("vitamin-a-3d") as HTMLButtonElement;
+        btn3D.addEventListener("click", async () => {
+          const on = btn3D.getAttribute("aria-pressed") !== "true";
+          btn3D.setAttribute("aria-pressed", String(on));
+          mapHost.hidden = on;
+          host3D.hidden = !on;
+          if (!on) return;
+          if (!va3D) {
+            btn3D.disabled = true;
+            va3D = new VitaminA3D(host3D, data);
+            await va3D.render();
+            btn3D.disabled = false;
+          } else {
+            va3D.resize();
+          }
+        });
       });
     };
   })();
